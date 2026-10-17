@@ -2,22 +2,22 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=4';
-import { buildSurfaces, T } from './surfaces.js?v=4';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=4';
-import { Doors } from './doors.js?v=4';
-import { Space } from './space.js?v=4';
-import { Input } from './input.js?v=4';
-import { Walker } from './walker.js?v=4';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=4';
-import { makeTape, makeVeil } from './tape.js?v=4';
-import { Slate } from './slate.js?v=4';
-import { NOTES, MUTTER, OBJECTIVES } from './story.js?v=4';
-import { Sound } from './dread.js?v=4';
-import { Horrors } from './horrors.js?v=4';
-import { Dressing } from './dressing.js?v=4';
-import { Scares } from './scares.js?v=4';
-import { makeHand } from './hands.js?v=4';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=5';
+import { buildSurfaces, T } from './surfaces.js?v=5';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=5';
+import { Doors } from './doors.js?v=5';
+import { Space } from './space.js?v=5';
+import { Input } from './input.js?v=5';
+import { Walker } from './walker.js?v=5';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=5';
+import { makeTape, makeVeil } from './tape.js?v=5';
+import { Slate } from './slate.js?v=5';
+import { NOTES, MUTTER, OBJECTIVES } from './story.js?v=5';
+import { Sound } from './dread.js?v=5';
+import { Horrors } from './horrors.js?v=5';
+import { Dressing } from './dressing.js?v=5';
+import { Scares } from './scares.js?v=5';
+import { makeHand } from './hands.js?v=5';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -67,6 +67,7 @@ const input = new Input(canvas, renderer);
 const walker = new Walker(dolly, camera, space);
 const cam = new Camcorder(scene);
 const sound = new Sound();
+const recording = sound.record((k) => { if (!G || !G.playing) $('loading').textContent = k < 1 ? `Recording sounds… ${Math.round(k * 100)}%` : ''; });
 const veil = makeVeil(); camera.add(veil.mesh); veil.mesh.visible = false;
 const G = {   // game state
   leftAdmin: false, sawPanel: false, fuses: 0, power: false, gateOpen: false, escaped: false, items: new Set(), notes: [], obj: 0,
@@ -275,6 +276,7 @@ document.addEventListener('pointerlockchange', () => { if (!document.pointerLock
 
 // ---------------------------------------------------------------- start
 async function begin(vr) {
+  if (!sound.rec) { $('loading').textContent = 'Recording sounds…'; await Promise.race([recording, new Promise((r) => { const iv = setInterval(() => { if (sound.rec) { clearInterval(iv); r(); } }, 100); })]); }
   sound.init(); await sound.ready;
   $('screen').hidden = true; G.playing = true; fade = 1; fadeTo(0);
   walker.place(cx(plan.start.x), cz(plan.start.y), plan.start.yaw); checkpoint();

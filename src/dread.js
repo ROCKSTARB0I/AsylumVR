@@ -5,7 +5,7 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=4';
+import { Score } from './score.js?v=5';
 
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
@@ -32,8 +32,7 @@ export class Sound {
     this.verb = ctx.createConvolver(); this.verb.buffer = this.impulse(QUEST ? 1.7 : 3.2, QUEST ? 2.2 : 2.6); this.verbIn = ctx.createGain(); this.verbIn.gain.value = 0.5; this.verbIn.connect(this.verb); this.verb.connect(this.duckG);
     this.dry = ctx.createGain(); this.dry.connect(this.duckG);
     this.noiseBuf = this.noise(2, 'white'); this.brownBuf = this.noise(4, 'brown');
-    this.ambience();
-    this.score = new Score(this);
+    if (this.rec && this.rec.amb) this.ambienceLoops(); else this.ambience();
     this.body();
   }
   impulse(sec, decay) {
@@ -133,6 +132,7 @@ export class Sound {
       else if (what === 'lost') this.syllables(p, 4, 130, { gain: 0.3 });
     }
   }
+  farScream(p) { this.voiceSynth(p, { f0: rnd(450, 650), f1: rnd(300, 500), dur: rnd(1.2, 2.2), vowels: ['a', 'e', 'o'], rough: 0.5, breath: 0.3, gain: 0.35, verb: 0.95 }); }
   breathAt(p, gain, dur, f) { this.burst(p, { f, q: 1.2, dur, gain, a: dur * 0.3, verb: 0.2 }); }
 
   // ---------------------------------------------------------- the building
@@ -161,8 +161,8 @@ export class Sound {
     const f = new THREE.Vector3(0, 0, -1).applyQuaternion(quat), u = new THREE.Vector3(0, 1, 0).applyQuaternion(quat);
     if (L.positionX) { L.positionX.setTargetAtTime(pos.x, t, 0.02); L.positionY.setTargetAtTime(pos.y, t, 0.02); L.positionZ.setTargetAtTime(pos.z, t, 0.02); L.forwardX.setTargetAtTime(f.x, t, 0.02); L.forwardY.setTargetAtTime(f.y, t, 0.02); L.forwardZ.setTargetAtTime(f.z, t, 0.02); L.upX.setTargetAtTime(u.x, t, 0.02); L.upY.setTargetAtTime(u.y, t, 0.02); L.upZ.setTargetAtTime(u.z, t, 0.02); }
     else { L.setPosition(pos.x, pos.y, pos.z); L.setOrientation(f.x, f.y, f.z, u.x, u.y, u.z); }
-    this.score.update(st.chaseKind, st.chase);
-    this.fearG.gain.setTargetAtTime(Math.max(0, st.fear - 0.3) * 0.05, t, 0.6);
+    this.music(st.chaseKind, st.chase);
+    this.fearG.gain.setTargetAtTime(Math.max(0, st.fear - 0.3) * (this.fearLoop ? 1.6 : 0.05), t, 0.6);
     // heart
     const fear = Math.max(st.fear, st.hurt * 0.8, st.hidden ? 0.45 : 0);
     if (fear > 0.25) { this.heartT -= dt; if (this.heartT <= 0) { this.heartT = 60 / (70 + fear * 90); const g = 0.25 + fear * 0.5; this.tone(null, { f: 58, f2: 40, dur: 0.14, gain: g, verb: 0 }); this.tone(null, { f: 52, f2: 36, dur: 0.12, gain: g * 0.7, verb: 0, delay: 0.16 }); } }
@@ -179,7 +179,7 @@ export class Sound {
     // the building, now and then
     this.every('drip', 2, 7, () => { const p = pos.clone().add(new THREE.Vector3(rnd(-6, 6), 2.5, rnd(-6, 6))); const f0 = rnd(1200, 2600); this.tone(p, { f: f0, f2: f0 * 0.6, dur: 0.08, gain: 0.12, verb: 0.6 }); });
     this.every('groan', 12, 30, () => { const p = pos.clone().add(new THREE.Vector3(rnd(-30, 30), 3, rnd(-30, 30))); this.burst(p, { f: rnd(120, 260), q: 18, dur: rnd(1.5, 3), gain: 0.35, a: 0.6, sweep: 0.5, verb: 0.9, brown: true }); });
-    this.every('scream', 35, 80, () => { const p = pos.clone().add(new THREE.Vector3(rnd(-35, 35), 2, rnd(-35, 35))); this.voiceSynth(p, { f0: rnd(450, 650), f1: rnd(300, 500), dur: rnd(1.2, 2.2), vowels: ['a', 'e', 'o'], rough: 0.5, breath: 0.3, gain: 0.35, verb: 0.95 }); });
+    this.every('scream', 35, 80, () => this.farScream(pos.clone().add(new THREE.Vector3(rnd(-35, 35), 2, rnd(-35, 35)))));
     this.every('knock', 20, 50, () => { const p = pos.clone().add(new THREE.Vector3(rnd(-15, 15), 1.5, rnd(-15, 15))); for (let i = 0; i < 3 + (Math.random() * 3 | 0); i++) this.tone(p, { f: 90, f2: 60, dur: 0.1, gain: 0.35, delay: i * rnd(0.25, 0.4), verb: 0.7 }); });
     this.every('pipe', 15, 40, () => { const p = pos.clone().add(new THREE.Vector3(rnd(-12, 12), 3, rnd(-12, 12))); this.clang(p, rnd(140, 260), 0.25, 2.2); });
     this.every('whisper', 25, 60, () => { if (st.fear < 0.2) return; const p = pos.clone().add(new THREE.Vector3(rnd(-2, 2), 1.6, rnd(-2, 2))); this.syllables(p, 5, 90, { breath: 0.95, gain: 0.25, verb: 0.3 }); });
@@ -272,6 +272,104 @@ export class Sound {
   buzz(pos) { const ctx = this.ctx; const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 120; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 4; const g = ctx.createGain(); g.gain.value = 0; o.connect(bp); bp.connect(g); const out = this.out(g, pos, { verb: 0.2, ref: 1, roll: 1.8 }); o.start(); return g; }
 }
 function setPos(p, v) { if (p.positionX) { p.positionX.value = v.x; p.positionY.value = v.y; p.positionZ.value = v.z; } else p.setPosition(v.x, v.y, v.z); }
+
+// ---------------------------------------------------------- recording
+// Every sound is synthesized from live nodes, which is too much for the
+// Quest's audio thread during a chase. So at load time we render them once,
+// offline, into buffers (a few variants each): chase themes as seamless
+// loops, the ambience beds as loops, voices, screams, stings, steps and
+// doors as one-shots. At runtime each is one buffer source and a panner.
+const ORIG = {};
+for (const k of ['voice', 'jump', 'scream', 'hit', 'kill', 'lockerRip', 'thud', 'squelch', 'step', 'footstep', 'door', 'syllables', 'mutter', 'farScream']) ORIG[k] = Sound.prototype[k];
+const SR = 22050;
+function shim(off, noiseBuf, brownBuf) {
+  const s = Object.create(Sound.prototype); Object.assign(s, { ctx: off, on: true, vip: true, live: 0, cap: 1e9, timers: {}, noiseBuf, brownBuf, rec: null });
+  const dest = off.createGain(); dest.connect(off.destination); s.dry = s.vipDry = s.duckG = s.master = dest;
+  const verb = off.createConvolver(); verb.buffer = s.impulse(1.5, 2.4); s.verbIn = off.createGain(); s.verbIn.gain.value = 0.5; s.verbIn.connect(verb); verb.connect(dest);
+  return s;
+}
+async function render(dur, fn, noiseBuf, brownBuf, ch = 1) {
+  const off = new OfflineAudioContext(ch, Math.ceil(dur * SR), SR); const s = shim(off, noiseBuf, brownBuf); fn(s); return off.startRendering();
+}
+// fold the tail of a render back onto its start so the loop has no seam
+function foldLoop(buf, loopLen) {
+  const n = Math.floor(loopLen * buf.sampleRate); const out = new AudioBuffer({ length: n, numberOfChannels: buf.numberOfChannels, sampleRate: buf.sampleRate });
+  for (let c = 0; c < buf.numberOfChannels; c++) { const src = buf.getChannelData(c), dst = out.getChannelData(c); dst.set(src.subarray(0, n)); for (let i = n; i < src.length; i++) dst[i - n] += src[i]; }
+  return out;
+}
+const V0 = new THREE.Vector3(0, 0, 0);
+Sound.prototype.record = async function (onProgress) {
+  if (this.rec) return this.rec;
+  const tmp = new OfflineAudioContext(1, 1, SR); const fake = { ctx: tmp }; const noiseBuf = Sound.prototype.noise.call(fake, 2, 'white'), brownBuf = Sound.prototype.noise.call(fake, 4, 'brown');
+  const rec = { one: {}, music: {}, amb: null, fear: null }; const jobs = [];
+  const one = (key, dur, n, fn) => { for (let i = 0; i < n; i++) jobs.push(async () => { const b = await render(dur, fn, noiseBuf, brownBuf); (rec.one[key] ||= []).push(b); }); };
+  // music: four bars of each theme, plus the sting when a chase starts
+  for (const kind of ['brute', 'surgeon', 'patient', 'eater']) jobs.push(async () => {
+    const len = Score.loopSeconds(kind, 4); const b = await render(len + 2.5, (s) => { const sc = new Score(s); sc.renderLoop(kind, 4); }, noiseBuf, brownBuf, 1); rec.music[kind] = foldLoop(b, len);
+  });
+  jobs.push(async () => { rec.one['hitIn'] = [await render(2.2, (s) => { const sc = new Score(s); sc.bus.gain.value = 0.62; sc.hitIn(0.02); }, noiseBuf, brownBuf, 1)]; });
+  // ambience beds
+  jobs.push(async () => { const b = await render(14, (s) => { Sound.prototype.ambience.call(s); s.fearG.gain.value = 0; }, noiseBuf, brownBuf, 1); rec.amb = foldLoop(b, 12); });
+  jobs.push(async () => { const b = await render(7, (s) => { Sound.prototype.ambience.call(s); s.droneG.gain.value = 0; s.fearG.gain.value = 0.05; }, noiseBuf, brownBuf, 1); rec.fear = foldLoop(b, 5); });
+  // voices
+  const VO = { brute: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], surgeon: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], rocker: ['mutter', 'scream'], eater: ['chew', 'chase', 'alert', 'attack', 'pant'], patient: ['idle', 'chase', 'alert', 'attack', 'pant', 'lost'] };
+  for (const [kind, whats] of Object.entries(VO)) for (const w of whats) one(`v:${kind}:${w}`, w === 'idle' || w === 'mutter' ? 4.6 : 2.2, w === 'idle' ? 1 : 2, (s) => ORIG.voice.call(s, kind, w, V0));
+  for (const k of ['sting', 'scare']) one('j:' + k, 2.6, k === 'scare' ? 3 : 2, (s) => ORIG.jump.call(s, k));
+  one('kill', 3, 2, (s) => ORIG.kill.call(s)); one('rip', 2.6, 2, (s) => ORIG.lockerRip.call(s));
+  one('scream', 1.6, 3, (s) => ORIG.scream.call(s, null, 1)); one('far', 2.8, 2, (s) => ORIG.farScream.call(s, null));
+  one('hit', 1, 2, (s) => ORIG.hit.call(s)); one('thud', 0.9, 2, (s) => ORIG.thud.call(s, null, 1)); one('squelch', 0.8, 2, (s) => ORIG.squelch.call(s, null, 1));
+  for (const z of [1, 4, 6, 8]) one('s:' + z, 0.3, 3, (s) => ORIG.step.call(s, 1, z));
+  for (const k of ['brute', 'surgeon', 'patient']) one('f:' + k, 0.5, 3, (s) => ORIG.footstep.call(s, k, V0, 1));
+  for (const m of [0, 1]) for (const k of ['open', 'close', 'slam']) one(`d:${m}:${k}`, 1.4, 1, (s) => ORIG.door.call(s, { metal: !!m }, k, 0, 0));
+  one('whisper', 2.2, 2, (s) => ORIG.syllables.call(s, null, 5, 95, { breath: 0.92, gain: 0.3, verb: 0.3 })); one('mutter', 1.8, 2, (s) => ORIG.mutter.call(s));
+  // the beds and the music first: the game can start as soon as those exist
+  const core = jobs.splice(0, 7); await Promise.all(core.map((j) => j().catch(() => {})));
+  this.rec = rec; if (onProgress) onProgress(1);
+  if (this.on && !this.droneLoop) this.swapAmbience();
+  // the rest a couple at a time in the background (anything not ready yet is synthesized live)
+  for (let i = 0; i < jobs.length; i += 2) await Promise.all(jobs.slice(i, i + 2).map((j) => j().catch(() => {})));
+  return rec;
+};
+Sound.prototype.has = function (key) { return this.rec && this.rec.one[key] && this.rec.one[key].length; };
+Sound.prototype.playRec = function (key, pos, { gain = 1, verb = 0.12, delay = 0, rate = 1, ref = 1.5, roll = 1.2 } = {}) {
+  if (!this.on) return; const list = this.rec.one[key]; const buf = list[(Math.random() * list.length) | 0];
+  const s = this.ctx.createBufferSource(); s.buffer = buf; s.playbackRate.value = rate * (0.97 + Math.random() * 0.06);
+  this.out(s, pos, { gain, verb, ref, roll }); s.start(this.t + delay);
+};
+const OV = {
+  voice(kind, what, pos) { const k = `v:${kind}:${what}`; if (this.has(k)) return this.playRec(k, pos && pos.clone().setY(1.6), { ref: 2 }); return ORIG.voice.call(this, kind, what, pos); },
+  jump(kind = 'sting', delay = 0) { const k = 'j:' + (kind === 'kill' || kind === 'rip' ? 'scare' : kind === 'power' ? 'scare' : kind); if (this.has(k)) return this.playRec(k, null, { delay }); return ORIG.jump.call(this, kind, delay); },
+  scream(pos, k = 1) { if (this.has('scream')) return this.playRec('scream', pos, { gain: Math.min(1.3, k), rate: 1 / Math.max(0.7, k) * 0.9 + 0.1 }); return ORIG.scream.call(this, pos, k); },
+  kill(kind) { if (this.has('kill')) return this.playRec('kill', null); return ORIG.kill.call(this, kind); },
+  lockerRip() { if (this.has('rip')) return this.playRec('rip', null); return ORIG.lockerRip.call(this); },
+  hit(kind) { if (this.has('hit')) return this.playRec('hit', null); return ORIG.hit.call(this, kind); },
+  thud(pos, k = 1) { if (this.has('thud')) return this.playRec('thud', pos, { gain: k }); return ORIG.thud.call(this, pos, k); },
+  squelch(pos, k = 1) { if (this.has('squelch')) return this.playRec('squelch', pos, { gain: k }); return ORIG.squelch.call(this, pos, k); },
+  farScream(p) { if (this.has('far')) return this.playRec('far', p, { ref: 2, roll: 1 }); return ORIG.farScream.call(this, p); },
+  step(k, zone) { const z = zone === 4 || zone === 5 ? 4 : zone === 6 || zone === 11 ? 6 : zone === 8 || zone === 10 ? 8 : 1; if (this.has('s:' + z)) return this.playRec('s:' + z, null, { gain: (0.06 + k * 0.22) / 0.28, verb: 0.05 }); return ORIG.step.call(this, k, zone); },
+  footstep(kind, pos, speed) { const k = 'f:' + (kind === 'brute' ? 'brute' : kind === 'surgeon' ? 'surgeon' : 'patient'); if (this.has(k)) return this.playRec(k, pos.clone().setY(0.1), { gain: speed > 2 ? 1.4 : 1 }); return ORIG.footstep.call(this, kind, pos, speed); },
+  door(d, kind, x, z) { const k = `d:${d.metal ? 1 : 0}:${kind}`; if (this.has(k)) return this.playRec(k, new THREE.Vector3(x, 1.1, z)); return ORIG.door.call(this, d, kind, x, z); },
+  syllables(pos, n, base, opts = {}) { if ((opts.breath || 0) >= 0.8 && this.has('whisper')) { this.playRec('whisper', pos, { gain: (opts.gain || 0.3) / 0.3 }); return 2; } return ORIG.syllables.call(this, pos, n, base, opts); },
+  mutter() { if (this.has('mutter')) return this.playRec('mutter', null); return ORIG.mutter.call(this); },
+  // chase music: crossfade between the recorded loops
+  music(kind, chase) {
+    if (!this.rec) return; const want = chase > 0.2 && kind && this.rec.music[kind] ? kind : null; const t = this.t;
+    if (want === this.musicKind) return;
+    if (this.musicNow) { const m = this.musicNow; m.g.gain.setTargetAtTime(0, t, want ? 0.15 : 1.4); m.s.stop(t + (want ? 1 : 6)); }
+    this.musicNow = null; this.musicKind = want;
+    if (!want) return;
+    const s = this.ctx.createBufferSource(); s.buffer = this.rec.music[want]; s.loop = true; const g = this.ctx.createGain(); g.gain.value = 0.0001; g.gain.setTargetAtTime(1, t, 0.06);
+    s.connect(g); g.connect(this.vipDry); s.start(t); this.musicNow = { s, g };
+    if (this.has('hitIn')) { const h = this.ctx.createBufferSource(); h.buffer = this.rec.one.hitIn[0]; h.connect(this.vipDry); h.start(t); }
+  },
+  // the realtime ambience was started before the recording finished: swap it for the loops
+  swapAmbience() { if (!this.rec || !this.rec.amb) return; const old = [this.droneG, this.fearG]; this.ambienceLoops(); for (const g of old) if (g) g.gain.setTargetAtTime(0, this.t, 0.5); this.droneLoop = true; },
+  ambienceLoops() {
+    const loop = (buf, gain) => { const s = this.ctx.createBufferSource(); s.buffer = buf; s.loop = true; const g = this.ctx.createGain(); g.gain.value = gain; s.connect(g); g.connect(this.dry); s.start(); return g; };
+    this.droneG = loop(this.rec.amb, 1); this.fearG = loop(this.rec.fear, 0); this.fearLoop = true; this.droneLoop = true;
+  },
+};
+Object.assign(Sound.prototype, OV);
 
 // screams, hits and scares always get through the voice budget and the hush
 for (const k of ['jump', 'scream', 'hit', 'kill', 'lockerRip', 'thud', 'squelch']) { const f = Sound.prototype[k]; Sound.prototype[k] = function (...a) { const v = this.vip; this.vip = true; try { return f.apply(this, a); } finally { this.vip = v; } }; }

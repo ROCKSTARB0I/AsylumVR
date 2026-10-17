@@ -5,7 +5,7 @@
 // handle toward the thumb, +Y back along the forearm, palm facing -X on
 // the right hand and +X on the left), so it sits on the controller as is.
 import * as THREE from '../vendor/three.module.js';
-import { fbm } from './surfaces.js?v=4';
+import { fbm } from './surfaces.js?v=5';
 
 const V = THREE.Vector3;
 const FINGERS = [   // z along the handle (index nearest the thumb), length of the three bones, base radius

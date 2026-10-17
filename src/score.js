@@ -104,21 +104,30 @@ export class Score {
     if (!want && this.bus.gain.value < 0.01) this.theme = null;
     if (!this.theme) return;
     const th = THEMES[this.theme]; const sx = 60 / th.bpm / 4;
-    while (this.next < now + 0.15) {
-      const i = this.step % 32, t = this.next + (i % 2 ? th.swing * sx : 0);
-      const b = th.bass[i]; if (b) this.bass(t, b, sx * 0.95, th.color.cut);
-      if (th.kick[i]) this.kick(t, th.kick[i] === 2 ? 1 : 0.7);
-      if (th.snare[i]) this.snare(t, th.snare[i] === 2 ? 1 : 0.55);
-      if (th.hat[i]) this.hat(t, i % 4 === 2 ? 1 : 0.6);
-      for (const [at, ch] of th.stab) if (at === i) this.stab(t, ch);
-      if (th.lead && th.lead[i]) this.lead(t, th.lead[i], sx * th.leadDur, th.leadType);
-      if (th.arp && th.arp[i]) this.arp(t, th.arp[i], th.arpType);
-      if (th.metal && th.metal[i]) this.metal(t);
-      if (th.screech && (this.step % th.screech.every) === th.screech.at % th.screech.every && Math.random() < 0.8) this.screech(t, N(th.screech.from), N(th.screech.to), sx * 6);
-      if (th.swell && i % 16 === 12) this.swell(t, sx * 4);
-      this.step++; this.next += sx;
-    }
+    while (this.next < now + 0.15) { this.scheduleStep(th, this.step, this.next, sx); this.step++; this.next += sx; }
   }
+  scheduleStep(th, step, t0, sx) {
+    const i = step % 32, t = t0 + (i % 2 ? th.swing * sx : 0);
+    const b = th.bass[i]; if (b) this.bass(t, b, sx * 0.95, th.color.cut);
+    if (th.kick[i]) this.kick(t, th.kick[i] === 2 ? 1 : 0.7);
+    if (th.snare[i]) this.snare(t, th.snare[i] === 2 ? 1 : 0.55);
+    if (th.hat[i]) this.hat(t, i % 4 === 2 ? 1 : 0.6);
+    for (const [at, ch] of th.stab) if (at === i) this.stab(t, ch);
+    if (th.lead && th.lead[i]) this.lead(t, th.lead[i], sx * th.leadDur, th.leadType);
+    if (th.arp && th.arp[i]) this.arp(t, th.arp[i], th.arpType);
+    if (th.metal && th.metal[i]) this.metal(t);
+    if (th.screech && (step % th.screech.every) === th.screech.at % th.screech.every && Math.random() < 0.8) this.screech(t, N(th.screech.from), N(th.screech.to), sx * 6);
+    if (th.swell && i % 16 === 12) this.swell(t, sx * 4);
+  }
+  // offline: schedule a whole loop of a theme at once (for recording)
+  renderLoop(kind, bars) {
+    const th = THEMES[kind]; const sx = 60 / th.bpm / 4; const steps = bars * 16;
+    this.theme = kind; this.setDrive(th.color.drive); this.lp.frequency.value = th.color.cut * 1.8; this.bus.gain.value = 0.62;
+    if (th.drone) this.startDrone(th.drone);
+    for (let k = 0; k < steps; k++) this.scheduleStep(th, k, 0.02 + k * sx, sx);
+    return steps * sx;
+  }
+  static loopSeconds(kind, bars) { return bars * 16 * 60 / THEMES[kind].bpm / 4; }
   // string glissando that screams up (or down) a long way
   screech(t, from, to, dur) {
     const g = this.amp(t, 0.04, 0.07, dur * 0.7, dur * 0.3); const bp = this.ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = mtof(to) * 0.8; bp.Q.value = 0.8;
