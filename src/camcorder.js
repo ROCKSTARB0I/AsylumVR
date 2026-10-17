@@ -3,13 +3,13 @@
 // raise it to your eye (right mouse / Q); in VR it is in your left hand
 // with its flip-out screen showing what it sees.
 import * as THREE from '../vendor/three.module.js';
-import { makeScreenMaterial } from './tape.js?v=3';
+import { makeScreenMaterial } from './tape.js?v=4';
 
 export const EYE_LAYER = 5;   // things only the camcorder sees (eye-shine)
 
 export class Camcorder {
   constructor(scene) {
-    this.battery = 1; this.spares = 1; this.nv = false; this.raised = false; this.raise = 0; this.zoom = 1; this.clock = 0; this.drain = 1 / 110;
+    this.battery = 1; this.spares = 1; this.nv = false; this.raised = false; this.raise = 0; this.zoom = 1; this.clock = 0; this.drain = 0;   // night vision never runs out
     this.cam = new THREE.PerspectiveCamera(52, 4 / 3, 0.05, 90); this.cam.layers.enable(EYE_LAYER);
     this.ir = new THREE.SpotLight(0xffffff, 0, 0, 0.78, 0.8, 1.7); this.ir.layers.enableAll();
     scene.add(this.ir, this.ir.target);
@@ -73,7 +73,7 @@ export class Camcorder {
     const bx = w - 70, by = h - 40; c.strokeStyle = '#fff'; c.lineWidth = 2; c.strokeRect(bx, by, 50, 20); c.fillStyle = '#fff'; c.fillRect(bx + 50, by + 6, 4, 8);
     c.fillStyle = this.battery < 0.2 ? (blink ? '#ff3020' : 'transparent') : '#fff';
     const bars = Math.ceil(this.battery * 4); for (let i = 0; i < bars; i++) c.fillRect(bx + 3 + i * 12, by + 3, 9, 14);
-    c.fillStyle = '#fff'; c.font = '16px "Courier New", monospace'; c.fillText(`x${this.spares}`, bx - 34, by + 3);
+    c.fillStyle = '#fff'; c.font = '16px "Courier New", monospace';
     c.fillText(this.nv ? 'NIGHT SHOT' : (this.dead ? 'BATTERY EMPTY' : ''), 22, h - 36);
     if (this.zoom > 1.05) c.fillText(`ZOOM ${this.zoom.toFixed(1)}x`, w / 2 - 50, h - 36);
     // corner brackets

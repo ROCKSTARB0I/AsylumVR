@@ -2,22 +2,22 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=3';
-import { buildSurfaces, T } from './surfaces.js?v=3';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=3';
-import { Doors } from './doors.js?v=3';
-import { Space } from './space.js?v=3';
-import { Input } from './input.js?v=3';
-import { Walker } from './walker.js?v=3';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=3';
-import { makeTape, makeVeil } from './tape.js?v=3';
-import { Slate } from './slate.js?v=3';
-import { NOTES, MUTTER, OBJECTIVES } from './story.js?v=3';
-import { Sound } from './dread.js?v=3';
-import { Horrors } from './horrors.js?v=3';
-import { Dressing } from './dressing.js?v=3';
-import { Scares } from './scares.js?v=3';
-import { makeHand } from './hands.js?v=3';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=4';
+import { buildSurfaces, T } from './surfaces.js?v=4';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=4';
+import { Doors } from './doors.js?v=4';
+import { Space } from './space.js?v=4';
+import { Input } from './input.js?v=4';
+import { Walker } from './walker.js?v=4';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=4';
+import { makeTape, makeVeil } from './tape.js?v=4';
+import { Slate } from './slate.js?v=4';
+import { NOTES, MUTTER, OBJECTIVES } from './story.js?v=4';
+import { Sound } from './dread.js?v=4';
+import { Horrors } from './horrors.js?v=4';
+import { Dressing } from './dressing.js?v=4';
+import { Scares } from './scares.js?v=4';
+import { makeHand } from './hands.js?v=4';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -153,6 +153,7 @@ const itemMeshes = [];
     return g;
   };
   for (const it of plan.items) {
+    if (it.k === 'battery') continue;   // night vision is unlimited, so no batteries to find
     const m = mk(it.k); const x = cx(it.x), z = cz(it.y);
     // rest on whatever is under it
     let y = 0.02; for (const c of world.colliders) if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1) y = Math.max(y, Math.min(1.2, c.y1) + 0.02);
@@ -260,7 +261,7 @@ let fade = 1, fadeGoal = 0;
 function fadeTo(v) { fadeGoal = v; }
 function setPaused(p) {
   G.paused = p; $('pause').hidden = !p || renderer.xr.isPresenting;
-  if (p) { sound.duck(true); $('notesList').textContent = G.notes.length ? 'Notes: ' + G.notes.map((n) => NOTES[n].t).join(' · ') : ''; if (renderer.xr.isPresenting) { card.card([['PAUSED', 70], [objectiveText(), 34, '#c8c0b0'], ['', 20], [`Fuses ${G.fuses}/3   ·   Batteries ${cam.spares}   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}`, 32, '#9a948a'], ['', 20], ['B resume   ·   hold trigger 2 s: last checkpoint', 30, '#9a948a']]); placeCard(); } }
+  if (p) { sound.duck(true); $('notesList').textContent = G.notes.length ? 'Notes: ' + G.notes.map((n) => NOTES[n].t).join(' · ') : ''; if (renderer.xr.isPresenting) { card.card([['PAUSED', 70], [objectiveText(), 34, '#c8c0b0'], ['', 20], [`Fuses ${G.fuses}/3   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}`, 32, '#9a948a'], ['', 20], ['B resume   ·   hold trigger 2 s: last checkpoint', 30, '#9a948a']]); placeCard(); } }
   else { sound.duck(false); card.mesh.visible = false; if (!renderer.xr.isPresenting) input.wantLock = true; }
 }
 $('resume').onclick = () => setPaused(false);
@@ -303,7 +304,8 @@ setInterval(() => { if (!G.playing) { const s = Math.floor(performance.now() / 1
 const clock = new THREE.Clock();
 const tmpQ = new THREE.Quaternion(), tmpV = new V(), tmpV2 = new V();
 let zoomWheel = 1, readHold = 0;
-renderer.setAnimationLoop(frame);
+let crashes = 0;
+renderer.setAnimationLoop(() => { try { frame(); } catch (e) { if (crashes++ < 20) console.error('frame error', e); } });
 function frame() {
   const dt = Math.min(0.05, clock.getDelta());
   const I = input.frame();
@@ -349,7 +351,7 @@ function frame() {
   let origin, dir;
   if (vr && hands.right) { origin = hands.right.getWorldPosition(new V()); dir = new V(0, 0, -1).applyQuaternion(hands.right.getWorldQuaternion(tmpQ)); }
   else { origin = camera.getWorldPosition(new V()); dir = new V(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(tmpQ)); }
-  focus = walker.alive ? (walker.hidden ? { kind: 'unhide', label: () => walker.hidden.k === 'locker' ? 'Leave locker' : 'Crawl out' } : pick(origin, dir)) : null;
+  const hid = walker.hidden; focus = walker.alive ? (hid ? { kind: 'unhide', label: () => walker.hidden ? (hid.k === 'locker' ? 'Leave locker' : 'Crawl out') : '' } : pick(origin, dir)) : null;
   if (I.interact && focus) { if (focus.kind === 'unhide') { walker.unhide(); sound.locker(false); } else use(focus); }
   if (walker.hidden && vr && (Math.abs(I.mx) + Math.abs(I.mz) > 1.3)) { walker.unhide(); sound.locker(false); }
   const lab = focus ? focus.label() : '';
@@ -409,7 +411,7 @@ function draw(dt, vr, I) {
     if (cam.nv) camera.layers.enable(EYE_LAYER); else camera.layers.disable(EYE_LAYER); camera.updateMatrixWorld();
     cam.aim(camera.getWorldPosition(tmpV), camera.getWorldQuaternion(tmpQ), 70); cam.setIR(cam.nv);
     $('tc').textContent = timecode(cam.clock); $('mode').textContent = cam.nv ? 'NIGHT SHOT' : cam.dead ? 'BATTERY EMPTY' : '';
-    $('zoom').textContent = cam.zoom > 1.05 ? `ZOOM ${cam.zoom.toFixed(1)}x` : ''; $('spares').textContent = 'x' + cam.spares;
+    $('zoom').textContent = cam.zoom > 1.05 ? `ZOOM ${cam.zoom.toFixed(1)}x` : ''; $('spares').textContent = '';
     const bars = Math.ceil(cam.battery * 4); document.querySelectorAll('#osd .bat i').forEach((el, i) => el.classList.toggle('off', i >= bars)); document.querySelector('#osd .bat').classList.toggle('low', cam.battery < 0.2);
   } else { camera.layers.disable(EYE_LAYER); cam.setIR(false); }
   renderer.setRenderTarget(rtMain); renderer.render(scene, camera); renderer.setRenderTarget(null);
