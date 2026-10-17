@@ -2,22 +2,22 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=1';
-import { buildSurfaces, T } from './surfaces.js?v=1';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=1';
-import { Doors } from './doors.js?v=1';
-import { Space } from './space.js?v=1';
-import { Input } from './input.js?v=1';
-import { Walker } from './walker.js?v=1';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=1';
-import { makeTape, makeVeil } from './tape.js?v=1';
-import { Slate } from './slate.js?v=1';
-import { NOTES, MUTTER, OBJECTIVES } from './story.js?v=1';
-import { Sound } from './dread.js?v=1';
-import { Horrors } from './horrors.js?v=1';
-import { Dressing } from './dressing.js?v=1';
-import { Scares } from './scares.js?v=1';
-import { makeHand } from './hands.js?v=1';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=2';
+import { buildSurfaces, T } from './surfaces.js?v=2';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=2';
+import { Doors } from './doors.js?v=2';
+import { Space } from './space.js?v=2';
+import { Input } from './input.js?v=2';
+import { Walker } from './walker.js?v=2';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=2';
+import { makeTape, makeVeil } from './tape.js?v=2';
+import { Slate } from './slate.js?v=2';
+import { NOTES, MUTTER, OBJECTIVES } from './story.js?v=2';
+import { Sound } from './dread.js?v=2';
+import { Horrors } from './horrors.js?v=2';
+import { Dressing } from './dressing.js?v=2';
+import { Scares } from './scares.js?v=2';
+import { makeHand } from './hands.js?v=2';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -79,15 +79,9 @@ const horrors = new Horrors({ scene, plan, world, space, doors, walker, cam, sou
 const scares = new Scares({ scene, plan, world, space, doors, walker, cam, sound, G, horrors, camera, dressing });
 
 // ---------------------------------------------------------------- hands
-// your own hands: in VR on the controllers' grips; on desktop the left one holds the camcorder low in view
+// your own hands, empty, on the controllers' grips in VR (the camcorder is the whole view, not something you hold)
 const handLight = { value: new THREE.Color(0.02, 0.02, 0.02) };
 const handL = makeHand('left', handLight), handR = makeHand('right', handLight);
-// the camcorder sits in the left fist, lens forward along the handle
-const camMount = new THREE.Group(); handL.root.add(camMount); camMount.add(cam.model);
-cam.model.position.set(0.03, -0.005, -0.005); cam.model.rotation.set(0.0, 0, 0);
-handL.pose(0.7, 0.75, 0.6, 0.1);
-const viewmodel = new THREE.Group(); camera.add(viewmodel); viewmodel.add(handL.root);
-const VM_LOW = { p: new V(-0.15, -0.19, -0.36), r: new THREE.Euler(0.55, 0.35, 0.25) };
 const left = renderer.xr.getController(0), right = renderer.xr.getController(1);
 const gripL = renderer.xr.getControllerGrip(0), gripR = renderer.xr.getControllerGrip(1);
 dolly.add(left, right, gripL, gripR);
@@ -98,28 +92,48 @@ const hands = { left: null, right: null, gripLeft: null, gripRight: null, pads: 
 });
 const ray = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V(0, 0, 0), new V(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18 }));
 function attachHand(c, g, side) {
-  if (side === 'left') { g.add(handL.root); handL.root.position.set(0, 0, 0); handL.root.rotation.set(0, 0, 0); }
+  if (side === 'left') g.add(handL.root);
   else { g.add(handR.root); c.add(ray); ray.scale.z = 1.8; }
 }
 function updateHands(dt, vr) {
+  if (!vr) return;
   if (!handLight.lock) handLight.value.copy(world.lightAt(walker.pos.x, walker.pos.z));
-  cam.hinge.rotation.y = vr ? 0.25 : Math.PI / 2;     // the flip screen folds shut on desktop
-  if (vr) {
-    if (handL.root.parent === viewmodel) { viewmodel.remove(handL.root); if (hands.gripLeft) attachHand(hands.left, hands.gripLeft, 'left'); }
-    const src = hands.pads.right; if (src && src.gamepad) { const b = src.gamepad.buttons; handR.pose(b[0] ? b[0].value : 0, b[1] ? b[1].value : 0, b[3] && b[3].touched ? 0.9 : 0.4); }
-    return;
-  }
-  if (handL.root.parent !== viewmodel) { viewmodel.add(handL.root); handL.root.position.set(0, 0, 0); handL.root.rotation.set(0, 0, 0); }
-  // lower in view while walking; lifted to the eye (and gone into the viewfinder) when raised
-  const k = cam.raise; const bob = Math.sin(walker.stepPhase * Math.PI) * 0.01 * Math.min(1, walker.speed / 3);
-  viewmodel.position.set(VM_LOW.p.x * (1 - k), VM_LOW.p.y * (1 - k) - 0.02 * k + bob, VM_LOW.p.z + 0.12 * k);
-  viewmodel.rotation.set(VM_LOW.r.x * (1 - k), VM_LOW.r.y * (1 - k), VM_LOW.r.z * (1 - k));
-  viewmodel.visible = k < 0.6 && walker.alive && !walker.hidden;
+  for (const [side, h] of [['left', handL], ['right', handR]]) { const src = hands.pads[side]; if (src && src.gamepad) { const b = src.gamepad.buttons; h.pose(b[0] ? b[0].value : 0, b[1] ? b[1].value : 0, b[3] && b[3].touched ? 0.9 : 0.4); } }
 }
+
+// ---------------------------------------------------------------- night vision in VR
+// A full-screen pass costs too much in the headset, so every material gets the
+// night-vision grade at the end of its own shader: luminance lifted hard,
+// green phosphor, grain. The camcorder's infrared lamp does the rest.
+const NVU = { on: { value: 0 }, t: { value: 0 } };
+function nvify(m) {
+  if (!m || m.userData.nv || m.isShaderMaterial || m.userData.noNV) return;
+  m.userData.nv = true; const prev = m.onBeforeCompile; const key = m.customProgramCacheKey();
+  m.onBeforeCompile = (sh, r) => {
+    if (prev) prev.call(m, sh, r);
+    sh.uniforms.uNV = NVU.on; sh.uniforms.uNVt = NVU.t;
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uNV; uniform float uNVt;')
+      .replace('#include <dithering_fragment>', `#include <dithering_fragment>
+        if (uNV > 0.5) {
+          float l = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));
+          float v = clamp(pow(l * 0.95, 0.9), 0.0, 1.0);
+          float g = fract(sin(dot(floor(gl_FragCoord.xy * 0.5) + floor(uNVt * 24.0) * 7.13, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
+          v = clamp(v * (0.9 + g * 0.35) + g * 0.06, 0.0, 1.0);
+          gl_FragColor.rgb = vec3(0.3, 1.0, 0.4) * v + vec3(0.5, 1.0, 0.6) * smoothstep(0.8, 1.0, v) * 0.3;
+        }`);
+  };
+  m.customProgramCacheKey = () => key + '|nv';
+  m.needsUpdate = true;
+}
+function nvifyScene() { scene.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach(nvify); }); }
+
 // VR slates: a reading/pause card, captions low in view, a small prompt
 const card = new Slate(1024, 640, 0.9); scene.add(card.mesh);
 const capSlate = new Slate(1024, 160, 0.9, {}); camera.add(capSlate.mesh); capSlate.mesh.position.set(0, -0.28, -0.9);
 const promptSlate = new Slate(512, 96, 0.22); scene.add(promptSlate.mesh);
+const osdHud = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.975), new THREE.MeshBasicMaterial({ map: cam.osdTex, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false }));
+osdHud.material.userData.noNV = true; osdHud.position.set(0, 0, -1.0); osdHud.renderOrder = 998; osdHud.visible = false; camera.add(osdHud);
+for (const sl of [card, capSlate, promptSlate]) sl.mesh.material.userData.noNV = true;
 
 // ---------------------------------------------------------------- pickups
 const itemMeshes = [];
@@ -265,7 +279,7 @@ async function begin(vr) {
   walker.place(cx(plan.start.x), cz(plan.start.y), plan.start.yaw); checkpoint();
   if (!vr) { input.wantLock = true; $('dot').classList.add('on'); try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
   setTimeout(() => say('start'), 1500);
-  setTimeout(() => { if (!cam.nv) caption(vr ? 'Left trigger: night vision' : 'F: night vision · Q or right mouse: camcorder'); }, 6000);
+  setTimeout(() => { if (!cam.nv) caption(vr ? 'Left trigger: night vision' : 'F: night vision · right mouse: zoom'); }, 6000);
 }
 $('playDesktop').onclick = () => begin(false);
 $('howBtn').onclick = () => { $('how').hidden = !$('how').hidden; };
@@ -280,13 +294,14 @@ vrBtn.onclick = async () => {
     begin(true);
   } catch (e) { $('vrNote').textContent = 'Could not start VR: ' + e.message; }
 };
+nvifyScene(); setInterval(nvifyScene, 3000);
 $('loading').textContent = '';
 setInterval(() => { if (!G.playing) { const s = Math.floor(performance.now() / 1000); $('titleTc').textContent = `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; } }, 250);
 
 // ---------------------------------------------------------------- frame
 const clock = new THREE.Clock();
 const tmpQ = new THREE.Quaternion(), tmpV = new V(), tmpV2 = new V();
-let raisedHold = false, readHold = 0;
+let zoomWheel = 1, readHold = 0;
 renderer.setAnimationLoop(frame);
 function frame() {
   const dt = Math.min(0.05, clock.getDelta());
@@ -308,14 +323,11 @@ function frame() {
   // the camcorder
   if (I.nv) { if (cam.toggleNV()) sound.nv(cam.nv); else { sound.click(); caption(cam.spares ? (vr ? 'Battery dead. X swaps a battery.' : 'Battery dead. R swaps a battery.') : 'Battery dead. Find more batteries.', 2.5); } }
   if (I.reload) { if (cam.reload()) { sound.battery(); caption('New battery.', 1.5); } else sound.click(); }
-  if (I.raise === 'toggle') { raisedHold = !raisedHold; if (!raisedHold && cam.nv) { cam.nv = false; sound.nv(false); } }
-  // night vision always shows: turning it on brings the camcorder up to your eye
-  cam.raised = vr ? true : (I.raise === true || raisedHold || cam.nv);
-  cam.raise += ((cam.raised ? 1 : 0) - cam.raise) * (1 - Math.exp(-dt * 10));
-  if (!vr && cam.raised && I.zoom) cam.zoom = Math.max(1, Math.min(4, cam.zoom - I.zoom * 0.25));
-  if (vr) cam.zoom += ((I.zoomHold ? 3 : 1) - cam.zoom) * (1 - Math.exp(-dt * 4));
-  if (!vr && !cam.raised) cam.zoom = 1;
-  cam.update(dt, vr || cam.raise > 0.5);
+  // the camcorder is the view itself; right mouse (or the wheel) zooms on desktop
+  cam.raised = true; cam.raise = 1;
+  if (!vr) { if (I.zoom) zoomWheel = Math.max(1, Math.min(4, zoomWheel - I.zoom * 0.25)); const want = I.raise === true ? Math.max(2.5, zoomWheel) : zoomWheel; cam.zoom += (want - cam.zoom) * (1 - Math.exp(-dt * 6)); }
+  else cam.zoom = 1;
+  cam.update(dt, true);
   if (cam.battery < 0.2 && cam.nv) say('lowBattery');
 
   // the body
@@ -376,26 +388,21 @@ function draw(dt, vr, I) {
   fade += (fadeGoal - fade) * (1 - Math.exp(-dt * 3));
   const t = G.t; const hurt = Math.max(0, 1 - walker.health / 100); const glitch = horrors.glitch || 0;
   if (vr) {
-    // the camcorder renders its own view for the flip-out screen
-    camFrame = (camFrame + 1) % 2;
-    if (hands.gripLeft && camFrame === 0) {
-      cam.screen.visible = true;
-      const lp = cam.model.getWorldPosition(tmpV), lq = cam.model.getWorldQuaternion(tmpQ);
-      cam.aim(lp.clone().add(new V(0, 0.01, -0.16).applyQuaternion(lq)), lq, 52);
-      cam.setIR(cam.nv);
-      renderer.xr.enabled = false; const prevT = renderer.getRenderTarget();
-      renderer.setRenderTarget(cam.rt); renderer.render(scene, cam.cam); renderer.setRenderTarget(prevT); renderer.xr.enabled = true;
-      cam.setIR(false);
-      const u = cam.screenMat.uniforms; u.t.value = t; u.mode.value = cam.nv ? 2 : 1; u.glitch.value = glitch; u.battery.value = cam.battery; u.zoom.value = 1; u.fear.value = horrors.fear; u.exposure.value = 2.6 * S.bright;
-      cam.paintOSD(false, objT > 0 ? objectiveText() : '');
-    }
+    // night vision: the infrared lamp rides on your head and every surface takes the green grade
+    NVU.on.value = cam.nv ? 1 : 0; NVU.t.value = t;
+    if (cam.nv) camera.layers.enable(EYE_LAYER); else camera.layers.disable(EYE_LAYER);
+    camera.getWorldPosition(tmpV); camera.getWorldQuaternion(tmpQ); cam.aim(tmpV, tmpQ, 90); cam.setIR(cam.nv);
+    for (const h of world.hazeCones) h.mesh.visible = !cam.nv;
+    osdHud.visible = G.playing && !G.reading && !G.paused; cam.paintOSD(false, objT > 0 ? objectiveText() : '');
     veil.uniforms.t.value = t; veil.uniforms.hurt.value = hurt; veil.uniforms.fear.value = horrors.fear * S.grain; veil.uniforms.fade.value = fade;
     renderer.render(scene, camera);
+    cam.setIR(false);
     return;
   }
+  NVU.on.value = 0;
   // desktop: the whole view is tape
-  const raised = cam.raise > 0.5;
-  $('osd').hidden = !raised || !G.playing;
+  const raised = true;
+  $('osd').hidden = !G.playing;
   if (raised) {
     camera.layers.enable(EYE_LAYER); camera.updateMatrixWorld();
     cam.aim(camera.getWorldPosition(tmpV), camera.getWorldQuaternion(tmpQ), 70); cam.setIR(cam.nv);
@@ -429,7 +436,7 @@ function ending() {
   }, 2200);
 }
 
-window.__asy = { G, walker, cam, world, plan, doors, horrors, scene, camera, LIGHT, space, sound, renderer, use, interactables, scares, dressing, handL, handR, viewmodel, handLight, VM_LOW,
+window.__asy = { G, walker, cam, world, plan, doors, horrors, scene, camera, LIGHT, space, sound, renderer, use, interactables, scares, dressing, handL, handR, handLight, NVU,
   // test hook: step the game a few frames by hand (the pane may not be animating) and grab the picture
-  snap(steps = 3, w = 560) { const I0 = { mx: 0, mz: 0, turn: 0, lookDx: 0, lookDy: 0 }; for (let i = 0; i < steps; i++) { walker.update(1 / 30, I0); doors.update(1 / 30); lights(1 / 30); horrors.update(1 / 30); dressing.update(1 / 30, walker.pos, camera); cam.raise += ((cam.raised ? 1 : 0) - cam.raise) * 0.3; updateHands(1 / 30, false); } draw(1, false, I0);
+  snap(steps = 3, w = 560) { const I0 = { mx: 0, mz: 0, turn: 0, lookDx: 0, lookDy: 0 }; for (let i = 0; i < steps; i++) { walker.update(1 / 30, I0); doors.update(1 / 30); lights(1 / 30); horrors.update(1 / 30); dressing.update(1 / 30, walker.pos, camera);  } draw(1, false, I0);
     const c = document.createElement('canvas'); c.width = w; c.height = Math.round(w * canvas.height / canvas.width); c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.72); } };

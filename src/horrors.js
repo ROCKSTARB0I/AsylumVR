@@ -3,8 +3,8 @@
 // dark), hears (your steps, doors, things you knock), patrols or keeps to
 // its corner, investigates, chases, searches, checks lockers, and kills.
 import * as THREE from '../vendor/three.module.js';
-import { C, W, D, cx, cz } from './plan.js?v=1';
-import { makeBody, pose, cleaver, bonesaw, BODY_LIGHT } from './carcass.js?v=1';
+import { C, W, D, cx, cz } from './plan.js?v=2';
+import { makeBody, pose, cleaver, bonesaw, BODY_LIGHT } from './carcass.js?v=2';
 
 const V = THREE.Vector3;
 const tmp = new V(), tmp2 = new V();
@@ -64,7 +64,7 @@ class Horror {
     this.reset();
   }
   reset() {
-    this.pos = this.home.clone(); this.yaw = this.homeYaw; this.state = this.opts.idle || 'patrol'; this.t = 0; this.phase = 0; this.speed = 0;
+    this.pos = this.home.clone(); this.yaw = this.homeYaw; this.state = this.opts.idle || 'patrol'; this.route = this.opts.route || null; this.ri = 0; this.t = 0; this.phase = 0; this.speed = 0;
     this.path = null; this.goal = null; this.repath = 0; this.aware = 0; this.lastSeen = null; this.lostT = 0; this.atk = 0; this.cool = 0; this.wait = 0; this.searchT = 0;
     this.sawHide = null; this.voiceT = 2 + Math.random() * 4; this.active = !this.opts.dormant; this.body.root.visible = this.active; this.stuck = 0; this.doorPause = 0; this.lockerChecks = 0;
   }
@@ -90,7 +90,7 @@ class Horror {
     const d = Math.hypot(x - this.pos.x, z - this.pos.z); let rr = r * this.K.hear;
     if (!this.H.space.los(this.pos.x, this.pos.z, x, z, true)) rr *= 0.55;      // through walls and doors it's muffled
     if (d > rr) return;
-    if (this.kind === 'rocker') return;
+    if (this.kind === 'rocker' || !this.H.isHunter(this)) return;
     this.goal = new V(x, 0, z); this.state = 'investigate'; this.path = null; this.wait = 0.4 + Math.random() * 0.4;
     if (this.voiceT > 1) { this.voiceT = 0.3; this.H.sound.voice(this.K.voice, 'alert', this.pos); }
   }
@@ -124,18 +124,20 @@ class Horror {
   update(dt) {
     if (!this.active) return;
     const H = this.H, w = H.walker, P = w.pos; this.t += dt; this.voiceT -= dt; this.cool -= dt;
+    // the feral patient gets up from its meal when its segment begins
+    if (this.opts.huntRoute && H.isHunter(this) && this.state === 'eat') { this.state = 'patrol'; this.route = this.opts.huntRoute; this.ri = 0; this.path = null; H.sound.voice('eater', 'chase', this.pos); }
     const dist = Math.hypot(P.x - this.pos.x, P.z - this.pos.z);
     // seeing you
     const see = w.alive ? this.canSee(P) : 0;
     if (see > 0) { this.aware = Math.min(1.5, this.aware + see * dt * (this.state === 'investigate' || this.state === 'search' ? 3.2 : 1.8)); this.lastSeen = P.clone(); this.lostT = 0; }
     else this.aware = Math.max(0, this.aware - dt * 0.25);
-    if (this.aware >= 1 && this.state !== 'chase' && this.state !== 'attack' && this.state !== 'execute' && this.K.run && this.state !== 'eat' + 'x') {
+    if (this.aware >= 1 && this.state !== 'chase' && this.state !== 'attack' && this.state !== 'execute' && this.K.run && this.state !== 'eat' && H.mayChase(this)) {
       this.state = 'chase'; this.path = null; H.sound.voice(this.K.voice, 'chase', this.pos); H.onChase(this);
-    } else if (this.aware > 0.35 && (this.state === 'patrol' || this.state === 'idle') && this.K.run) { this.state = 'investigate'; this.goal = P.clone(); this.wait = 0.5; }
+    } else if (this.aware > 0.35 && (this.state === 'patrol' || this.state === 'idle') && this.K.run && H.isHunter(this)) { this.state = 'investigate'; this.goal = P.clone(); this.wait = 0.5; }
     let st = this.state; let anim = 'idle', animP = {};
     switch (st) {
       case 'rock': anim = 'rock'; if (this.voiceT < 0) { this.voiceT = 3 + Math.random() * 5; H.sound.voice('rocker', 'mutter', this.pos); } if (dist < 2.2 && !this.flinched) { this.flinched = true; H.sound.voice('rocker', 'scream', this.pos); H.scare(0.5); } if (dist > 4) this.flinched = false; break;
-      case 'eat': anim = 'eat'; if (this.voiceT < 0) { this.voiceT = 1.5 + Math.random() * 2; H.sound.voice('eater', 'chew', this.pos); } if (this.aware > 0.5 || (dist < 3 && w.speed > 1.5 && !w.hidden)) { this.state = 'chase'; this.aware = 1.2; H.sound.voice('eater', 'chase', this.pos); H.onChase(this); } break;
+      case 'eat': anim = 'eat'; if (!H.isHunter(this) && dist < 1.8 && !this.hissed) { this.hissed = true; H.sound.voice('eater', 'alert', this.pos); H.scare(0.6); } if (dist > 4) this.hissed = false; if (this.voiceT < 0) { this.voiceT = 1.5 + Math.random() * 2; H.sound.voice('eater', 'chew', this.pos); } if (H.mayChase(this) && (this.aware > 0.5 || (dist < 3 && w.speed > 1.5 && !w.hidden))) { this.state = 'chase'; this.aware = 1.2; H.sound.voice('eater', 'chase', this.pos); H.onChase(this); } break;
       case 'idle': anim = 'idle'; break;
       case 'patrol': {
         if (!this.route) { this.state = 'idle'; break; }
@@ -240,9 +242,12 @@ export class Horrors {
     this.list.push(this.brute, this.surgeon);
     for (const [i, m] of p.inmates.entries()) {
       const kind = m.kind === 'eater' ? 'eater' : m.kind === 'stalker' ? 'patient' : 'rocker';
-      const h = new Horror(this, kind, cx(m.x), cz(m.y), { idle: m.kind === 'eater' ? 'eat' : m.kind === 'stalker' ? 'patrol' : 'rock', yaw: m.facing ?? (i * 1.7), seed: 40 + i, route: m.route, look: m.look, dormant: m.dormant });
+      const h = new Horror(this, kind, cx(m.x), cz(m.y), { huntRoute: m.huntRoute, idle: m.kind === 'eater' ? 'eat' : m.kind === 'stalker' ? 'patrol' : 'rock', yaw: m.facing ?? (i * 1.7), seed: 40 + i, route: m.route, look: m.look, dormant: m.dormant });
       this.list.push(h);
+      if (m.kind === 'eater') this.feral = h;
     }
+    this.brute.active = true; this.surgeon.active = false; this.surgeon.body.root.visible = false;
+    this.setSegment(this.segment, true);
   }
   heard(x, z, r) { if (r <= 0) return; for (const h of this.list) h.hear(x, z, r); }
   sawHide(hide) { for (const h of this.list) if (h.state === 'chase' && h.canSee(this.walker.pos, true) > 0) h.sawHide = hide; }
@@ -259,13 +264,39 @@ export class Horrors {
   glitchKick(k) { this.kick = Math.max(this.kick, k); }
   scare(k) { this.glitchKick(k); }
   shake(x, z, k) { const d = Math.hypot(x - this.walker.pos.x, z - this.walker.pos.z); if (d < 6) this.walker.shake = Math.max(this.walker.shake, k * (1 - d / 6)); }
-  powerOn(at) { this.surgeon.active = true; this.surgeon.body.root.visible = true; for (const h of this.list) if (h.K.run) h.hear(at.x, at.z, 60); this.lightsOut = false; }
-  wakeSurgeon() { if (!this.surgeon.active) { this.surgeon.active = true; this.surgeon.body.root.visible = true; } }
-  alarm() { for (const h of this.list) if (h.K.run) { h.state = 'investigate'; h.goal = this.walker.pos.clone(); h.path = null; h.wait = 0; } }
-  reset() { for (const h of this.list) { const was = h.active; h.reset(); if (h === this.surgeon && (this.G.fuses >= 1 || this.G.power)) { h.active = true; h.body.root.visible = true; } } this.face = null; this.kick = 0; }
+  // Outlast-style segments: one hunter at a time.
+  //   0  before the first fuse: Kroft, the west wing and the cafeteria
+  //   1  one or two fuses: Dr. Voss
+  //   2  third fuse to the gate: the feral patient from the morgue
+  get segment() { return this.G.power || this.G.fuses >= 3 ? 2 : this.G.fuses >= 1 ? 1 : 0; }
+  get hunter() { return [this.brute, this.surgeon, this.feral][this.segment]; }
+  isHunter(h) { return h === this.hunter; }
+  mayChase(h) { return this.isHunter(h) && !this.list.some((o) => o !== h && (o.state === 'chase' || o.state === 'attack' || o.state === 'execute')); }
+  setSegment(seg, instant = false) {
+    this.seg = seg;
+    for (const h of [this.brute, this.surgeon, this.feral]) {
+      const mine = h === this.hunter;
+      if (mine && !h.active) { h.reset(); h.active = true; h.body.root.visible = true; }
+      if (!mine && h !== this.feral && h.active) h.leaving = true;      // gone once it stops chasing
+      if (!mine && h === this.feral) { h.leaving = false; }
+    }
+    if (instant) for (const h of this.list) if (h.leaving) { h.leaving = false; h.active = false; h.body.root.visible = false; }
+  }
+  powerOn(at) { this.lightsOut = false; }
+  alarm() { const h = this.hunter; if (h && h.state !== 'chase') { h.state = 'investigate'; h.goal = this.walker.pos.clone(); h.path = null; h.wait = 0; } }
+  reset() {
+    for (const h of this.list) h.reset();
+    this.brute.active = this.surgeon.active = false; this.brute.body.root.visible = this.surgeon.body.root.visible = false;
+    this.setSegment(this.segment, true); this.face = null; this.kick = 0;
+  }
   update(dt) {
     BODY_LIGHT.up.value.set(0, 1, 0).transformDirection(this.camera.matrixWorldInverse);
-    if (!this.surgeon.active && this.G.fuses >= 1) this.wakeSurgeon();
+    if (this.seg !== this.segment) this.setSegment(this.segment);
+    for (const h of this.list) if (h.leaving && h.state !== 'chase' && h.state !== 'attack' && h.state !== 'execute') {
+      // walk off when you can't see it, then it's gone for good
+      const seen = this.space.los(this.walker.pos.x, this.walker.pos.z, h.pos.x, h.pos.z, true) && h.pos.distanceTo(this.walker.pos) < 18;
+      if (!seen) { h.leaving = false; h.active = false; h.body.root.visible = false; }
+    }
     let fear = 0, chase = 0, near = 1e9; this.face = null; this.chaseKind = this.chaseKind || null;
     for (const h of this.list) {
       h.update(dt);

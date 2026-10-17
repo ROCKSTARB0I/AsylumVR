@@ -2,8 +2,8 @@
 // (and usually looking the right way). They borrow a few spare bodies and
 // pose them by hand, then hand back to the patrols.
 import * as THREE from '../vendor/three.module.js';
-import { C, H, cx, cz } from './plan.js?v=1';
-import { makeBody, pose } from './carcass.js?v=1';
+import { C, H, cx, cz } from './plan.js?v=2';
+import { makeBody, pose } from './carcass.js?v=2';
 
 const V = THREE.Vector3;
 const near = (p, x, y, r) => Math.hypot(p.x - cx(x), p.z - cz(y)) < r;
@@ -33,12 +33,13 @@ export class Scares {
   show(a, on) { a.root.visible = on; }
   light(a) { a.mat.userData.uAmb.value.copy(this.world.lightAt(a.root.position.x, a.root.position.z)).multiplyScalar(1.3); }
   powerOn() {
-    // the lights come up and Kroft is standing in the generator room doorway
+    // the lights come up and the thing from the morgue is standing in the generator room doorway
     if (this.done.has('power')) return; this.done.add('power');
-    const b = this.horrors.brute; setTimeout(() => {
-      b.pos.set(cx(42), 0, cz(19.6)); b.yaw = 0; b.state = 'idle'; b.aware = 0.9; b.path = null;
-      this.horrors.glitchKick(1.2); this.sound.jump('scare'); this.sound.voice('brute', 'chase', b.pos);
-      setTimeout(() => { b.state = 'chase'; b.aware = 1.4; this.horrors.onChase(b); }, 1600);
+    const b = this.horrors.feral; if (!b) return;
+    setTimeout(() => {
+      b.pos.set(cx(42), 0, cz(19.6)); b.yaw = 0; b.state = 'idle'; b.aware = 0.9; b.path = null; b.route = b.opts.huntRoute;
+      this.horrors.glitchKick(1.2); this.sound.jump('scare'); this.sound.voice('eater', 'chase', b.pos);
+      setTimeout(() => { if (this.horrors.mayChase(b)) { b.state = 'chase'; b.aware = 1.4; this.horrors.onChase(b); } else b.state = 'patrol'; }, 1600);
     }, 2700);
   }
   update(dt) {

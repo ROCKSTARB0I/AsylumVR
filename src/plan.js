@@ -177,10 +177,10 @@ export function makePlan() {
   // creature spawns and patrol routes
   const brute = { x: 13, y: 6, route: [[13, 6], [23.5, 6.5], [24.5, 18.5], [8, 18.5], [1.5, 18.5], [1.5, 6], [13, 6], [24.5, 4.5], [45, 4.5], [42, 12], [42, 18.5], [24.5, 18.5], [25.5, 25]] };
   // Dr. Voss wakes when the first fuse is taken and walks the east wing, humming
-  const surgeon = { x: 33, y: 23.5, route: [[33, 23.5], [33, 19], [42, 18.5], [42, 23], [42, 18.5], [42, 12], [42, 4.5], [32, 4.5], [32, 12], [32, 18.5], [25.5, 18.5], [25.5, 25], [28.5, 23], [33, 23.5]] };
+  const surgeon = { x: 33, y: 23.5, route: [[33, 23.5], [33, 19], [42, 18.5], [42, 12], [42, 4.5], [32, 4.5], [32, 12], [32, 18.5], [24.5, 18.5], [13, 18.5], [9, 15], [5, 18.5], [1.5, 18.5], [1.5, 25], [1.5, 18.5], [13, 18.5], [17, 22], [24.5, 18.5], [24.5, 6], [24.5, 18.5], [28.5, 23], [33, 23.5]] };
   const inmates = [
     { x: 9, y: 22.6, kind: 'rocker' }, { x: 17, y: 14.3, kind: 'rocker', facing: Math.PI }, { x: 33.5, y: 12.5, kind: 'rocker', facing: 0 },
-    { x: 30.6, y: 25.0, kind: 'eater', facing: Math.PI / 2 }, { x: 5.5, y: 32.5, kind: 'rocker', facing: 2 },
+    { x: 30.6, y: 25.0, kind: 'eater', facing: Math.PI / 2, huntRoute: [[33, 19], [42, 18.5], [42, 23], [42, 18.5], [25.5, 18.5], [25.5, 25], [25.5, 32], [16, 31.5], [25.5, 32], [25.5, 18.5], [12, 18.5], [33, 19]] }, { x: 5.5, y: 32.5, kind: 'rocker', facing: 2 },
     // a patient who walks the west cells and the cafeteria in a loop
     { x: 2, y: 25, kind: 'stalker', route: [[1.5, 25], [1.5, 12], [1.5, 6], [8, 6], [1.5, 6], [1.5, 18.5], [12, 18.5], [1.5, 18.5]] },
   ];
