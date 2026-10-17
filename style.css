@@ -1,0 +1,78 @@
+:root { --ink: #e6e1d6; --dim: #8b867c; --red: #c8221a; --bg: #000; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden; font-family: 'VT323', ui-monospace, monospace; }
+#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; background: #000; }
+
+#screen { position: fixed; inset: 0; display: flex; align-items: center; padding: 24px clamp(16px, 7vw, 110px); overflow-y: auto;
+  background: radial-gradient(ellipse at 30% 50%, rgba(0,0,0,0.25), rgba(0,0,0,0.75) 75%); }
+#screen[hidden] { display: none; }
+#screen::before { content: ''; position: fixed; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.22) 0 1px, transparent 1px 3px); }
+.osd-top, .osd-bot { position: fixed; left: clamp(16px, 5vw, 60px); right: clamp(16px, 5vw, 60px); display: flex; justify-content: space-between; font-size: clamp(24px, 3.4vw, 40px); color: #fff; letter-spacing: 0.06em; pointer-events: none;
+  text-shadow: 2px 0 rgba(0,255,255,0.45), -2px 0 rgba(255,0,200,0.45), 0 0 6px rgba(0,0,0,0.9); }
+.osd-top { top: clamp(14px, 4vh, 40px); } .osd-bot { bottom: clamp(14px, 4vh, 40px); }
+.osd-top .play { animation: blink 2s steps(1) infinite; }
+.vhs { max-width: 620px; width: 100%; position: relative; animation: jit 5s infinite steps(1); }
+@keyframes jit { 0%, 95% { transform: none; filter: none } 96% { transform: translateX(4px) skewX(-2deg); filter: blur(0.6px) } 97% { transform: translateX(-6px) } 98% { transform: translateX(2px) } }
+.kicker { color: #b9b2a4; letter-spacing: 0.14em; text-transform: uppercase; font-size: clamp(15px, 1.8vw, 19px); margin: 0 0 4px; text-shadow: 0 0 6px #000; }
+.logo { font-family: 'Special Elite', serif; font-weight: 400; font-size: clamp(56px, 12vw, 128px); line-height: 0.95; margin: 0 0 clamp(18px, 4vh, 40px); color: #e4dccb; letter-spacing: 0.04em;
+  text-shadow: 3px 0 rgba(255,0,40,0.5), -3px 0 rgba(0,190,255,0.35), 0 0 30px rgba(0,0,0,0.9); }
+.logo span { color: var(--red); font-size: 0.4em; vertical-align: super; margin-left: 0.06em; }
+.menu { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.menu button { font: inherit; font-size: clamp(28px, 3.6vw, 40px); background: none; border: 0; color: #d8d2c6; padding: 2px 14px 2px 34px; cursor: pointer; letter-spacing: 0.08em; text-transform: uppercase; position: relative; text-shadow: 0 0 6px #000; }
+.menu button::before { content: '\25B6\FE0E'; position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font-size: 0.6em; opacity: 0; }
+.menu button:hover:not(:disabled), .menu button:focus-visible { background: #e8e2d4; color: #000; text-shadow: none; outline: none; }
+.menu button:hover:not(:disabled)::before, .menu button:focus-visible::before { opacity: 1; }
+.menu button:disabled { opacity: 0.35; cursor: default; }
+#enterVR { color: #ff5a4a; }
+button { font: inherit; font-size: 20px; background: transparent; color: var(--ink); border: 1px solid #4a4640; padding: 8px 20px; cursor: pointer; letter-spacing: 0.1em; text-transform: uppercase; }
+button:hover:not(:disabled), button:focus-visible { border-color: var(--red); color: #fff; outline: none; }
+#vrNote, #loading { color: #9a948a; font-size: 19px; min-height: 1em; margin: 14px 0 0; text-shadow: 0 0 6px #000; }
+.how { margin-top: 14px; font-family: 'Special Elite', serif; font-size: 13px; line-height: 1.6; color: #cfc8ba; background: rgba(0,0,0,0.6); padding: 12px 16px; border-left: 2px solid var(--red); }
+.how b { font-family: 'VT323', monospace; color: #ff5a4a; font-weight: normal; letter-spacing: 0.12em; text-transform: uppercase; font-size: 19px; display: block; }
+.end .lede { font-family: 'Special Elite', serif; line-height: 1.6; color: #cfc8ba; font-size: 15px; text-shadow: 0 0 6px #000; }
+
+/* camcorder on-screen display (desktop) */
+#osd { position: fixed; inset: 0; pointer-events: none; color: #fff; font-size: 30px; text-shadow: 0 0 3px #000, 1px 0 rgba(0,255,255,0.4), -1px 0 rgba(255,0,255,0.4); }
+#osd[hidden] { display: none; }
+#osd .tl { position: absolute; top: 5%; left: 6%; display: flex; align-items: center; gap: 10px; }
+#osd .dot { width: 18px; height: 18px; border-radius: 50%; background: #f22; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0 } }
+#osd .tr { position: absolute; top: 5%; right: 6%; }
+#osd .bl { position: absolute; bottom: 6%; left: 6%; }
+#osd .bm { position: absolute; bottom: 6%; left: 50%; transform: translateX(-50%); }
+#osd .br { position: absolute; bottom: 6%; right: 6%; display: flex; align-items: center; gap: 14px; }
+#osd .bat { display: inline-flex; gap: 3px; border: 2px solid #fff; padding: 3px; position: relative; }
+#osd .bat::after { content: ''; position: absolute; right: -7px; top: 6px; width: 4px; height: 8px; background: #fff; }
+#osd .bat i { width: 12px; height: 16px; background: #fff; }
+#osd .bat i.off { background: transparent; }
+#osd .bat.low i { background: #f33; animation: blink 0.6s steps(1) infinite; }
+#osd .corner { position: absolute; width: 40px; height: 40px; border: 3px solid rgba(255,255,255,0.85); }
+#osd .a { top: 12%; left: 4%; border-right: 0; border-bottom: 0; } #osd .b { top: 12%; right: 4%; border-left: 0; border-bottom: 0; }
+#osd .c { bottom: 13%; left: 4%; border-right: 0; border-top: 0; } #osd .d { bottom: 13%; right: 4%; border-left: 0; border-top: 0; }
+
+#objective { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); font-size: 22px; letter-spacing: 0.08em; color: #eee; text-shadow: 0 0 4px #000; pointer-events: none; text-align: center; max-width: 90vw; transition: opacity 0.8s; }
+#objective[hidden], #prompt[hidden], #caption[hidden] { display: none; }
+#prompt { position: fixed; top: 58%; left: 50%; transform: translateX(-50%); font-size: 22px; color: #ddd; letter-spacing: 0.12em; text-transform: uppercase; pointer-events: none; text-shadow: 0 0 4px #000; }
+#caption { position: fixed; bottom: 11%; left: 50%; transform: translateX(-50%); max-width: min(720px, 90vw); text-align: center; font-family: 'Special Elite', serif; font-size: 18px; color: #f0eadc; text-shadow: 0 1px 3px #000, 0 0 8px #000; pointer-events: none; }
+#dot { position: fixed; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; border-radius: 50%; background: rgba(255,255,255,0.35); pointer-events: none; display: none; }
+#dot.on { display: block; }
+
+#reader { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.6); padding: 16px; }
+#reader[hidden] { display: none; }
+#reader .paper { max-width: 560px; width: 100%; max-height: 86vh; overflow-y: auto; background: #cfc6ad; color: #1d1a14; padding: 28px 30px; font-family: 'Special Elite', serif; font-size: 16px; line-height: 1.55; box-shadow: 0 0 60px #000; transform: rotate(-0.6deg); background-image: radial-gradient(ellipse at 70% 80%, rgba(110,60,20,0.25), transparent 60%), radial-gradient(ellipse at 20% 10%, rgba(80,40,10,0.18), transparent 50%); }
+#reader h3 { margin: 0 0 12px; font-weight: 400; letter-spacing: 0.06em; border-bottom: 1px solid #6a5f48; padding-bottom: 6px; }
+#reader .close { font-family: 'VT323', monospace; color: #5a4c34; font-size: 18px; margin: 14px 0 0; text-align: right; }
+
+#pause { position: fixed; inset: 0; background: rgba(0,0,0,0.82); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; }
+#pause[hidden] { display: none; }
+#pause h2 { font-family: 'Special Elite', serif; font-weight: 400; letter-spacing: 0.15em; margin: 0 0 6px; font-size: 40px; }
+#pause .row { display: flex; gap: 10px; align-items: center; color: #c9c2b4; font-size: 20px; flex-wrap: wrap; justify-content: center; }
+#notesList { max-width: 600px; color: var(--dim); font-size: 18px; text-align: center; }
+
+#dead { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
+#dead[hidden] { display: none; }
+#dead .big { font-size: 64px; margin: 0; color: #fff; text-shadow: 3px 0 #0ff, -3px 0 #f0f; letter-spacing: 0.1em; }
+#dead .small { font-family: 'Special Elite', serif; color: #aaa; margin: 4px 0 0; }
+#fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.5s; }
+#fade.on { opacity: 1; }
+@media (max-width: 480px) { #osd { font-size: 20px; } }

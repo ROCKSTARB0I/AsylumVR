@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>AsylumVR</title>
+<meta name="description" content="Mount Harrow State Asylum. You are a journalist with a camcorder. Run. Hide. Record. A VR found-footage horror game for Meta Quest.">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<canvas id="view" tabindex="0"></canvas>
+
+<div id="osd" hidden>
+  <div class="tl"><span class="dot"></span>REC</div>
+  <div class="tr" id="tc">00:00:00:00</div>
+  <div class="bl" id="mode"></div>
+  <div class="bm" id="zoom"></div>
+  <div class="br"><span id="spares">x1</span><span class="bat"><i></i><i></i><i></i><i></i></span></div>
+  <div class="corner a"></div><div class="corner b"></div><div class="corner c"></div><div class="corner d"></div>
+</div>
+<div id="objective" hidden></div>
+<div id="prompt" hidden></div>
+<div id="caption" hidden></div>
+<div id="dot"></div>
+
+<div id="reader" hidden><div class="paper"><h3 id="readerTitle"></h3><div id="readerBody"></div><p class="close">[E] close</p></div></div>
+
+<div id="pause" hidden>
+  <h2>PAUSED</h2>
+  <div class="row"><button id="resume">Resume</button><button id="restartCk">Last checkpoint</button><button id="toTitle">Title</button></div>
+  <div class="row"><label>Brightness <input id="bright" type="range" min="0.5" max="2" step="0.05" value="1"></label></div>
+  <div class="row"><label>Tape grain <input id="grain" type="range" min="0" max="1.5" step="0.05" value="1"></label></div>
+  <div class="row"><label><input id="smooth" type="checkbox"> VR smooth turn</label></div>
+  <div id="notesList"></div>
+</div>
+
+<div id="dead" hidden><p class="big">SIGNAL LOST</p><p class="small">the tape keeps rolling</p></div>
+<div id="fade"></div>
+
+<div id="screen">
+  <div class="osd-top"><span class="play">&#9654;&#xFE0E; PLAY</span><span class="sp">SP <span id="titleTc">0:00:00</span></span></div>
+  <div class="vhs">
+    <p class="kicker">Recovered footage &middot; Mount Harrow State Asylum &middot; Tape 1 of 4</p>
+    <h1 class="logo">ASYLUM<span>VR</span></h1>
+    <nav class="menu" id="menu">
+      <button id="enterVR">Enter VR</button>
+      <button id="playDesktop">Play on desktop</button>
+      <button id="howBtn">How to play</button>
+    </nav>
+    <p id="vrNote"></p>
+    <p id="loading">Rewinding tape&hellip;</p>
+    <div class="how" id="how" hidden>
+      <p><b>Quest</b> Left stick walks, click it to run. Right stick snap-turns. The camcorder is in your left hand: left trigger toggles night vision, left grip zooms, X swaps a battery, Y shows your objective. Point with your right hand and pull the trigger to open doors, pick things up, or climb into a locker or under a bed. A crouches (or crouch for real). B pauses.</p>
+      <p><b>Desktop</b> WASD walk, Shift run, C crouch, mouse look. Hold right mouse (or Q) to raise the camcorder, F night vision, wheel zooms, R swaps a battery. E or click uses. Tab notes, Esc pauses, V free camera.</p>
+      <p><b>Surviving</b> You can't fight. Break line of sight, shut doors behind you, hide and keep still. Running is loud. Night vision is the only way to see in the dark, and it eats batteries.</p>
+    </div>
+  </div>
+  <div class="osd-bot"><span class="date">OCT.17 1993</span><span class="clock">2:13 AM</span></div>
+</div>
+
+<script type="module" src="src/main.js?v=1"></script>
+</body>
+</html>
