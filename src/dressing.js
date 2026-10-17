@@ -4,9 +4,9 @@
 // damp hanging in the beams, water dripping from the ceiling, steam in
 // the showers.
 import * as THREE from '../vendor/three.module.js';
-import { C, H, cx, cz } from './plan.js?v=2';
-import { makeBody, pose } from './carcass.js?v=2';
-import { rng } from './surfaces.js?v=2';
+import { C, H, cx, cz } from './plan.js?v=3';
+import { makeBody, pose } from './carcass.js?v=3';
+import { rng } from './surfaces.js?v=3';
 
 const V = THREE.Vector3;
 
@@ -95,11 +95,11 @@ export class Dressing {
   update(dt, at, camera) {
     this.t = (this.t || 0) + dt; const t = this.t;
     for (const b of this.dead) if (b.swing) { b.root.rotation.z = Math.sin(t * 0.6 + b.swing.k) * 0.02; b.root.rotation.y += dt * 0.03 * Math.sin(t * 0.2 + b.swing.k); }
+    if (this.flies) { let best = null, bd = 8; for (const f of this.flies) { const d = f.at.distanceTo(at); if (d < bd) { bd = d; best = f; } } const S = window.__asy && window.__asy.sound; if (S && S.on) S.fliesAt(best ? best.at : at, best ? 1 - bd / 8 : 0); }
     if (this.flies) for (const f of this.flies) {
       const d = f.at.distanceTo(at); f.pts.visible = d < 12; if (!f.pts.visible) continue;
       const a = f.pts.geometry.attributes.position.array; f.seeds.forEach(([s, sp, r], i) => { const k = t * sp * 3 + s; a[i * 3] = f.at.x + Math.sin(k) * r + Math.sin(k * 3.1) * 0.05; a[i * 3 + 1] = f.at.y + Math.sin(k * 1.7) * 0.25; a[i * 3 + 2] = f.at.z + Math.cos(k * 1.3) * r; });
       f.pts.geometry.attributes.position.needsUpdate = true;
-      if (!f.sound && window.__asy && window.__asy.sound.on) f.sound = window.__asy.sound.flies(f.at);
     }
     if (this.moteMat) { this.moteMat.uniforms.t.value = t; this.moteMat.uniforms.c.value.set(at.x, 1.5, at.z); const L = this.world.lightAt(at.x, at.z); this.moteMat.uniforms.L.value.copy(L).multiplyScalar(0.5).addScalar(0.0015); }
     if (this.dripMesh) {

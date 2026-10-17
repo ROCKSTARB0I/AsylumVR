@@ -3,8 +3,8 @@
 // dark), hears (your steps, doors, things you knock), patrols or keeps to
 // its corner, investigates, chases, searches, checks lockers, and kills.
 import * as THREE from '../vendor/three.module.js';
-import { C, W, D, cx, cz } from './plan.js?v=2';
-import { makeBody, pose, cleaver, bonesaw, BODY_LIGHT } from './carcass.js?v=2';
+import { C, W, D, cx, cz } from './plan.js?v=3';
+import { makeBody, pose, cleaver, bonesaw, BODY_LIGHT } from './carcass.js?v=3';
 
 const V = THREE.Vector3;
 const tmp = new V(), tmp2 = new V();
@@ -235,7 +235,7 @@ class Horror {
 export class Horrors {
   constructor(ctx) {
     Object.assign(this, ctx); this.nav = new Nav(this.space); this.list = [];
-    this.fear = 0; this.chase = 0; this.glitch = 0; this.lightsOut = false; this.kick = 0; this.face = null;
+    this.fear = 0; this.chase = 0; this.glitch = 0; this.lightsOut = false; this.blackout = false; this.static = 0; this.staticT = 0; this.kick = 0; this.face = null;
     const p = this.plan;
     this.brute = new Horror(this, 'brute', cx(p.brute.x), cz(p.brute.y), { route: p.brute.route, seed: 11 });
     this.surgeon = new Horror(this, 'surgeon', cx(p.surgeon.x), cz(p.surgeon.y), { route: p.surgeon.route, seed: 23, dormant: true });
@@ -262,6 +262,7 @@ export class Horrors {
     if (!w.vr) { const hy = h.body.bones.head.getWorldPosition(new V()); const dx = hy.x - head.x, dz = hy.z - head.z; w.yaw = Math.atan2(-dx, -dz); w.pitch = Math.atan2(hy.y - head.y, Math.hypot(dx, dz)); }
   }
   glitchKick(k) { this.kick = Math.max(this.kick, k); }
+  staticBurst(sec) { this.staticT = Math.max(this.staticT, sec); }
   scare(k) { this.glitchKick(k); }
   shake(x, z, k) { const d = Math.hypot(x - this.walker.pos.x, z - this.walker.pos.z); if (d < 6) this.walker.shake = Math.max(this.walker.shake, k * (1 - d / 6)); }
   // Outlast-style segments: one hunter at a time.
@@ -309,6 +310,7 @@ export class Horrors {
     this.fear += (Math.max(0, fear) - this.fear) * (1 - Math.exp(-dt * 2));
     this.chase += (chase - this.chase) * (1 - Math.exp(-dt * (chase ? 4 : 0.4)));
     this.kick = Math.max(0, this.kick - dt * 1.4);
+    this.staticT = Math.max(0, this.staticT - dt); this.static = this.staticT > 0 ? 0.85 + Math.random() * 0.15 : Math.max(0, this.static - dt * 6);
     this.glitch = Math.min(1.5, this.kick + Math.max(0, this.fear - 0.6) * 0.6);
   }
 }

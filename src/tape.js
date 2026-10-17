@@ -13,7 +13,7 @@ const COMMON = `
 
 // mode: 0 = the eye (light tape look), 1 = camcorder, 2 = camcorder night vision
 export const VHS_FRAG = `
-  uniform sampler2D src; uniform float t, mode, glitch, hurt, fear, aspect, battery, fade, zoom, exposure;
+  uniform sampler2D src; uniform float t, mode, glitch, hurt, fear, aspect, battery, fade, zoom, exposure, stat;
   varying vec2 vUv;
   ${COMMON}
   vec3 sampleTape(vec2 uv){
@@ -68,6 +68,8 @@ export const VHS_FRAG = `
     c *= 1.0 - dot(q, q) * (mode > 0.5 ? 0.9 : 0.75);
     // hurt: the picture reddens and pulses at the edges
     c = mix(c, c * vec3(1.3, 0.35, 0.3), hurt * smoothstep(0.2, 0.8, length(q)) );
+    // a burst of dead-channel static over everything
+    c = mix(c, vec3(h1(vUv * vec2(640.0, 480.0) + fract(t * 91.7) * 50.0)) * (0.6 + 0.4 * h1(vec2(line, t))), clamp(stat, 0.0, 1.0));
     c *= 1.0 - fade;
     gl_FragColor = vec4(c, 1.0);
   }`;
@@ -75,7 +77,7 @@ export const VHS_FRAG = `
 export const QUAD_VERT = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
 
 export function makeTape() {
-  const uniforms = { src: { value: null }, t: { value: 0 }, mode: { value: 0 }, glitch: { value: 0 }, hurt: { value: 0 }, fear: { value: 0 }, aspect: { value: 1.5 }, battery: { value: 1 }, fade: { value: 0 }, zoom: { value: 1 }, exposure: { value: 2.6 } };
+  const uniforms = { src: { value: null }, t: { value: 0 }, mode: { value: 0 }, glitch: { value: 0 }, hurt: { value: 0 }, fear: { value: 0 }, aspect: { value: 1.5 }, battery: { value: 1 }, fade: { value: 0 }, zoom: { value: 1 }, exposure: { value: 2.6 }, stat: { value: 0 } };
   const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: QUAD_VERT, fragmentShader: VHS_FRAG, depthTest: false, depthWrite: false });
   const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); quad.frustumCulled = false;
   const scene = new THREE.Scene(); scene.add(quad);
@@ -86,7 +88,7 @@ export function makeTape() {
 // The material for the flip-out screen on the camcorder in VR: same tape,
 // sampling the camcorder's own render, plus its on-screen display.
 export function makeScreenMaterial(rtTex, osdTex) {
-  const uniforms = { src: { value: rtTex }, osd: { value: osdTex }, t: { value: 0 }, mode: { value: 2 }, glitch: { value: 0 }, hurt: { value: 0 }, fear: { value: 0 }, aspect: { value: 1.33 }, battery: { value: 1 }, fade: { value: 0 }, zoom: { value: 1 }, exposure: { value: 2.6 } };
+  const uniforms = { src: { value: rtTex }, osd: { value: osdTex }, t: { value: 0 }, mode: { value: 2 }, glitch: { value: 0 }, hurt: { value: 0 }, fear: { value: 0 }, aspect: { value: 1.33 }, battery: { value: 1 }, fade: { value: 0 }, zoom: { value: 1 }, exposure: { value: 2.6 }, stat: { value: 0 } };
   const frag = VHS_FRAG.replace('uniform sampler2D src;', 'uniform sampler2D src; uniform sampler2D osd;')
     .replace('gl_FragColor = vec4(c, 1.0);', 'vec4 o = texture2D(osd, vUv); c = mix(c, o.rgb, o.a); gl_FragColor = vec4(c, 1.0);');
   const mat = new THREE.ShaderMaterial({ uniforms, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }', fragmentShader: frag });
@@ -97,16 +99,17 @@ export function makeScreenMaterial(rtTex, osdTex) {
 // In VR a full-screen pass costs too much, so the eye view gets a light
 // grain-and-vignette veil on a quad pinned in front of the face.
 export function makeVeil() {
-  const uniforms = { t: { value: 0 }, hurt: { value: 0 }, fear: { value: 0 }, fade: { value: 0 } };
+  const uniforms = { t: { value: 0 }, hurt: { value: 0 }, fear: { value: 0 }, fade: { value: 0 }, stat: { value: 0 } };
   const mat = new THREE.ShaderMaterial({ uniforms, transparent: true, depthTest: false, depthWrite: false,
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `uniform float t, hurt, fear, fade; varying vec2 vUv; ${COMMON}
+    fragmentShader: `uniform float t, hurt, fear, fade, stat; varying vec2 vUv; ${COMMON}
       void main(){ vec2 q = vUv - 0.5; float r = length(q) * 1.6;
         float g = h1(vUv * 900.0 + fract(t * 37.0) * 50.0);
         float vig = smoothstep(0.35, 1.0, r);
         vec3 col = mix(vec3(g * 0.5), vec3(0.4, 0.0, 0.0), hurt * vig);
         float a = 0.05 + 0.03 * fear + vig * (0.55 + hurt * 0.4);
         a = max(a, fade);
+        col = mix(col, vec3(g), stat); a = max(a, stat * 0.95);
         gl_FragColor = vec4(col * (1.0 - fade), a); }` });
   const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), mat); m.position.z = -0.6; m.renderOrder = 999; m.frustumCulled = false;
   return { mesh: m, uniforms };

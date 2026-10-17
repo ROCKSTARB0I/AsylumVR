@@ -2,22 +2,22 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=2';
-import { buildSurfaces, T } from './surfaces.js?v=2';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=2';
-import { Doors } from './doors.js?v=2';
-import { Space } from './space.js?v=2';
-import { Input } from './input.js?v=2';
-import { Walker } from './walker.js?v=2';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=2';
-import { makeTape, makeVeil } from './tape.js?v=2';
-import { Slate } from './slate.js?v=2';
-import { NOTES, MUTTER, OBJECTIVES } from './story.js?v=2';
-import { Sound } from './dread.js?v=2';
-import { Horrors } from './horrors.js?v=2';
-import { Dressing } from './dressing.js?v=2';
-import { Scares } from './scares.js?v=2';
-import { makeHand } from './hands.js?v=2';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=3';
+import { buildSurfaces, T } from './surfaces.js?v=3';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=3';
+import { Doors } from './doors.js?v=3';
+import { Space } from './space.js?v=3';
+import { Input } from './input.js?v=3';
+import { Walker } from './walker.js?v=3';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=3';
+import { makeTape, makeVeil } from './tape.js?v=3';
+import { Slate } from './slate.js?v=3';
+import { NOTES, MUTTER, OBJECTIVES } from './story.js?v=3';
+import { Sound } from './dread.js?v=3';
+import { Horrors } from './horrors.js?v=3';
+import { Dressing } from './dressing.js?v=3';
+import { Scares } from './scares.js?v=3';
+import { makeHand } from './hands.js?v=3';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -290,6 +290,7 @@ vrBtn.onclick = async () => {
   try {
     const s = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] });
     await renderer.xr.setSession(s); veil.mesh.visible = true;
+    s.addEventListener('visibilitychange', () => sound.wake && sound.wake()); s.addEventListener('selectstart', () => sound.wake && sound.wake());
     s.addEventListener('end', () => { veil.mesh.visible = false; capSlate.mesh.visible = false; });
     begin(true);
   } catch (e) { $('vrNote').textContent = 'Could not start VR: ' + e.message; }
@@ -376,11 +377,12 @@ let powerT = -1;
 function lights(dt) {
   const t = G.t;
   const stutter = (seed) => { const n = Math.sin(t * 13.1 + seed) * Math.sin(t * 7.3 + seed * 2.1) + Math.sin(t * 31.7 + seed * 5); const off = Math.sin(t * 0.37 + seed) > 0.55 ? 0.02 : 1; return Math.max(0, Math.min(1, (n > -0.6 ? 1 : 0.05) * off * (0.85 + 0.15 * Math.sin(t * 120)))); };
-  LIGHT.A.value = stutter(1.3) * (horrors.lightsOut ? 0 : 1); LIGHT.B.value = stutter(4.7) * (horrors.lightsOut ? 0 : 1);
-  if (G.power) { if (powerT < 0) powerT = 0; powerT += dt; LIGHT.P.value = powerT < 2.5 ? (Math.random() > 0.5 ? Math.min(1, powerT / 2.5) : 0.05) : 1; LIGHT.P.value *= horrors.lightsOut ? 0 : 1; }
+  const out = horrors.lightsOut || horrors.blackout ? 0 : 1; LIGHT.S.value = horrors.blackout ? 0.02 : 1;
+  LIGHT.A.value = stutter(1.3) * out; LIGHT.B.value = stutter(4.7) * out;
+  if (G.power) { if (powerT < 0) powerT = 0; powerT += dt; LIGHT.P.value = powerT < 2.5 ? (Math.random() > 0.5 ? Math.min(1, powerT / 2.5) : 0.05) : 1; LIGHT.P.value *= out; }
   else LIGHT.P.value = 0;
-  for (const f of Object.values(world.fixtureMats)) { const v = f.ch === 'S' ? 1 : LIGHT[f.ch].value; f.m.color.copy(f.col).multiplyScalar(f.ch === 'S' ? 1 : 0.04 + v * 1.6); }
-  for (const h of world.hazeCones) h.m.uniforms.k.value = h.ch === 'S' ? 1 : LIGHT[h.ch].value;
+  for (const f of Object.values(world.fixtureMats)) { const v = LIGHT[f.ch].value; f.m.color.copy(f.col).multiplyScalar(f.ch === 'S' ? 0.03 + v * 0.97 : 0.04 + v * 1.6); }
+  for (const h of world.hazeCones) h.m.uniforms.k.value = LIGHT[h.ch].value;
 }
 
 let camFrame = 0;
@@ -394,7 +396,7 @@ function draw(dt, vr, I) {
     camera.getWorldPosition(tmpV); camera.getWorldQuaternion(tmpQ); cam.aim(tmpV, tmpQ, 90); cam.setIR(cam.nv);
     for (const h of world.hazeCones) h.mesh.visible = !cam.nv;
     osdHud.visible = G.playing && !G.reading && !G.paused; cam.paintOSD(false, objT > 0 ? objectiveText() : '');
-    veil.uniforms.t.value = t; veil.uniforms.hurt.value = hurt; veil.uniforms.fear.value = horrors.fear * S.grain; veil.uniforms.fade.value = fade;
+    veil.uniforms.t.value = t; veil.uniforms.hurt.value = hurt; veil.uniforms.fear.value = horrors.fear * S.grain; veil.uniforms.fade.value = fade; veil.uniforms.stat.value = horrors.static || 0;
     renderer.render(scene, camera);
     cam.setIR(false);
     return;
@@ -404,7 +406,7 @@ function draw(dt, vr, I) {
   const raised = true;
   $('osd').hidden = !G.playing;
   if (raised) {
-    camera.layers.enable(EYE_LAYER); camera.updateMatrixWorld();
+    if (cam.nv) camera.layers.enable(EYE_LAYER); else camera.layers.disable(EYE_LAYER); camera.updateMatrixWorld();
     cam.aim(camera.getWorldPosition(tmpV), camera.getWorldQuaternion(tmpQ), 70); cam.setIR(cam.nv);
     $('tc').textContent = timecode(cam.clock); $('mode').textContent = cam.nv ? 'NIGHT SHOT' : cam.dead ? 'BATTERY EMPTY' : '';
     $('zoom').textContent = cam.zoom > 1.05 ? `ZOOM ${cam.zoom.toFixed(1)}x` : ''; $('spares').textContent = 'x' + cam.spares;
@@ -413,7 +415,7 @@ function draw(dt, vr, I) {
   renderer.setRenderTarget(rtMain); renderer.render(scene, camera); renderer.setRenderTarget(null);
   cam.setIR(false);
   const u = tape.uniforms; u.t.value = t; u.mode.value = raised ? (cam.nv ? 2 : 1) : 0; u.glitch.value = glitch; u.hurt.value = hurt; u.fear.value = horrors.fear * S.grain;
-  u.battery.value = cam.battery; u.fade.value = fade; u.zoom.value = raised ? cam.zoom : 1; u.exposure.value = 2.6 * S.bright;
+  u.battery.value = cam.battery; u.fade.value = fade; u.stat.value = horrors.static || 0; u.zoom.value = raised ? cam.zoom : 1; u.exposure.value = 2.6 * S.bright;
   renderer.render(tape.scene, tape.cam);
 }
 

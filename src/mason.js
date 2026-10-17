@@ -5,8 +5,8 @@
 // cones and stains are added on top. Light comes in four channels: S always
 // on, A and B the stuttering broken tubes, P the main circuit (generator).
 import * as THREE from '../vendor/three.module.js';
-import { C, H, W, D, Z, cx, cz } from './plan.js?v=2';
-import { T, scrawlTexture, rng } from './surfaces.js?v=2';
+import { C, H, W, D, Z, cx, cz } from './plan.js?v=3';
+import { T, scrawlTexture, rng } from './surfaces.js?v=3';
 
 const V3 = THREE.Vector3;
 export const LIGHT = { A: { value: 1 }, B: { value: 1 }, P: { value: 0 }, S: { value: 1 }, cool: { value: new THREE.Color(0.78, 0.88, 1.0) } };
@@ -415,6 +415,17 @@ export const EXTRA_MATS = {
 
 // Stains, scrawl and the dead are laid over the build by main once the
 // body module exists (see dressing.js).
+// find the wall face nearest to (x, z), trying the preferred side first
+function snapWall(world, x, z, pref) {
+  const D4 = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }; let best = null;
+  for (const k of [pref, 'n', 's', 'e', 'w']) {
+    const dir = D4[k]; if (!dir) continue; let px = x, pz = z, hit = false;
+    for (let i = 0; i < 70; i++) { if (world.baker.solid(px + dir[0] * 0.02, pz + dir[1] * 0.02)) { hit = true; break; } px += dir[0] * 0.04; pz += dir[1] * 0.04; }
+    if (!hit) continue; const d = Math.hypot(px - x, pz - z);
+    if (!best || d < best.d - (k === pref ? -0.3 : 0)) best = { d, px: px - dir[0] * 0.012, pz: pz - dir[1] * 0.012, dir };
+  }
+  return best;
+}
 export function laydecals(world, plan, scene) {
   const { tex, cells } = T.decals;
   const mat = bakedMaterial({ map: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, roughness: 0.3 });
@@ -426,9 +437,7 @@ export function laydecals(world, plan, scene) {
   };
   const wallDecal = (name, x, z, wall, s, y0) => {
     // find the wall surface by marching toward it
-    const dir = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }[wall]; let px = x, pz = z;
-    for (let i = 0; i < 60 && !world.baker.solid(px + dir[0] * 0.02, pz + dir[1] * 0.02); i++) { px += dir[0] * 0.05; pz += dir[1] * 0.05; }
-    px -= dir[0] * 0.012; pz -= dir[1] * 0.012;
+    const sw = snapWall(world, x, z, wall); if (!sw) return null; const { px, pz, dir } = sw;
     const tx = -dir[1], tz = dir[0]; const h = s / 2; const u = uvq(name); const n = [-dir[0], 0, -dir[1]];
     b.quad([px - tx * h, y0, pz - tz * h], [px + tx * h, y0, pz + tz * h], [px + tx * h, y0 + s, pz + tz * h], [px - tx * h, y0 + s, pz - tz * h], n, u[0], u[1], u[2], u[3]);
     return { px, pz, tx, tz, n };
@@ -456,9 +465,7 @@ export function laydecals(world, plan, scene) {
   for (const gd of plan.gore) if (gd.k === 'scrawl') {
     const m = bakedMaterial({ map: scrawlTexture(gd.t, (gd.x * 13 + gd.y) | 0), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, roughness: 0.4 });
     const bb = new Batch(m); const s = 2.4;
-    const dir = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }[gd.wall]; let px = cx(gd.x), pz = cz(gd.y);
-    for (let i = 0; i < 60 && !world.baker.solid(px + dir[0] * 0.02, pz + dir[1] * 0.02); i++) { px += dir[0] * 0.05; pz += dir[1] * 0.05; }
-    px -= dir[0] * 0.012; pz -= dir[1] * 0.012; const tx = -dir[1], tz = dir[0]; const n = [-dir[0], 0, -dir[1]]; const y0 = 1.3;
+    const sw = snapWall(world, cx(gd.x), cz(gd.y), gd.wall); if (!sw) continue; const { px, pz, dir } = sw; const tx = -dir[1], tz = dir[0]; const n = [-dir[0], 0, -dir[1]]; const y0 = 1.3;
     bb.quad([px - tx * s / 2, y0, pz - tz * s / 2], [px + tx * s / 2, y0, pz + tz * s / 2], [px + tx * s / 2, y0 + s / 4, pz + tz * s / 2], [px - tx * s / 2, y0 + s / 4, pz - tz * s / 2], n, [0, 0], [1, 0], [1, 1], [0, 1]);
     const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(bb.p, 3)); gg.setAttribute('normal', new THREE.Float32BufferAttribute(bb.n, 3)); gg.setAttribute('uv', new THREE.Float32BufferAttribute(bb.u, 2));
     world.baker.bakeGeometry(gg); const sm = new THREE.Mesh(gg, m); sm.renderOrder = 1; scene.add(sm);

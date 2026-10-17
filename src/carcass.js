@@ -5,9 +5,9 @@
 // trousers) and a face damaged in one of several ways. Procedural poses
 // drive the bones: walking, running, stalking, rocking, eating, reaching.
 import * as THREE from '../vendor/three.module.js';
-import { rng, fbm } from './surfaces.js?v=2';
-import { EYE_LAYER } from './camcorder.js?v=2';
-import { buildVisage, headMaterial } from './visage.js?v=2';
+import { rng, fbm } from './surfaces.js?v=3';
+import { EYE_LAYER } from './camcorder.js?v=3';
+import { buildVisage, headMaterial } from './visage.js?v=3';
 
 const V = THREE.Vector3;
 export const BODY_LIGHT = { up: { value: new V(0, 1, 0) } };
@@ -227,14 +227,14 @@ export function makeBody(kind, seed = 1, opts = {}) {
   const part = (geo, m4, colorFn, bone, w = 0, bone2 = bone) => parts.push({ geo, m4, colorFn, bone, bone2, w });
   const lidC = new THREE.Color(...r.skin).multiplyScalar(0.86);
   const irisC = r.dead ? new THREE.Color(0.17, 0.17, 0.14) : [new THREE.Color(0.24, 0.15, 0.08), new THREE.Color(0.2, 0.26, 0.3), new THREE.Color(0.22, 0.22, 0.14)][seed % 3];
-  const sclera = new THREE.Color(r.dead ? 0.42 : 0.62, r.dead ? 0.42 : 0.56, r.dead ? 0.36 : 0.46);
+  const sclera = new THREE.Color(r.dead ? 0.42 : 0.6, r.dead ? 0.42 : 0.5, r.dead ? 0.36 : 0.38);
   const eyeAt = [];
   for (let i = 0; i < 2; i++) {
     if (r.face === 'gouged' && i === 1) continue; if (r.face === 'bandaged' && i === 0) continue;
     const er = 0.0116 * HS; const c = headEyes[i].clone().add(new V(0, 0, -0.0065 * s)); eyeAt.push(c);
     part(new THREE.SphereGeometry(er, 22, 16).rotateX(Math.PI / 2), new THREE.Matrix4().makeTranslation(c.x, c.y, c.z), (p, n) => {
       const cz2 = n.z; if (cz2 > 0.972) return new THREE.Color(0.01, 0.01, 0.01); if (cz2 > 0.86) return irisC.clone().multiplyScalar(0.8 + (cz2 - 0.86) * 2);
-      const vein = Math.sin(n.x * 60 + n.y * 40) * Math.sin(n.y * 50) > 0.85; return vein ? new THREE.Color(0.5, 0.12, 0.1) : sclera.clone(); }, BI.head);
+      const vein = Math.sin(n.x * 60 + n.y * 40) * Math.sin(n.y * 50) > 0.6; const rim = cz2 < 0.5 ? 0.5 : 0; return vein ? new THREE.Color(0.55, 0.1, 0.08) : sclera.clone().lerp(new THREE.Color(0.55, 0.15, 0.12), rim); }, BI.head);
     const open = r.dead ? 0.35 : r.stare ? 0.75 : 0.5;
     for (const top of [true, false]) {
       const cover = top ? (1 - open) * 1.25 + 0.15 : (1 - open) * 0.7 + 0.12;
@@ -255,7 +255,7 @@ export function makeBody(kind, seed = 1, opts = {}) {
   geo.boundingSphere = new THREE.Sphere(new V(0, 1.0 * s, 0), 1.4 * s); mesh.frustumCulled = true;
   // eye-shine, seen only by the camcorder
   const eyes = [];
-  if (!r.dead) { const shine = new THREE.SpriteMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }); for (const c of eyeAt) { const sp = new THREE.Sprite(shine); sp.scale.setScalar(0.035 * s); sp.position.copy(c).sub(P.head).add(new V(0, 0, 0.02 * s)); sp.layers.set(EYE_LAYER); B.head.add(sp); eyes.push(sp); } }
+  if (!r.dead) { const shine = new THREE.SpriteMaterial({ map: glintTex(), color: 0xffffff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }); for (const c of eyeAt) { const sp = new THREE.Sprite(shine); sp.scale.setScalar(0.022 * s); sp.position.copy(c).sub(P.head).add(new V(0, 0, 0.02 * s)); sp.layers.set(EYE_LAYER); B.head.add(sp); eyes.push(sp); } }
   const body = { root, mesh, headMesh, bones: B, recipe: r, s, mat, eyes, kind, seed, rest: Object.fromEntries(BONES.map((n) => [n, B[n].position.clone()])) };
   if (r.shackles) for (const side of ['L', 'R']) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.05 * s, 0.012 * s, 6, 14), new THREE.MeshStandardMaterial({ color: 0x3a3632, metalness: 0.8, roughness: 0.5 })); ring.rotation.x = Math.PI / 2; ring.position.set(0, -0.2 * s, 0); B[side + 'fore'].add(ring); }
   if (r.glasses) { const gl = new THREE.Mesh(new THREE.TorusGeometry(0.019 * s, 0.002 * s, 4, 16), new THREE.MeshStandardMaterial({ color: 0x111111, metalness: 0.8 })); for (const e of headEyes) { const g2 = gl.clone(); g2.position.copy(e).sub(P.head).add(new V(0, 0, 0.016 * s)); B.head.add(g2); } }
@@ -413,4 +413,13 @@ function mergeParts(base, parts) {
   o.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); o.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); o.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); o.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); o.setAttribute('front', new THREE.Float32BufferAttribute(fr, 1));
   o.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4)); o.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4)); o.setIndex(idx);
   return o;
+}
+
+// a small soft round glint: the eye-shine night vision picks up
+let _glint = null;
+function glintTex() {
+  if (_glint) return _glint;
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.18, 'rgba(255,255,255,0.8)'); g.addColorStop(0.45, 'rgba(255,255,255,0.12)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64); _glint = new THREE.CanvasTexture(c); return _glint;
 }

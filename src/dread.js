@@ -5,23 +5,31 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=2';
+import { Score } from './score.js?v=3';
 
+const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
 const rnd = (a, b) => a + Math.random() * (b - a);
 
 export class Sound {
-  constructor() { this.ready = Promise.resolve(); this.on = false; this.timers = {}; }
+  constructor() { this.ready = Promise.resolve(); this.on = false; this.timers = {}; this.live = 0; this.cap = QUEST ? 22 : 64; this.vip = false; this.lastResume = 0; }
   init() {
     if (this.on) return; this.on = true;
-    const ctx = this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    // the headset's audio thread is weak: bigger buffers there, so it never runs dry
+    let ctx; try { ctx = new AC({ latencyHint: QUEST ? 'playback' : 'interactive' }); } catch (e) { ctx = new AC(); } this.ctx = ctx;
+    // the Quest browser suspends audio when the session or focus changes; bring it back on any input
+    const wake = () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); };
+    for (const ev of ['pointerdown', 'keydown', 'touchstart', 'visibilitychange', 'focus']) addEventListener(ev, wake, true);
+    ctx.onstatechange = () => { if (ctx.state !== 'running' && ctx.state !== 'closed') setTimeout(wake, 200); };
+    this.wake = wake;
     this.ready = ctx.resume ? ctx.resume() : Promise.resolve();
     this.master = ctx.createGain(); this.master.gain.value = 0.9;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.25;
     this.master.connect(comp); comp.connect(ctx.destination);
-    this.duckG = ctx.createGain(); this.duckG.connect(this.master);
+    this.duckG = ctx.createGain(); this.duckG.connect(this.master); this.vipDry = ctx.createGain(); this.vipDry.connect(this.master);
     // a long, damp hall reverb
-    this.verb = ctx.createConvolver(); this.verb.buffer = this.impulse(3.2, 2.6); this.verbIn = ctx.createGain(); this.verbIn.gain.value = 0.5; this.verbIn.connect(this.verb); this.verb.connect(this.duckG);
+    this.verb = ctx.createConvolver(); this.verb.buffer = this.impulse(QUEST ? 1.7 : 3.2, QUEST ? 2.2 : 2.6); this.verbIn = ctx.createGain(); this.verbIn.gain.value = 0.5; this.verbIn.connect(this.verb); this.verb.connect(this.duckG);
     this.dry = ctx.createGain(); this.dry.connect(this.duckG);
     this.noiseBuf = this.noise(2, 'white'); this.brownBuf = this.noise(4, 'brown');
     this.ambience();
@@ -43,20 +51,22 @@ export class Sound {
   out(node, pos, { verb = 0.35, gain = 1, ref = 1.5, roll = 1.2 } = {}) {
     const g = this.ctx.createGain(); g.gain.value = gain; node.connect(g);
     let tail = g;
-    if (pos) { const p = this.ctx.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = ref; p.rolloffFactor = roll; p.maxDistance = 60; setPos(p, pos); g.connect(p); tail = p; }
-    tail.connect(this.dry); const s = this.ctx.createGain(); s.gain.value = verb; tail.connect(s); s.connect(this.verbIn);
+    if (pos) { const p = this.ctx.createPanner(); p.panningModel = QUEST ? 'equalpower' : 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = ref; p.rolloffFactor = roll; p.maxDistance = 60; setPos(p, pos); g.connect(p); tail = p; }
+    tail.connect(this.vip ? this.vipDry : this.dry); const s = this.ctx.createGain(); s.gain.value = verb * (this.vip ? 0.6 : 1); tail.connect(s); s.connect(this.verbIn);
     return g;
   }
   env(param, t, a, peak, d, end = 0.0001) { param.cancelScheduledValues(t); param.setValueAtTime(0.0001, t); param.exponentialRampToValueAtTime(peak, t + a); param.exponentialRampToValueAtTime(end, t + a + d); }
   get t() { return this.ctx.currentTime; }
   // a burst of filtered noise
+  // a budget of simultaneous sounds; screams, hits and scares always get through
+  take(dur) { if (this.live >= this.cap && !this.vip) return false; this.live++; setTimeout(() => { this.live--; }, (dur + 0.25) * 1000); return true; }
   burst(pos, { f = 800, q = 1, type = 'bandpass', dur = 0.1, gain = 0.5, a = 0.002, verb = 0.3, brown = false, sweep = 0, delay = 0 } = {}) {
-    if (!this.on) return; const t = this.t + delay; const s = this.src(brown ? this.brownBuf : this.noiseBuf); const fl = this.ctx.createBiquadFilter(); fl.type = type; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
+    if (!this.on || !this.take(dur + delay)) return; const t = this.t + delay; const s = this.src(brown ? this.brownBuf : this.noiseBuf); const fl = this.ctx.createBiquadFilter(); fl.type = type; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
     if (sweep) fl.frequency.exponentialRampToValueAtTime(Math.max(20, f * sweep), t + dur);
     const g = this.ctx.createGain(); s.connect(fl); fl.connect(g); this.env(g.gain, t, a, gain, dur); this.out(g, pos, { verb }); s.start(t, Math.random() * 1.5); s.stop(t + a + dur + 0.05);
   }
   tone(pos, { f = 200, type = 'sine', dur = 0.3, gain = 0.3, a = 0.004, f2 = 0, verb = 0.3, delay = 0, detune = 0 } = {}) {
-    if (!this.on) return; const t = this.t + delay; const o = this.ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); o.detune.value = detune; if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    if (!this.on || !this.take(dur + delay)) return; const t = this.t + delay; const o = this.ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); o.detune.value = detune; if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
     const g = this.ctx.createGain(); o.connect(g); this.env(g.gain, t, a, gain, dur); this.out(g, pos, { verb }); o.start(t); o.stop(t + a + dur + 0.05);
   }
   // metallic: a few inharmonic partials
@@ -65,7 +75,7 @@ export class Sound {
   // ---------------------------------------------------------- voices
   // a formant voice: f0 contour, vowels over time, breathiness, roughness
   voiceSynth(pos, { f0 = 120, f1 = null, dur = 0.6, vowels = ['a'], breath = 0.2, rough = 0, gain = 0.4, vib = 5, vibD = 0.02, verb = 0.4, jitter = 0.02, delay = 0, a = 0.04 } = {}) {
-    if (!this.on) return; const ctx = this.ctx; const t = this.t + delay;
+    if (!this.on || !this.take(dur + delay)) return; const ctx = this.ctx; const t = this.t + delay;
     const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
     const lfo = ctx.createOscillator(); lfo.frequency.value = vib; const lg = ctx.createGain(); lg.gain.value = f0 * vibD; lfo.connect(lg); lg.connect(o.frequency);
     const jit = this.src(this.brownBuf, true); const jg = ctx.createGain(); jg.gain.value = f0 * jitter * 8; jit.connect(jg); jg.connect(o.frequency);
@@ -147,6 +157,7 @@ export class Sound {
   // ---------------------------------------------------------- per frame
   listen(pos, quat, dt, st) {
     if (!this.on) return; const L = this.ctx.listener; const t = this.t;
+    if (this.ctx.state !== 'running' && performance.now() - this.lastResume > 500) { this.lastResume = performance.now(); this.wake(); }
     const f = new THREE.Vector3(0, 0, -1).applyQuaternion(quat), u = new THREE.Vector3(0, 1, 0).applyQuaternion(quat);
     if (L.positionX) { L.positionX.setTargetAtTime(pos.x, t, 0.02); L.positionY.setTargetAtTime(pos.y, t, 0.02); L.positionZ.setTargetAtTime(pos.z, t, 0.02); L.forwardX.setTargetAtTime(f.x, t, 0.02); L.forwardY.setTargetAtTime(f.y, t, 0.02); L.forwardZ.setTargetAtTime(f.z, t, 0.02); L.upX.setTargetAtTime(u.x, t, 0.02); L.upY.setTargetAtTime(u.y, t, 0.02); L.upZ.setTargetAtTime(u.z, t, 0.02); }
     else { L.setPosition(pos.x, pos.y, pos.z); L.setOrientation(f.x, f.y, f.z, u.x, u.y, u.z); }
@@ -239,14 +250,28 @@ export class Sound {
   // the jumpscare hit: screeching strings, a scream of noise, a boom
   jump(kind = 'sting', delay = 0) {
     if (!this.on) return; const big = kind === 'kill' || kind === 'rip' || kind === 'scare';
-    for (let i = 0; i < (big ? 9 : 5); i++) { const f = rnd(600, 1400); this.tone(null, { f, f2: f * rnd(1.3, 2), dur: big ? 1.4 : 0.8, gain: big ? 0.12 : 0.07, type: 'sawtooth', a: 0.01, delay, detune: rnd(-40, 40), verb: 0.6 }); }
-    this.burst(null, { f: 2500, q: 0.6, dur: big ? 0.8 : 0.4, gain: big ? 0.6 : 0.3, a: 0.005, delay, sweep: 0.4 });
-    this.tone(null, { f: 60, f2: 28, dur: 1.2, gain: big ? 1 : 0.6, delay, verb: 0.5 });
+    // screeching string cluster sliding up
+    for (let i = 0; i < (big ? 10 : 5); i++) { const f = rnd(500, 1500); this.tone(null, { f, f2: f * rnd(1.4, 2.4), dur: big ? 1.5 : 0.8, gain: big ? 0.16 : 0.07, type: 'sawtooth', a: 0.005, delay, detune: rnd(-50, 50), verb: 0.5 }); }
+    // a slam of full-band noise and a sub drop that you feel
+    this.burst(null, { f: 2500, q: 0.4, dur: big ? 0.9 : 0.4, gain: big ? 0.9 : 0.3, a: 0.002, delay, sweep: 0.3 });
+    this.tone(null, { f: 55, f2: 22, dur: 1.4, gain: big ? 1.3 : 0.6, delay, verb: 0.4 });
+    if (big) {
+      this.tone(null, { f: 110, f2: 40, dur: 0.6, gain: 0.9, type: 'square', delay, verb: 0.2 });
+      this.clang(null, rnd(90, 140), 0.6, 1.8);
+      this.voiceSynth(null, { f0: rnd(700, 900), f1: rnd(400, 600), dur: 1.0, vowels: ['a', 'i', 'a'], rough: 1, breath: 0.35, gain: 1.1, vib: 11, vibD: 0.06, delay, a: 0.005, verb: 0.3 });
+      this.voiceSynth(null, { f0: rnd(250, 330), f1: rnd(150, 200), dur: 1.2, vowels: ['a', 'o'], rough: 1, breath: 0.5, gain: 0.9, vib: 7, vibD: 0.05, delay: delay + 0.03, a: 0.005, verb: 0.3 });
+    }
   }
+  // the building goes quiet just before something happens
+  hush(sec) { if (!this.on) return; const t = this.t; this.duckG.gain.cancelScheduledValues(t); this.duckG.gain.setTargetAtTime(0.06, t, 0.25); this.duckG.gain.setTargetAtTime(1, t + sec, 0.05); }
   scream(pos, k = 1) { this.voiceSynth(pos, { f0: rnd(550, 750), f1: rnd(900, 1100), dur: 1.1 * k, vowels: ['a', 'i'], rough: 0.7, breath: 0.3, gain: 1.0, vib: 8, vibD: 0.05, verb: 0.4 }); }
   thud(pos, k = 1) { this.tone(pos, { f: 70, f2: 35, dur: 0.4, gain: 0.9 * k, verb: 0.5 }); this.burst(pos, { f: 400, q: 0.6, dur: 0.25, gain: 0.7 * k, brown: true }); }
   squelch(pos, k = 1) { for (let i = 0; i < 3; i++) this.burst(pos, { f: rnd(150, 400), q: 4, dur: 0.15, gain: 0.4 * k, brown: true, delay: i * 0.09 }); }
-  flies(pos) { const ctx = this.ctx; const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 190; const l = ctx.createOscillator(); l.frequency.value = 7; const lg = ctx.createGain(); lg.gain.value = 25; l.connect(lg); lg.connect(o.frequency); const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 400; bp.Q.value = 3; const g = ctx.createGain(); g.gain.value = 0.05; o.connect(bp); bp.connect(g); this.out(g, pos, { verb: 0.1, ref: 0.6, roll: 2.2 }); o.start(); l.start(); return g; }
+  fliesAt(pos, k) { if (!this.on) return; if (!this.fly) { this.fly = this.flies(pos); this.flyP = this.fly.panner; } if (this.flyP) setPos(this.flyP, pos); this.fly.gain.setTargetAtTime(0.05 * k, this.t, 0.3); }
+  flies(pos) { const ctx = this.ctx; const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 190; const l = ctx.createOscillator(); l.frequency.value = 7; const lg = ctx.createGain(); lg.gain.value = 25; l.connect(lg); lg.connect(o.frequency); const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 400; bp.Q.value = 3; const g = ctx.createGain(); g.gain.value = 0; o.connect(bp); bp.connect(g); const p = ctx.createPanner(); p.panningModel = QUEST ? 'equalpower' : 'HRTF'; p.refDistance = 0.6; p.rolloffFactor = 2.2; setPos(p, pos); g.connect(p); p.connect(this.dry); o.start(); l.start(); g.panner = p; return g; }
   buzz(pos) { const ctx = this.ctx; const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 120; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 4; const g = ctx.createGain(); g.gain.value = 0; o.connect(bp); bp.connect(g); const out = this.out(g, pos, { verb: 0.2, ref: 1, roll: 1.8 }); o.start(); return g; }
 }
 function setPos(p, v) { if (p.positionX) { p.positionX.value = v.x; p.positionY.value = v.y; p.positionZ.value = v.z; } else p.setPosition(v.x, v.y, v.z); }
+
+// screams, hits and scares always get through the voice budget and the hush
+for (const k of ['jump', 'scream', 'hit', 'kill', 'lockerRip', 'thud', 'squelch']) { const f = Sound.prototype[k]; Sound.prototype[k] = function (...a) { const v = this.vip; this.vip = true; try { return f.apply(this, a); } finally { this.vip = v; } }; }

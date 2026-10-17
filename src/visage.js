@@ -6,7 +6,7 @@
 // bandages, a missing nose, a surgical mask). Both maps share a front
 // projection; the rest of the head keeps procedural vertex colour.
 import * as THREE from '../vendor/three.module.js';
-import { rng, fbm } from './surfaces.js?v=2';
+import { rng, fbm } from './surfaces.js?v=3';
 
 const V = THREE.Vector3;
 const D = 256, T = 512;     // depth map and face texture sizes
@@ -78,9 +78,10 @@ function faceTexture(r, R, skinHex) {
   c.putImageData(id, 0, 0);
   const rgba = (rr, gg, bb, a) => `rgba(${rr},${gg},${bb},${a})`;
   for (const s of [-1, 1]) {
-    blob(P, s * 0.36, 0.04, 0.2, 0.14, rgba(60, 30, 40, 0.55), 10);                // bruised, sleepless sockets
-    blob(P, s * 0.34, -0.06, 0.15, 0.05, rgba(80, 40, 60, 0.4), 6);
-    blob(P, s * 0.36, 0.045, 0.12, 0.06, rgba(40, 18, 18, 0.65), 2);              // lid crease shadow
+    blob(P, s * 0.36, 0.04, 0.24, 0.17, rgba(28, 12, 18, 0.8), 12);               // sunken, bruised, sleepless sockets
+    blob(P, s * 0.34, -0.07, 0.17, 0.06, rgba(70, 25, 45, 0.6), 6);                // dark bags
+    blob(P, s * 0.36, 0.045, 0.13, 0.065, rgba(25, 8, 8, 0.85), 2);                // lid crease shadow
+    blob(P, s * 0.36, 0.0, 0.1, 0.035, rgba(140, 30, 30, 0.55), 3);               // raw red rims
     if (r.face !== 'burned' || s < 0) for (let k = 0; k < 26; k++) {                // brows, hair by hair
       const t = k / 25; const x0 = s * (0.18 + t * 0.32), y0 = 0.2 + Math.sin(t * Math.PI) * 0.04 - t * 0.02;
       stroke(P, [[x0, y0 - 0.02], [x0 + s * 0.04, y0 + 0.015]], 0.012, rgba(30, 22, 16, 0.7), 0.5);
@@ -95,6 +96,9 @@ function faceTexture(r, R, skinHex) {
     const R3 = rng(r.seed * 7 + 1); c.fillStyle = 'rgba(30,24,20,0.35)';
     for (let i = 0; i < 2600; i++) { const fx = (R3() - 0.5) * 1.5, fy = -0.3 - R3() * 0.7; if (Math.hypot(fx / 0.75, (fy + 0.6) / 0.5) > 1 || Math.abs(fy + 0.5) < 0.06 && Math.abs(fx) < 0.26) continue; c.fillRect(P.X(fx), P.Y(fy), 1.2, 1.2); }
   }
+  // filth, scabs and old blood ground into the skin
+  for (let i = 0; i < 26; i++) blob(P, (R() - 0.5) * 1.6, (R() - 0.5) * 1.8, 0.03 + R() * 0.12, 0.02 + R() * 0.1, R() > 0.6 ? rgba(60, 10, 8, 0.35) : rgba(40, 30, 18, 0.3), 4, R() * 3);
+  for (let i = 0; i < 12; i++) blob(P, (R() - 0.5) * 1.4, (R() - 0.5) * 1.6, 0.012 + R() * 0.02, 0.012 + R() * 0.02, rgba(90, 20, 15, 0.8), 1);
   // forehead creases, veins at the temples on starved faces
   for (let i = 0; i < 3; i++) stroke(P, [[-0.4, 0.4 + i * 0.08], [0, 0.42 + i * 0.08], [0.4, 0.4 + i * 0.08]], 0.008, 'rgba(70,40,35,0.35)', 1);
   if (r.lean > 0.6) for (const s of [-1, 1]) stroke(P, [[s * 0.62, 0.35], [s * 0.58, 0.2], [s * 0.65, 0.1]], 0.012, 'rgba(70,80,110,0.4)', 1);
