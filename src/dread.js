@@ -1,0 +1,252 @@
+// Dread: every sound in the asylum, synthesized with Web Audio. A low
+// building drone and ventilation hiss, drips, pipes, far-off screams and
+// knocking, the buzz of dying tubes; your breath and heartbeat; strings
+// when something chases you; voices built from formant filters (the
+// brute sings, the doctor hums, patients mutter and scream); doors,
+// lockers, footsteps on tile and concrete, the generator and the alarm.
+import * as THREE from '../vendor/three.module.js';
+import { Score } from './score.js?v=1';
+
+const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
+const rnd = (a, b) => a + Math.random() * (b - a);
+
+export class Sound {
+  constructor() { this.ready = Promise.resolve(); this.on = false; this.timers = {}; }
+  init() {
+    if (this.on) return; this.on = true;
+    const ctx = this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.ready = ctx.resume ? ctx.resume() : Promise.resolve();
+    this.master = ctx.createGain(); this.master.gain.value = 0.9;
+    const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.25;
+    this.master.connect(comp); comp.connect(ctx.destination);
+    this.duckG = ctx.createGain(); this.duckG.connect(this.master);
+    // a long, damp hall reverb
+    this.verb = ctx.createConvolver(); this.verb.buffer = this.impulse(3.2, 2.6); this.verbIn = ctx.createGain(); this.verbIn.gain.value = 0.5; this.verbIn.connect(this.verb); this.verb.connect(this.duckG);
+    this.dry = ctx.createGain(); this.dry.connect(this.duckG);
+    this.noiseBuf = this.noise(2, 'white'); this.brownBuf = this.noise(4, 'brown');
+    this.ambience();
+    this.score = new Score(this);
+    this.body();
+  }
+  impulse(sec, decay) {
+    const ctx = this.ctx, n = Math.floor(sec * ctx.sampleRate), b = ctx.createBuffer(2, n, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < n; i++) { const t = i / n; d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, decay) * (i < 400 ? i / 400 : 1); } }
+    return b;
+  }
+  noise(sec, kind) {
+    const ctx = this.ctx, n = Math.floor(sec * ctx.sampleRate), b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0);
+    let last = 0; for (let i = 0; i < n; i++) { const w = Math.random() * 2 - 1; if (kind === 'brown') { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; } else d[i] = w; }
+    return b;
+  }
+  src(buf, loop = false) { const s = this.ctx.createBufferSource(); s.buffer = buf; s.loop = loop; if (!loop) s.loopStart = 0; return s; }
+  // route a node out: positional (HRTF panner) or flat, with reverb send
+  out(node, pos, { verb = 0.35, gain = 1, ref = 1.5, roll = 1.2 } = {}) {
+    const g = this.ctx.createGain(); g.gain.value = gain; node.connect(g);
+    let tail = g;
+    if (pos) { const p = this.ctx.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = ref; p.rolloffFactor = roll; p.maxDistance = 60; setPos(p, pos); g.connect(p); tail = p; }
+    tail.connect(this.dry); const s = this.ctx.createGain(); s.gain.value = verb; tail.connect(s); s.connect(this.verbIn);
+    return g;
+  }
+  env(param, t, a, peak, d, end = 0.0001) { param.cancelScheduledValues(t); param.setValueAtTime(0.0001, t); param.exponentialRampToValueAtTime(peak, t + a); param.exponentialRampToValueAtTime(end, t + a + d); }
+  get t() { return this.ctx.currentTime; }
+  // a burst of filtered noise
+  burst(pos, { f = 800, q = 1, type = 'bandpass', dur = 0.1, gain = 0.5, a = 0.002, verb = 0.3, brown = false, sweep = 0, delay = 0 } = {}) {
+    if (!this.on) return; const t = this.t + delay; const s = this.src(brown ? this.brownBuf : this.noiseBuf); const fl = this.ctx.createBiquadFilter(); fl.type = type; fl.frequency.setValueAtTime(f, t); fl.Q.value = q;
+    if (sweep) fl.frequency.exponentialRampToValueAtTime(Math.max(20, f * sweep), t + dur);
+    const g = this.ctx.createGain(); s.connect(fl); fl.connect(g); this.env(g.gain, t, a, gain, dur); this.out(g, pos, { verb }); s.start(t, Math.random() * 1.5); s.stop(t + a + dur + 0.05);
+  }
+  tone(pos, { f = 200, type = 'sine', dur = 0.3, gain = 0.3, a = 0.004, f2 = 0, verb = 0.3, delay = 0, detune = 0 } = {}) {
+    if (!this.on) return; const t = this.t + delay; const o = this.ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); o.detune.value = detune; if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    const g = this.ctx.createGain(); o.connect(g); this.env(g.gain, t, a, gain, dur); this.out(g, pos, { verb }); o.start(t); o.stop(t + a + dur + 0.05);
+  }
+  // metallic: a few inharmonic partials
+  clang(pos, f = 300, gain = 0.25, dur = 0.8) { for (const [k, gg] of [[1, 1], [1.58, 0.6], [2.74, 0.45], [4.1, 0.3], [5.4, 0.2]]) this.tone(pos, { f: f * k * rnd(0.99, 1.01), dur: dur * rnd(0.6, 1), gain: gain * gg * 0.4, verb: 0.5 }); this.burst(pos, { f: 3000, q: 0.7, dur: 0.03, gain: gain * 0.6 }); }
+
+  // ---------------------------------------------------------- voices
+  // a formant voice: f0 contour, vowels over time, breathiness, roughness
+  voiceSynth(pos, { f0 = 120, f1 = null, dur = 0.6, vowels = ['a'], breath = 0.2, rough = 0, gain = 0.4, vib = 5, vibD = 0.02, verb = 0.4, jitter = 0.02, delay = 0, a = 0.04 } = {}) {
+    if (!this.on) return; const ctx = this.ctx; const t = this.t + delay;
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    const lfo = ctx.createOscillator(); lfo.frequency.value = vib; const lg = ctx.createGain(); lg.gain.value = f0 * vibD; lfo.connect(lg); lg.connect(o.frequency);
+    const jit = this.src(this.brownBuf, true); const jg = ctx.createGain(); jg.gain.value = f0 * jitter * 8; jit.connect(jg); jg.connect(o.frequency);
+    const mix = ctx.createGain(); mix.gain.value = 1 - breath;
+    let srcNode = o;
+    if (rough) { const ws = ctx.createWaveShaper(); const n = 256, cur = new Float32Array(n); for (let i = 0; i < n; i++) { const x = i / n * 2 - 1; cur[i] = Math.tanh(x * (1 + rough * 8)); } ws.curve = cur; o.connect(ws); srcNode = ws;
+      const sub = ctx.createOscillator(); sub.type = 'square'; sub.frequency.value = f0 / 2; const sg = ctx.createGain(); sg.gain.value = rough * 0.4; sub.connect(sg); sg.connect(mix); sub.start(t); sub.stop(t + dur + 0.2); }
+    srcNode.connect(mix);
+    const nz = this.src(this.noiseBuf, true); const ng = ctx.createGain(); ng.gain.value = breath * 0.6; nz.connect(ng);
+    const sum = ctx.createGain(); mix.connect(sum); ng.connect(sum);
+    const outG = ctx.createGain(); outG.gain.value = 0;
+    const seg = dur / vowels.length;
+    for (let k = 0; k < 3; k++) {
+      const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = [9, 12, 14][k];
+      vowels.forEach((v, i) => { const F = VOWELS[v] || VOWELS.a; const ff = F[k] * (f0 > 300 ? 1.15 : 1); if (i === 0) bp.frequency.setValueAtTime(ff, t); else bp.frequency.linearRampToValueAtTime(ff, t + seg * i); });
+      const fg = ctx.createGain(); fg.gain.value = [1, 0.55, 0.3][k]; sum.connect(bp); bp.connect(fg); fg.connect(outG);
+    }
+    outG.gain.setValueAtTime(0.0001, t); outG.gain.exponentialRampToValueAtTime(gain, t + a); outG.gain.setValueAtTime(gain, t + Math.max(a, dur - 0.08)); outG.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
+    this.out(outG, pos, { verb, ref: 2 });
+    o.start(t); lfo.start(t); jit.start(t, Math.random() * 3); nz.start(t, Math.random()); const end = t + dur + 0.15; o.stop(end); lfo.stop(end); jit.stop(end); nz.stop(end);
+  }
+  syllables(pos, n, base, opts = {}) { let d = 0; const V = Object.keys(VOWELS); for (let i = 0; i < n; i++) { const dur = rnd(0.12, 0.3); this.voiceSynth(pos, { f0: base * rnd(0.85, 1.2), f1: base * rnd(0.8, 1.1), dur, vowels: [V[(Math.random() * V.length) | 0], V[(Math.random() * V.length) | 0]], delay: d, a: 0.02, ...opts }); d += dur + rnd(0.02, 0.15); } return d; }
+  voice(kind, what, pos) {
+    if (!this.on) return; const p = pos.clone(); p.y = 1.6;
+    if (kind === 'brute') {
+      if (what === 'idle') {   // Kroft sings: a low wandering nursery tune, out of key
+        const notes = [0, 2, 3, 2, 0, -2, 0, 3, 5, 3]; let d = 0; const base = 92;
+        const k = (Math.random() * 4) | 0; for (let i = 0; i < 5; i++) { const n = notes[(k + i) % notes.length]; const dur = rnd(0.35, 0.7); this.voiceSynth(p, { f0: base * Math.pow(2, n / 12), dur, vowels: ['o', 'u'], breath: 0.25, rough: 0.25, gain: 0.5, vib: 4, vibD: 0.03, delay: d, a: 0.08 }); d += dur + 0.05; }
+      } else if (what === 'alert') this.voiceSynth(p, { f0: 85, f1: 70, dur: 0.7, vowels: ['uh', 'o'], rough: 0.6, breath: 0.3, gain: 0.7 });
+      else if (what === 'chase' || what === 'attack') { this.voiceSynth(p, { f0: 110, f1: 75, dur: what === 'chase' ? 1.4 : 0.6, vowels: ['a', 'o'], rough: 0.95, breath: 0.35, gain: 1.0, vib: 9, vibD: 0.05 }); }
+      else if (what === 'pant') this.breathAt(p, 0.45, 0.9, 260);
+      else if (what === 'lost') this.voiceSynth(p, { f0: 80, f1: 65, dur: 1.2, vowels: ['o', 'm'], rough: 0.4, gain: 0.6 });
+    } else if (kind === 'surgeon') {
+      if (what === 'idle') {   // Dr. Voss hums while he works
+        const tune = [7, 5, 4, 5, 7, 7, 7, 5, 5, 5, 7, 10, 10]; let d = 0; const base = 150;
+        for (let i = 0; i < 7; i++) { const dur = rnd(0.3, 0.5); this.voiceSynth(p, { f0: base * Math.pow(2, tune[i] / 12), dur, vowels: ['m'], breath: 0.15, gain: 0.35, vib: 5, vibD: 0.012, delay: d, a: 0.05, verb: 0.55 }); d += dur + 0.03; }
+      } else if (what === 'alert') this.voiceSynth(p, { f0: 130, f1: 160, dur: 0.5, vowels: ['m', 'm'], gain: 0.5 });
+      else if (what === 'chase') { this.syllables(p, 4, 135, { gain: 0.6, rough: 0.15 }); this.tone(p, { f: 2400, dur: 0.6, gain: 0.05, type: 'sawtooth', f2: 2200 }); }
+      else if (what === 'attack') this.voiceSynth(p, { f0: 160, f1: 120, dur: 0.4, vowels: ['uh'], gain: 0.7, rough: 0.3 });
+      else if (what === 'pant') this.breathAt(p, 0.25, 0.7, 500);
+      else if (what === 'lost') this.syllables(p, 5, 125, { gain: 0.4 });
+    } else if (kind === 'rocker') {
+      if (what === 'mutter') this.syllables(p, 4 + ((Math.random() * 5) | 0), rnd(100, 160), { gain: 0.3, breath: 0.5, verb: 0.5 });
+      else if (what === 'scream') this.voiceSynth(p, { f0: rnd(500, 700), f1: rnd(800, 1000), dur: 1.3, vowels: ['a', 'i', 'e'], rough: 0.5, breath: 0.3, gain: 0.9, vib: 7, vibD: 0.04 });
+    } else if (kind === 'eater') {
+      if (what === 'chew') { for (let i = 0; i < 4; i++) { this.burst(p, { f: rnd(300, 900), q: 3, dur: rnd(0.05, 0.12), gain: 0.35, delay: i * rnd(0.12, 0.25), verb: 0.2 }); this.burst(p, { f: rnd(120, 220), q: 2, dur: 0.18, gain: 0.3, brown: true, delay: i * 0.2 + 0.05 }); } }
+      else if (what === 'chase' || what === 'alert') this.voiceSynth(p, { f0: 300, f1: 180, dur: 0.9, vowels: ['i', 'a'], rough: 0.8, breath: 0.5, gain: 0.8 });
+      else if (what === 'attack') this.voiceSynth(p, { f0: 260, dur: 0.4, vowels: ['a'], rough: 0.9, gain: 0.8 });
+      else if (what === 'pant') this.breathAt(p, 0.3, 0.5, 700);
+    } else if (kind === 'patient') {
+      if (what === 'idle') this.syllables(p, 3 + ((Math.random() * 4) | 0), rnd(110, 150), { gain: 0.3, breath: 0.4 });
+      else if (what === 'chase' || what === 'alert') this.voiceSynth(p, { f0: 220, f1: 420, dur: 1.0, vowels: ['e', 'a'], rough: 0.6, breath: 0.4, gain: 0.8 });
+      else if (what === 'attack') this.voiceSynth(p, { f0: 300, dur: 0.35, vowels: ['a'], rough: 0.7, gain: 0.8 });
+      else if (what === 'pant') this.breathAt(p, 0.3, 0.6, 600);
+      else if (what === 'lost') this.syllables(p, 4, 130, { gain: 0.3 });
+    }
+  }
+  breathAt(p, gain, dur, f) { this.burst(p, { f, q: 1.2, dur, gain, a: dur * 0.3, verb: 0.2 }); }
+
+  // ---------------------------------------------------------- the building
+  ambience() {
+    const ctx = this.ctx;
+    // drone
+    const dg = ctx.createGain(); dg.gain.value = 0.07; const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 160; lp.Q.value = 3; lp.connect(dg); this.out(dg, null, { verb: 0.2 });
+    for (const [f, type] of [[41, 'sawtooth'], [43.6, 'sawtooth'], [61.7, 'sine'], [82.3, 'triangle']]) { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.connect(lp); o.start(); }
+    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.05; const lg = ctx.createGain(); lg.gain.value = 70; lfo.connect(lg); lg.connect(lp.frequency); lfo.start();
+    // ventilation hiss: the muggy air moving
+    const air = this.src(this.brownBuf, true); const ab = ctx.createBiquadFilter(); ab.type = 'bandpass'; ab.frequency.value = 340; ab.Q.value = 0.6; const ag = ctx.createGain(); ag.gain.value = 0.05; air.connect(ab); ab.connect(ag); this.out(ag, null, { verb: 0.3 }); air.start();
+    this.droneG = dg;
+    // fear bed: high strings scrape and a sub pulse rise with fear
+    const fg = ctx.createGain(); fg.gain.value = 0; this.fearG = fg; const fb = ctx.createBiquadFilter(); fb.type = 'bandpass'; fb.frequency.value = 2400; fb.Q.value = 2; fb.connect(fg); this.out(fg, null, { verb: 0.6 });
+    for (const f of [1567, 1661, 1760.5]) { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; const tr = ctx.createOscillator(); tr.frequency.value = rnd(5, 8); const tg = ctx.createGain(); tg.gain.value = 6; tr.connect(tg); tg.connect(o.frequency); o.connect(fb); o.start(); tr.start(); }
+  }
+  body() {
+    // your breath and your heart (not positional)
+    this.heartT = 0; this.breathT = 0;
+  }
+
+  // ---------------------------------------------------------- per frame
+  listen(pos, quat, dt, st) {
+    if (!this.on) return; const L = this.ctx.listener; const t = this.t;
+    const f = new THREE.Vector3(0, 0, -1).applyQuaternion(quat), u = new THREE.Vector3(0, 1, 0).applyQuaternion(quat);
+    if (L.positionX) { L.positionX.setTargetAtTime(pos.x, t, 0.02); L.positionY.setTargetAtTime(pos.y, t, 0.02); L.positionZ.setTargetAtTime(pos.z, t, 0.02); L.forwardX.setTargetAtTime(f.x, t, 0.02); L.forwardY.setTargetAtTime(f.y, t, 0.02); L.forwardZ.setTargetAtTime(f.z, t, 0.02); L.upX.setTargetAtTime(u.x, t, 0.02); L.upY.setTargetAtTime(u.y, t, 0.02); L.upZ.setTargetAtTime(u.z, t, 0.02); }
+    else { L.setPosition(pos.x, pos.y, pos.z); L.setOrientation(f.x, f.y, f.z, u.x, u.y, u.z); }
+    this.score.update(st.chaseKind, st.chase);
+    this.fearG.gain.setTargetAtTime(Math.max(0, st.fear - 0.3) * 0.05, t, 0.6);
+    // heart
+    const fear = Math.max(st.fear, st.hurt * 0.8, st.hidden ? 0.45 : 0);
+    if (fear > 0.25) { this.heartT -= dt; if (this.heartT <= 0) { this.heartT = 60 / (70 + fear * 90); const g = 0.25 + fear * 0.5; this.tone(null, { f: 58, f2: 40, dur: 0.14, gain: g, verb: 0 }); this.tone(null, { f: 52, f2: 36, dur: 0.12, gain: g * 0.7, verb: 0, delay: 0.16 }); } }
+    // breath: harder after running, shaky when scared, held when hiding
+    const ex = Math.max(st.exhaust, st.fear * 0.6);
+    this.breathT -= dt;
+    if (this.breathT <= 0) {
+      const rate = 3.4 - ex * 2.2; this.breathT = rate * (st.hidden ? 1.6 : 1);
+      const g = (0.04 + ex * 0.22) * (st.hidden ? 0.5 : 1);
+      this.burst(null, { f: 900 + ex * 400, q: 0.8, dur: rate * 0.35, gain: g, a: rate * 0.15, verb: 0.05 });
+      this.burst(null, { f: 600 + ex * 300, q: 0.8, dur: rate * 0.4, gain: g * 0.8, a: rate * 0.08, verb: 0.05, delay: rate * 0.45 });
+      if (ex > 0.6 && Math.random() < 0.3) this.voiceSynth(null, { f0: 120, dur: 0.25, vowels: ['uh'], breath: 0.8, gain: 0.08, delay: rate * 0.45 });
+    }
+    // the building, now and then
+    this.every('drip', 2, 7, () => { const p = pos.clone().add(new THREE.Vector3(rnd(-6, 6), 2.5, rnd(-6, 6))); const f0 = rnd(1200, 2600); this.tone(p, { f: f0, f2: f0 * 0.6, dur: 0.08, gain: 0.12, verb: 0.6 }); });
+    this.every('groan', 12, 30, () => { const p = pos.clone().add(new THREE.Vector3(rnd(-30, 30), 3, rnd(-30, 30))); this.burst(p, { f: rnd(120, 260), q: 18, dur: rnd(1.5, 3), gain: 0.35, a: 0.6, sweep: 0.5, verb: 0.9, brown: true }); });
+    this.every('scream', 35, 80, () => { const p = pos.clone().add(new THREE.Vector3(rnd(-35, 35), 2, rnd(-35, 35))); this.voiceSynth(p, { f0: rnd(450, 650), f1: rnd(300, 500), dur: rnd(1.2, 2.2), vowels: ['a', 'e', 'o'], rough: 0.5, breath: 0.3, gain: 0.35, verb: 0.95 }); });
+    this.every('knock', 20, 50, () => { const p = pos.clone().add(new THREE.Vector3(rnd(-15, 15), 1.5, rnd(-15, 15))); for (let i = 0; i < 3 + (Math.random() * 3 | 0); i++) this.tone(p, { f: 90, f2: 60, dur: 0.1, gain: 0.35, delay: i * rnd(0.25, 0.4), verb: 0.7 }); });
+    this.every('pipe', 15, 40, () => { const p = pos.clone().add(new THREE.Vector3(rnd(-12, 12), 3, rnd(-12, 12))); this.clang(p, rnd(140, 260), 0.25, 2.2); });
+    this.every('whisper', 25, 60, () => { if (st.fear < 0.2) return; const p = pos.clone().add(new THREE.Vector3(rnd(-2, 2), 1.6, rnd(-2, 2))); this.syllables(p, 5, 90, { breath: 0.95, gain: 0.25, verb: 0.3 }); });
+  }
+  every(k, a, b, fn) { const now = this.t; if (this.timers[k] === undefined) this.timers[k] = now + rnd(a, b) * 0.5; if (now >= this.timers[k]) { this.timers[k] = now + rnd(a, b); fn(); } }
+  duck(on) { if (this.on) this.duckG.gain.setTargetAtTime(on ? 0.15 : 1, this.t, 0.2); }
+
+  // ---------------------------------------------------------- one-shots
+  step(k, zone) {
+    if (!this.on) return; const hard = zone === 4 || zone === 5 ? 1 : zone === 6 || zone === 11 ? 0.5 : zone === 8 || zone === 10 ? 0.3 : 0.7;
+    const g = 0.06 + k * 0.22;
+    this.burst(null, { f: 180 + hard * 200, q: 1, dur: 0.06, gain: g, type: 'lowpass', brown: true, verb: 0.25 });
+    this.burst(null, { f: 1500 + hard * 2500, q: 1.5, dur: 0.03 + hard * 0.02, gain: g * (0.25 + hard * 0.4), delay: 0.03, verb: 0.3 });
+    if (zone === 4 || Math.random() < 0.15) this.burst(null, { f: 2400, q: 4, dur: 0.06, gain: g * 0.3, delay: 0.05 });   // wet
+    if (zone === 6 && Math.random() < 0.3) this.tone(null, { f: rnd(400, 700), f2: rnd(300, 500), dur: 0.12, gain: 0.03, delay: 0.04 });   // creaking boards
+  }
+  footstep(kind, pos, speed) {
+    const p = pos.clone(); p.y = 0.1; const heavy = kind === 'brute' ? 1 : kind === 'surgeon' ? 0.6 : 0.35; const run = speed > 2 ? 1.4 : 1;
+    this.tone(p, { f: 70 * (1.4 - heavy * 0.4), f2: 40, dur: 0.12, gain: 0.35 * heavy * run, verb: 0.35 });
+    this.burst(p, { f: 400, q: 0.8, dur: 0.07, gain: 0.25 * heavy * run, brown: true });
+    if (kind === 'brute' && Math.random() < 0.7) for (let i = 0; i < 3; i++) this.tone(p.clone().setY(0.8), { f: rnd(2200, 4200), dur: 0.08, gain: 0.04, delay: 0.03 + i * 0.03 });   // chains
+    if (kind === 'surgeon') this.burst(p, { f: 3500, q: 3, dur: 0.02, gain: 0.08 });   // hard shoes
+  }
+  door(d, kind, x, z) {
+    const p = new THREE.Vector3(x, 1.1, z); const metal = d.metal;
+    if (kind === 'slam') { this.tone(p, { f: 55, f2: 35, dur: 0.5, gain: 0.8, verb: 0.7 }); this.burst(p, { f: 300, q: 0.7, dur: 0.25, gain: 0.7, brown: true }); if (metal) this.clang(p, 180, 0.5, 1.4); return; }
+    // creak: a rubbing, stick-slip squeal
+    const ctx = this.ctx; const t = this.t; const o = ctx.createOscillator(); o.type = 'sawtooth'; const base = metal ? rnd(120, 180) : rnd(70, 130); o.frequency.setValueAtTime(base, t);
+    for (let i = 1; i < 8; i++) o.frequency.linearRampToValueAtTime(base * rnd(0.7, 1.6), t + i * 0.12);
+    const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = metal ? 1400 : 900; bp.Q.value = 6; const g = ctx.createGain(); o.connect(bp); bp.connect(g);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35, t + 0.08); g.gain.setValueAtTime(0.3, t + 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + 1.0);
+    this.out(g, p, { verb: 0.5 }); o.start(t); o.stop(t + 1.1);
+    this.burst(p, { f: 2000, q: 2, dur: 0.04, gain: 0.25, delay: kind === 'close' ? 0.85 : 0 });
+    if (kind === 'close') this.tone(p, { f: 80, f2: 50, dur: 0.18, gain: 0.35, delay: 0.85 });
+  }
+  rattle(x, z) { const p = new THREE.Vector3(x, 1.1, z); for (let i = 0; i < 4; i++) this.burst(p, { f: 1800, q: 3, dur: 0.04, gain: 0.3, delay: i * 0.07 }); this.clang(p, 420, 0.12, 0.3); }
+  locker(inOut, kind = 'locker', x, z) { const p = x !== undefined ? new THREE.Vector3(x, 1.2, z) : null; if (kind === 'locker') { this.clang(p, 260, 0.2, 0.6); this.burst(p, { f: 2600, q: 3, dur: 0.08, gain: 0.2 }); } else { this.burst(p, { f: 300, q: 0.7, dur: 0.4, gain: 0.25, brown: true }); this.tone(p, { f: 300, f2: 200, dur: 0.3, gain: 0.05, type: 'sawtooth' }); } }
+  lockerRip() { this.clang(null, 200, 0.7, 1.2); this.tone(null, { f: 50, f2: 30, dur: 0.6, gain: 0.8 }); this.jump('rip'); }
+  pickup(k) { if (k === 'paper') { for (let i = 0; i < 6; i++) this.burst(null, { f: rnd(2000, 5000), q: 1, dur: 0.05, gain: 0.08, delay: i * 0.05 }); } else if (k === 'battery') { this.burst(null, { f: 3000, q: 2, dur: 0.02, gain: 0.2 }); this.burst(null, { f: 2500, q: 2, dur: 0.02, gain: 0.2, delay: 0.08 }); } else this.clang(null, 900, 0.12, 0.4); }
+  battery() { this.burst(null, { f: 2800, q: 3, dur: 0.03, gain: 0.25 }); this.burst(null, { f: 1800, q: 3, dur: 0.04, gain: 0.25, delay: 0.25 }); this.tone(null, { f: 2000, dur: 0.06, gain: 0.08, delay: 0.5 }); }
+  nv(on) { this.tone(null, { f: on ? 2200 : 1600, dur: 0.06, gain: 0.08 }); this.tone(null, { f: on ? 300 : 900, f2: on ? 900 : 300, dur: 0.35, gain: 0.03, type: 'sawtooth' }); }
+  click() { this.burst(null, { f: 3000, q: 4, dur: 0.02, gain: 0.15 }); }
+  mutter() { if (!this.on) return; this.syllables(null, 4, 115, { breath: 0.85, gain: 0.08, verb: 0.05 }); }
+  generator(pos) {
+    const p = pos.clone(); const ctx = this.ctx; const t = this.t;
+    for (let i = 0; i < 3; i++) { this.tone(p, { f: 60, f2: 180, dur: 0.6, gain: 0.3, type: 'sawtooth', delay: i * 0.8 }); this.burst(p, { f: 200, q: 1, dur: 0.3, gain: 0.5, brown: true, delay: i * 0.8 + 0.5 }); }
+    // the engine runs from now on
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 29; const am = ctx.createOscillator(); am.frequency.value = 14.5; const ag = ctx.createGain(); ag.gain.value = 0.5; am.connect(ag);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 220; const g = ctx.createGain(); g.gain.value = 0.0001; ag.connect(g.gain); o.connect(lp); lp.connect(g);
+    g.gain.setValueAtTime(0.0001, t + 2.3); g.gain.exponentialRampToValueAtTime(0.5, t + 3);
+    this.out(g, p, { verb: 0.3, ref: 3, roll: 0.8 }); o.start(t + 2.3); am.start(t + 2.3);
+    // and every light on the main circuit hums
+    const hum = ctx.createOscillator(); hum.type = 'square'; hum.frequency.value = 120; const hb = ctx.createBiquadFilter(); hb.type = 'bandpass'; hb.frequency.value = 240; hb.Q.value = 5; const hg = ctx.createGain(); hg.gain.value = 0.0001; hum.connect(hb); hb.connect(hg); this.out(hg, null, { verb: 0.2 }); hum.start(t + 2.5); hg.gain.setTargetAtTime(0.012, t + 2.6, 0.5);
+    this.jump('power', 2.5);
+  }
+  gate() {
+    const ctx = this.ctx; const t = this.t;
+    // two-tone alarm for twenty seconds
+    const o = ctx.createOscillator(); o.type = 'square'; const g = ctx.createGain(); g.gain.value = 0.07; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 900; bp.Q.value = 2; o.connect(bp); bp.connect(g); this.out(g, null, { verb: 0.7 });
+    for (let i = 0; i < 40; i++) o.frequency.setValueAtTime(i % 2 ? 660 : 880, t + i * 0.5); g.gain.setValueAtTime(0.07, t + 19.5); g.gain.exponentialRampToValueAtTime(0.0001, t + 20); o.start(t); o.stop(t + 20.1);
+    for (let i = 0; i < 12; i++) this.burst(null, { f: rnd(1500, 3000), q: 2, dur: 0.05, gain: 0.15, delay: 1 + i * 0.25 });
+    this.tone(null, { f: 50, f2: 90, dur: 4, gain: 0.25, type: 'sawtooth', delay: 0.5 });
+  }
+  hit(kind) { this.tone(null, { f: 80, f2: 40, dur: 0.3, gain: 0.9, verb: 0.2 }); this.burst(null, { f: 1200, q: 0.8, dur: 0.12, gain: 0.7 }); this.voiceSynth(null, { f0: 140, f1: 110, dur: 0.35, vowels: ['uh', 'a'], breath: 0.4, rough: 0.3, gain: 0.35, verb: 0.05 }); }
+  whoosh(pos) { this.burst(pos.clone().setY(1.5), { f: 600, q: 0.8, dur: 0.25, gain: 0.4, sweep: 3, a: 0.08 }); }
+  kill(kind) { this.jump('kill'); for (let i = 0; i < 4; i++) { this.tone(null, { f: 70, f2: 35, dur: 0.25, gain: 0.8, delay: 0.5 + i * 0.28 }); this.burst(null, { f: 500, q: 0.6, dur: 0.2, gain: 0.6, brown: true, delay: 0.5 + i * 0.28 }); } this.voiceSynth(null, { f0: 180, f1: 450, dur: 1.4, vowels: ['a', 'o'], breath: 0.4, rough: 0.6, gain: 0.5, delay: 0.3, verb: 0.1 }); }
+  stinger() { this.jump('sting'); }
+  // the jumpscare hit: screeching strings, a scream of noise, a boom
+  jump(kind = 'sting', delay = 0) {
+    if (!this.on) return; const big = kind === 'kill' || kind === 'rip' || kind === 'scare';
+    for (let i = 0; i < (big ? 9 : 5); i++) { const f = rnd(600, 1400); this.tone(null, { f, f2: f * rnd(1.3, 2), dur: big ? 1.4 : 0.8, gain: big ? 0.12 : 0.07, type: 'sawtooth', a: 0.01, delay, detune: rnd(-40, 40), verb: 0.6 }); }
+    this.burst(null, { f: 2500, q: 0.6, dur: big ? 0.8 : 0.4, gain: big ? 0.6 : 0.3, a: 0.005, delay, sweep: 0.4 });
+    this.tone(null, { f: 60, f2: 28, dur: 1.2, gain: big ? 1 : 0.6, delay, verb: 0.5 });
+  }
+  scream(pos, k = 1) { this.voiceSynth(pos, { f0: rnd(550, 750), f1: rnd(900, 1100), dur: 1.1 * k, vowels: ['a', 'i'], rough: 0.7, breath: 0.3, gain: 1.0, vib: 8, vibD: 0.05, verb: 0.4 }); }
+  thud(pos, k = 1) { this.tone(pos, { f: 70, f2: 35, dur: 0.4, gain: 0.9 * k, verb: 0.5 }); this.burst(pos, { f: 400, q: 0.6, dur: 0.25, gain: 0.7 * k, brown: true }); }
+  squelch(pos, k = 1) { for (let i = 0; i < 3; i++) this.burst(pos, { f: rnd(150, 400), q: 4, dur: 0.15, gain: 0.4 * k, brown: true, delay: i * 0.09 }); }
+  flies(pos) { const ctx = this.ctx; const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 190; const l = ctx.createOscillator(); l.frequency.value = 7; const lg = ctx.createGain(); lg.gain.value = 25; l.connect(lg); lg.connect(o.frequency); const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 400; bp.Q.value = 3; const g = ctx.createGain(); g.gain.value = 0.05; o.connect(bp); bp.connect(g); this.out(g, pos, { verb: 0.1, ref: 0.6, roll: 2.2 }); o.start(); l.start(); return g; }
+  buzz(pos) { const ctx = this.ctx; const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 120; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 4; const g = ctx.createGain(); g.gain.value = 0; o.connect(bp); bp.connect(g); const out = this.out(g, pos, { verb: 0.2, ref: 1, roll: 1.8 }); o.start(); return g; }
+}
+function setPos(p, v) { if (p.positionX) { p.positionX.value = v.x; p.positionY.value = v.y; p.positionZ.value = v.z; } else p.setPosition(v.x, v.y, v.z); }
