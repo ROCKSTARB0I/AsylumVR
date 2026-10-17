@@ -1,8 +1,8 @@
 // Space: what is solid. Circle movers (you and them) are pushed out of
 // wall cells, props, door leaves and the gate; sight lines are traced
 // through the grid and closed doors.
-import { C, W, D } from './plan.js?v=5';
-import { circleSeg } from './doors.js?v=5';
+import { C, W, D } from './plan.js?v=6';
+import { circleSeg } from './doors.js?v=6';
 
 export class Space {
   constructor(plan, world, doors) {

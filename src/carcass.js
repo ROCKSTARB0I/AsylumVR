@@ -5,9 +5,9 @@
 // trousers) and a face damaged in one of several ways. Procedural poses
 // drive the bones: walking, running, stalking, rocking, eating, reaching.
 import * as THREE from '../vendor/three.module.js';
-import { rng, fbm } from './surfaces.js?v=5';
-import { EYE_LAYER } from './camcorder.js?v=5';
-import { buildVisage, headMaterial } from './visage.js?v=5';
+import { rng, fbm } from './surfaces.js?v=6';
+import { EYE_LAYER } from './camcorder.js?v=6';
+import { buildVisage, headMaterial } from './visage.js?v=6';
 
 const V = THREE.Vector3;
 export const BODY_LIGHT = { up: { value: new V(0, 1, 0) } };
@@ -18,8 +18,8 @@ const BI = Object.fromEntries(BONES.map((b, i) => [b, i]));
 // ---------------------------------------------------------------- recipes
 // height, girth (fat/muscle), lean (emaciation), outfit, face damage
 export const RECIPES = {
-  brute: { h: 2.05, girth: 1.55, muscle: 1, lean: 0, outfit: 'trousers', face: 'noseless', skin: [0.55, 0.42, 0.36], bald: true, scars: 1, blood: 0.7, dirt: 0.8, shackles: true },
-  surgeon: { h: 1.86, girth: 0.95, muscle: 0.2, lean: 0.3, outfit: 'surgeon', face: 'masked', skin: [0.62, 0.5, 0.43], bald: false, scars: 0.2, blood: 0.6, dirt: 0.3, glasses: true },
+  brute: { h: 2.16, girth: 1.6, muscle: 1, lean: 0, outfit: 'trousers', face: 'noseless', smile: true, skin: [0.55, 0.42, 0.36], bald: true, scars: 1, blood: 1.0, dirt: 0.8, shackles: true, stare: true },
+  surgeon: { h: 1.9, girth: 0.95, muscle: 0.2, lean: 0.3, outfit: 'surgeon', face: 'masked', skin: [0.62, 0.5, 0.43], bald: false, scars: 0.2, blood: 0.95, dirt: 0.3, glasses: true, stare: true },
   gown: { h: 1.74, girth: 0.78, muscle: 0, lean: 0.9, outfit: 'gown', face: 'random', skin: [0.6, 0.48, 0.41], bald: 'random', scars: 0.7, blood: 0.4, dirt: 0.9 },
   jacket: { h: 1.78, girth: 0.82, muscle: 0, lean: 0.7, outfit: 'straitjacket', face: 'random', skin: [0.58, 0.46, 0.39], bald: 'random', scars: 0.6, blood: 0.3, dirt: 0.8 },
   corpse: { h: 1.75, girth: 0.85, muscle: 0, lean: 0.6, outfit: 'gown', face: 'dead', skin: [0.55, 0.53, 0.48], bald: 'random', scars: 0.5, blood: 1, dirt: 0.9, dead: true },
@@ -303,7 +303,8 @@ export function pose(body, st, t, p = {}) {
   for (const n of Object.keys(B)) { B[n].rotation.set(0, 0, 0); B[n].position.copy(body.rest[n]); }
   const sp = p.speed ?? 0;      // m/s
   const ph = p.phase ?? 0;      // gait phase (radians)
-  const tw = (k) => Math.sin(t * 23 + k) * Math.sin(t * 7.1 + k * 3) > 0.92 ? (Math.sin(t * 61 + k) * 0.25) : 0;   // nervous twitches
+  const twK = p.twitch ?? 0.4;
+  const tw = (k) => Math.sin(t * 23 + k) * Math.sin(t * 7.1 + k * 3) > 0.92 - twK * 0.15 ? (Math.sin(t * 61 + k) * (0.25 + twK * 0.35)) : 0;   // twitches; hunters jerk harder
   if (st === 'walk' || st === 'run' || st === 'stalk' || st === 'shamble' || st === 'brute') {
     const run = st === 'run'; const amp = run ? 0.85 : st === 'stalk' ? 0.35 : st === 'brute' ? 0.45 : 0.42;
     const sw = Math.sin(ph), cw = Math.cos(ph);
@@ -330,6 +331,17 @@ export function pose(body, st, t, p = {}) {
         E(B[S + 'hand'], st === 'stalk' ? 0.4 : 0, 0, 0);
       }
     }
+  } else if (st === 'crawl') {
+    // on all fours, fast, the head held up and forward like an animal
+    const sw = Math.sin(ph), cw = Math.cos(ph); const amp = Math.min(1, sp / 3) * 0.75 + 0.15;
+    B.hips.position.y = 0.62 * s - Math.abs(cw) * 0.04 * s; E(B.hips, 1.22, sw * 0.12, cw * 0.06);
+    E(B.spine, 0.12, -sw * 0.1, 0); E(B.chest, 0.05, -sw * 0.12, 0);
+    E(B.neck, -1.0, 0, tw(1) * 0.5); E(B.head, -0.35 + tw(2) * 0.4, tw(3), 0);
+    for (const [S, k] of [['L', 1], ['R', -1]]) {
+      E(B[S + 'thigh'], -1.15 - k * sw * amp * 0.7, 0, (S === 'L' ? 1 : -1) * 0.15); E(B[S + 'shin'], 1.5 + Math.max(0, k * cw) * 0.5, 0, 0); E(B[S + 'foot'], 0.6, 0, 0);
+      E(B[S + 'upper'], -1.25 + k * sw * amp * 0.8, 0, (S === 'L' ? 1 : -1) * 0.18); E(B[S + 'fore'], -0.25 - Math.max(0, -k * cw) * 0.5, 0, 0); E(B[S + 'hand'], -0.9, 0, 0);
+    }
+    B.jaw.rotation.x = 0.35 + Math.sin(t * 11) * 0.12;
   } else if (st === 'idle' || st === 'search' || st === 'listen') {
     const br = Math.sin(t * 1.6) * 0.03;
     E(B.spine, 0.05 + br, 0, 0); E(B.chest, 0.04 + br, 0, 0);

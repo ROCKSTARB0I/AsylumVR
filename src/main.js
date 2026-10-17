@@ -2,22 +2,22 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=5';
-import { buildSurfaces, T } from './surfaces.js?v=5';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=5';
-import { Doors } from './doors.js?v=5';
-import { Space } from './space.js?v=5';
-import { Input } from './input.js?v=5';
-import { Walker } from './walker.js?v=5';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=5';
-import { makeTape, makeVeil } from './tape.js?v=5';
-import { Slate } from './slate.js?v=5';
-import { NOTES, MUTTER, OBJECTIVES } from './story.js?v=5';
-import { Sound } from './dread.js?v=5';
-import { Horrors } from './horrors.js?v=5';
-import { Dressing } from './dressing.js?v=5';
-import { Scares } from './scares.js?v=5';
-import { makeHand } from './hands.js?v=5';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=6';
+import { buildSurfaces, T } from './surfaces.js?v=6';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=6';
+import { Doors } from './doors.js?v=6';
+import { Space } from './space.js?v=6';
+import { Input } from './input.js?v=6';
+import { Walker } from './walker.js?v=6';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=6';
+import { makeTape, makeVeil } from './tape.js?v=6';
+import { Slate } from './slate.js?v=6';
+import { NOTES, MUTTER, OBJECTIVES } from './story.js?v=6';
+import { Sound } from './dread.js?v=6';
+import { Horrors } from './horrors.js?v=6';
+import { Dressing } from './dressing.js?v=6';
+import { Scares } from './scares.js?v=6';
+import { makeHand } from './hands.js?v=6';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -117,7 +117,7 @@ function nvify(m) {
       .replace('#include <dithering_fragment>', `#include <dithering_fragment>
         if (uNV > 0.5) {
           float l = dot(gl_FragColor.rgb, vec3(0.299, 0.587, 0.114));
-          float v = clamp(pow(l * 0.95, 0.9), 0.0, 1.0);
+          float v = clamp(pow(l * 1.7, 0.85), 0.0, 1.0);
           float g = fract(sin(dot(floor(gl_FragCoord.xy * 0.5) + floor(uNVt * 24.0) * 7.13, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
           v = clamp(v * (0.9 + g * 0.35) + g * 0.06, 0.0, 1.0);
           gl_FragColor.rgb = vec3(0.3, 1.0, 0.4) * v + vec3(0.5, 1.0, 0.6) * smoothstep(0.8, 1.0, v) * 0.3;

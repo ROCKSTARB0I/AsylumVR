@@ -3,7 +3,7 @@
 // raise it to your eye (right mouse / Q); in VR it is in your left hand
 // with its flip-out screen showing what it sees.
 import * as THREE from '../vendor/three.module.js';
-import { makeScreenMaterial } from './tape.js?v=5';
+import { makeScreenMaterial } from './tape.js?v=6';
 
 export const EYE_LAYER = 5;   // things only the camcorder sees (eye-shine)
 
@@ -60,7 +60,7 @@ export class Camcorder {
     this.ir.position.copy(pos); const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(quat);
     this.ir.target.position.copy(pos).addScaledVector(fwd, 5); this.ir.target.updateMatrixWorld();
   }
-  setIR(on) { this.irOn = on; this.ir.intensity = on ? 85 : 0; }
+  setIR(on) { this.irOn = on; this.ir.intensity = on ? 22 : 0; }
   // the camcorder display (VR screen) — REC, time code, battery, mode
   paintOSD(force, objective) {
     this.osdT -= 1; if (this.osdT > 0 && !force) return; this.osdT = 6;

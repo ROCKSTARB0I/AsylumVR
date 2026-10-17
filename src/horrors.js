@@ -3,8 +3,8 @@
 // dark), hears (your steps, doors, things you knock), patrols or keeps to
 // its corner, investigates, chases, searches, checks lockers, and kills.
 import * as THREE from '../vendor/three.module.js';
-import { C, W, D, cx, cz } from './plan.js?v=5';
-import { makeBody, pose, cleaver, bonesaw, BODY_LIGHT } from './carcass.js?v=5';
+import { C, W, D, cx, cz } from './plan.js?v=6';
+import { makeBody, pose, cleaver, bonesaw, BODY_LIGHT } from './carcass.js?v=6';
 
 const V = THREE.Vector3;
 const tmp = new V(), tmp2 = new V();
@@ -132,7 +132,7 @@ class Horror {
     if (see > 0) { this.aware = Math.min(1.5, this.aware + see * dt * (this.state === 'investigate' || this.state === 'search' ? 3.2 : 1.8)); this.lastSeen = P.clone(); this.lostT = 0; }
     else this.aware = Math.max(0, this.aware - dt * 0.25);
     if (this.aware >= 1 && this.state !== 'chase' && this.state !== 'attack' && this.state !== 'execute' && this.K.run && this.state !== 'eat' && H.mayChase(this)) {
-      this.state = 'chase'; this.path = null; H.sound.voice(this.K.voice, 'chase', this.pos); H.onChase(this);
+      this.state = 'spot'; this.spotT = 0; this.path = null; H.onChase(this);
     } else if (this.aware > 0.35 && (this.state === 'patrol' || this.state === 'idle') && this.K.run && H.isHunter(this)) { this.state = 'investigate'; this.goal = P.clone(); this.wait = 0.5; }
     let st = this.state; let anim = 'idle', animP = {};
     switch (st) {
@@ -184,7 +184,9 @@ class Horror {
         }
         if (see <= 0) { this.lostT += dt; if (this.lostT > (this.kind === 'brute' ? 7 : 5)) { this.state = 'investigate'; this.goal = this.lastSeen || P.clone(); this.wait = 0; H.sound.voice(this.K.voice, 'lost', this.pos); break; } }
         const target = see > 0 || this.lostT < 1.2 ? P.clone() : this.lastSeen;
-        const d = this.goTo(target, dt, this.K.run);
+        this.burst = Math.max(0, (this.burst || 0) - dt);
+        const lunge = dist < 4.5 && see > 0 ? 1.18 : 1;
+        const d = this.goTo(target, dt, this.K.run * lunge * (this.burst > 0 ? 1.1 : 1));
         if (dist < this.K.reach && this.cool <= 0 && w.alive) { this.state = 'attack'; this.atk = 0; this.hitDone = false; H.sound.voice(this.K.voice, 'attack', this.pos); }
         if (this.voiceT < 0) { this.voiceT = 1.2 + Math.random() * 1.5; H.sound.voice(this.K.voice, 'pant', this.pos); }
         break;
@@ -206,11 +208,21 @@ class Horror {
         if (this.atk >= 1) { this.state = 'chase'; this.cool = 0.9; }
         break;
       }
+      case 'spot': {
+        // it stops dead, its head snaps round to you, it screams, then it comes
+        this.spotT += dt; anim = 'listen'; this.speed = 0;
+        const want = Math.atan2(P.x - this.pos.x, P.z - this.pos.z); let da = ((want - this.yaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI; this.yaw += Math.max(-dt * 9, Math.min(dt * 9, da));
+        if (this.spotT > 0.18 && !this.roared) { this.roared = true; H.sound.voice(this.K.voice, 'chase', this.pos); H.glitchKick(1.1); }
+        animP = { mouth: this.spotT > 0.18 ? 0.75 : 0 };
+        if (this.spotT > (this.kind === 'eater' ? 0.55 : 0.9)) { this.state = 'chase'; this.roared = false; this.burst = 1.4; }
+        break;
+      }
       case 'execute': {
         // the kill: it drags you out (or you are already down) and its face is all you see
-        this.exT += dt; anim = 'grab'; animP = { k: Math.min(1, this.exT) };
-        H.holdFace(this);
-        if (this.exT > 1.4 && w.alive) w.hurt(999);
+        this.exT += dt; anim = 'grab'; animP = { k: Math.min(1, this.exT), mouth: 0.6 + Math.sin(this.exT * 30) * 0.15 };
+        H.holdFace(this); w.shake = Math.max(w.shake, 1.4);
+        if (!this.exHit && this.exT > 0.9) { this.exHit = true; H.sound.hit(this.kind); H.sound.squelch(this.pos, 1.3); H.staticBurst(0.08); }
+        if (this.exT > 2.0 && w.alive) { w.hurt(999); H.staticBurst(0.5); this.exHit = false; }
         break;
       }
     }
@@ -224,9 +236,17 @@ class Horror {
     if (this.speed > 0.2) { const before = Math.floor(this.phase / Math.PI); this.phase += dt * (this.speed > 2 ? 9 : 5.2) * (this.kind === 'brute' ? 0.85 : 1); if (Math.floor(this.phase / Math.PI) !== before) H.sound.footstep(this.kind, this.pos, this.speed); }
     if (this.voiceT < 0 && (this.state === 'patrol' || this.state === 'search' || this.state === 'idle')) { this.voiceT = 4 + Math.random() * 6; H.sound.voice(this.K.voice, 'idle', this.pos); }
     // draw
-    const b = this.body; b.root.position.set(this.pos.x, 0, this.pos.z); b.root.rotation.y = this.yaw;
-    if (anim === 'run' && this.kind === 'eater') anim = 'stalk';
-    pose(b, anim, this.t, { speed: this.speed, phase: this.phase, reach: this.state === 'chase' && dist < 3 && this.kind !== 'brute', ...animP });
+    const b = this.body;
+    if (this.kind === 'eater' && (anim === 'run' || anim === 'stalk' || anim === 'walk' || anim === 'shamble')) anim = 'crawl';
+    // the feral and the inmates move like a damaged tape: held frames, then a jump
+    const jerky = (this.kind === 'eater' || this.kind === 'patient') && anim !== 'eat' && anim !== 'rock';
+    this.frameT = (this.frameT || 0) - dt;
+    if (!jerky || this.frameT <= 0 || this.state === 'execute') {
+      this.frameT = jerky ? 0.06 + Math.random() * 0.1 : 0;
+      b.root.position.set(this.pos.x, 0, this.pos.z); b.root.rotation.y = this.yaw;
+      pose(b, anim, this.t, { speed: this.speed, phase: this.phase, reach: this.state === 'chase' && dist < 3 && this.kind !== 'brute', twitch: this.K.run ? 1 : 0.4, ...animP });
+    }
+    if (this.lamp) this.lamp.update(this);
     const L = H.world.lightAt(this.pos.x, this.pos.z); b.mat.userData.uAmb.value.copy(L);
   }
 }
@@ -239,6 +259,14 @@ export class Horrors {
     const p = this.plan;
     this.brute = new Horror(this, 'brute', cx(p.brute.x), cz(p.brute.y), { route: p.brute.route, seed: 11 });
     this.surgeon = new Horror(this, 'surgeon', cx(p.surgeon.x), cz(p.surgeon.y), { route: p.surgeon.route, seed: 23, dormant: true });
+    {
+      const sp = new THREE.SpotLight(0xfff0d0, 0, 14, 0.42, 0.55, 1.6); const tgt = new THREE.Object3D(); this.scene.add(sp, tgt); sp.target = tgt;
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(0.032, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false })); disc.material.userData.noNV = false;
+      const head = this.surgeon.body.bones.head; disc.position.set(0, 0.17 * this.surgeon.body.s, 0.085 * this.surgeon.body.s); head.add(disc);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.085 * this.surgeon.body.s, 0.008, 4, 20), new THREE.MeshStandardMaterial({ color: 0x1a1a1a })); band.rotation.x = Math.PI / 2; band.position.set(0, 0.16 * this.surgeon.body.s, 0.005); head.add(band);
+      const v = new V(), q = new THREE.Quaternion();
+      this.surgeon.lamp = { update: (h) => { const on = h.active && h.body.root.visible; sp.intensity = on ? 14 * (0.92 + Math.random() * 0.08) : 0; if (!on) return; disc.getWorldPosition(v); sp.position.copy(v); head.getWorldQuaternion(q); tgt.position.copy(v).add(new V(0, -0.35, 1).applyQuaternion(q)); tgt.updateMatrixWorld(); } };
+    }
     this.list.push(this.brute, this.surgeon);
     for (const [i, m] of p.inmates.entries()) {
       const kind = m.kind === 'eater' ? 'eater' : m.kind === 'stalker' ? 'patient' : 'rocker';
@@ -272,7 +300,7 @@ export class Horrors {
   get segment() { return this.G.power || this.G.fuses >= 3 ? 2 : this.G.fuses >= 1 ? 1 : 0; }
   get hunter() { return [this.brute, this.surgeon, this.feral][this.segment]; }
   isHunter(h) { return h === this.hunter; }
-  mayChase(h) { return this.isHunter(h) && !this.list.some((o) => o !== h && (o.state === 'chase' || o.state === 'attack' || o.state === 'execute')); }
+  mayChase(h) { return this.isHunter(h) && !this.list.some((o) => o !== h && (o.state === 'chase' || o.state === 'attack' || o.state === 'execute' || o.state === 'spot')); }
   setSegment(seg, instant = false) {
     this.seg = seg;
     for (const h of [this.brute, this.surgeon, this.feral]) {
@@ -303,7 +331,7 @@ export class Horrors {
       h.update(dt);
       if (!h.active || h.K.harmless) continue;
       const d = h.pos.distanceTo(this.walker.pos);
-      if (h.state === 'chase' || h.state === 'attack' || h.state === 'execute') { chase = 1; fear = Math.max(fear, 1 - d / 25); if (d < near) { near = d; this.chaseKind = h.kind; } }
+      if (h.state === 'chase' || h.state === 'attack' || h.state === 'execute' || h.state === 'spot') { chase = 1; fear = Math.max(fear, 1 - d / 25); if (d < near) { near = d; this.chaseKind = h.kind; } }
       else if (h.aware > 0.2 || h.state === 'search' || h.state === 'investigate') fear = Math.max(fear, (1 - d / 15) * 0.6);
       else fear = Math.max(fear, (1 - d / 10) * 0.35);
     }

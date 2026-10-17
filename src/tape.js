@@ -45,7 +45,7 @@ export const VHS_FRAG = `
     float lum = dot(c, vec3(0.299, 0.587, 0.114));
     if (mode > 1.5) {
       // night vision: huge gain on the dim scene, green phosphor, blooming highlights
-      float v = 1.0 - exp(-lum * 14.0);
+      float v = 1.0 - exp(-lum * 18.0);
       v = pow(v, 0.85);
       c = vec3(0.32, 1.0, 0.42) * v + vec3(0.6, 1.0, 0.65) * smoothstep(0.75, 1.0, v) * 0.35;
       c *= 0.85 + 0.15 * battery;

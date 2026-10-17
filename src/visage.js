@@ -6,7 +6,7 @@
 // bandages, a missing nose, a surgical mask). Both maps share a front
 // projection; the rest of the head keeps procedural vertex colour.
 import * as THREE from '../vendor/three.module.js';
-import { rng, fbm } from './surfaces.js?v=5';
+import { rng, fbm } from './surfaces.js?v=6';
 
 const V = THREE.Vector3;
 const D = 256, T = 512;     // depth map and face texture sizes
@@ -53,7 +53,7 @@ function depthMap(r, R) {
   blob(P, 0, -0.66, 0.2, 0.05, g(116), 4);                                       // under the lip
   blob(P, 0, -0.8, 0.22, 0.12, g(160), 8);                                       // chin
   if (r.face === 'gouged') blob(P, 0.36, 0.05, 0.14, 0.1, g(30), 3);
-  if (r.face === 'smile') for (const s of [-1, 1]) stroke(P, [[s * 0.24, -0.5], [s * 0.4, -0.38], [s * 0.55, -0.24]], 0.03, g(80), 1);
+  if (r.face === 'smile' || r.smile) for (const s of [-1, 1]) stroke(P, [[s * 0.24, -0.5], [s * 0.4, -0.38], [s * 0.55, -0.24]], 0.03, g(80), 1);
   if (r.face === 'burned') { const R2 = rng(r.seed || 3); for (let i = 0; i < 40; i++) blob(P, 0.1 + R2() * 0.7, -0.8 + R2() * 1.4, 0.04 + R2() * 0.1, 0.03 + R2() * 0.08, g(110 + R2() * 40), 3); }
   if (r.muscle) { blob(P, 0, 0.22, 0.6, 0.12, g(160), 6); for (const s of [-1, 1]) blob(P, s * 0.62, -0.55, 0.2, 0.25, g(146), 10); }   // heavy brow and jaw
   const img = c.getImageData(0, 0, D, D).data; const out = new Float32Array(D * D);
@@ -106,6 +106,7 @@ function faceTexture(r, R, skinHex) {
   // what was done to them
   const blood = (a = 0.9) => rgba(70 + R() * 20 | 0, 4, 3, a);
   const drips = (fx, fy, n, len) => { for (let i = 0; i < n; i++) { const x = fx + (R() - 0.5) * 0.15; stroke(P, [[x, fy], [x + (R() - 0.5) * 0.02, fy - len * (0.4 + R())]], 0.012 + R() * 0.012, blood(0.85), 0.5); } };
+  if (r.smile && r.face !== 'smile') for (const s of [-1, 1]) { stroke(P, [[s * 0.24, -0.5], [s * 0.42, -0.36], [s * 0.6, -0.2]], 0.03, 'rgba(60,5,5,1)', 0.5); stroke(P, [[s * 0.24, -0.5], [s * 0.42, -0.36], [s * 0.6, -0.2]], 0.07, blood(0.45), 4); for (let i = 0; i < 5; i++) { const x = s * (0.3 + i * 0.05); stroke(P, [[x, -0.45 + i * 0.03], [x, -0.5 + i * 0.03]], 0.012, 'rgba(200,180,140,0.9)', 0); } drips(s * 0.4, -0.42, 3, 0.4); }
   switch (r.face) {
     case 'sewn':
       for (let i = 0; i < 9; i++) { const x = -0.22 + i * 0.055; stroke(P, [[x - 0.015, -0.45], [x + 0.015, -0.56]], 0.012, 'rgba(20,12,8,0.95)', 0); blob(P, x - 0.015, -0.45, 0.012, 0.012, blood(0.7), 1); blob(P, x + 0.015, -0.56, 0.012, 0.012, blood(0.7), 1); }
