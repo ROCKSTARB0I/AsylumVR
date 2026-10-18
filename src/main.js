@@ -2,23 +2,23 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=9';
-import { buildSurfaces, T } from './surfaces.js?v=9';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=9';
-import { Doors } from './doors.js?v=9';
-import { Space } from './space.js?v=9';
-import { Input } from './input.js?v=9';
-import { Walker } from './walker.js?v=9';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=9';
-import { makeTape, makeVeil } from './tape.js?v=9';
-import { Slate } from './slate.js?v=9';
-import * as STORY1 from './story.js?v=9';
-import * as TAPE2 from './tape2.js?v=9';
-import { Sound } from './dread.js?v=9';
-import { Horrors } from './horrors.js?v=9';
-import { Dressing } from './dressing.js?v=9';
-import { Scares } from './scares.js?v=9';
-import { makeHand } from './hands.js?v=9';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=10';
+import { buildSurfaces, T } from './surfaces.js?v=10';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=10';
+import { Doors } from './doors.js?v=10';
+import { Space } from './space.js?v=10';
+import { Input } from './input.js?v=10';
+import { Walker } from './walker.js?v=10';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=10';
+import { makeTape, makeVeil } from './tape.js?v=10';
+import { Slate } from './slate.js?v=10';
+import * as STORY1 from './story.js?v=10';
+import * as TAPE2 from './tape2.js?v=10';
+import { Sound } from './dread.js?v=10';
+import { Horrors } from './horrors.js?v=10';
+import { Dressing } from './dressing.js?v=10';
+import { Scares } from './scares.js?v=10';
+import { makeHand } from './hands.js?v=10';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -416,7 +416,8 @@ function frame() {
   else { origin = camera.getWorldPosition(new V()); dir = new V(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(tmpQ)); }
   const hid = walker.hidden; focus = walker.alive ? (hid ? { kind: 'unhide', label: () => walker.hidden ? (hid.k === 'locker' ? 'Leave locker' : 'Crawl out') : '' } : pick(origin, dir)) : null;
   if (walker.hidden && walker.hidden.k === 'strap') focus = { kind: 'strap', label: tapeLogic.strapLabel };
-  if (I.interact && focus) { if (focus.kind === 'strap') tapeLogic.struggle(); else if (focus.kind === 'unhide') { walker.unhide(); sound.locker(false); } else use(focus); }
+  if (G.strapped && tapeLogic && I.any) tapeLogic.struggle();
+  if (I.interact && focus && focus.kind !== 'strap') { if (focus.kind === 'unhide') { walker.unhide(); sound.locker(false); } else use(focus); }
   if (walker.hidden && walker.hidden.k !== 'strap' && vr && (Math.abs(I.mx) + Math.abs(I.mz) > 1.3)) { walker.unhide(); sound.locker(false); }
   const lab = focus ? focus.label() : '';
   $('prompt').hidden = !lab || vr; $('prompt').textContent = lab ? (vr ? lab : `[E] ${lab}`) : '';

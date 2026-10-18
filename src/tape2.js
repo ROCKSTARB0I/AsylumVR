@@ -1,8 +1,8 @@
 // Tape 2, The Male Ward: the documents, what you mutter, the objectives,
 // the wake-up, the keys, and this tape's own set-piece scares.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, H } from './plan.js?v=9';
-import { makeBody, pose } from './carcass.js?v=9';
+import { cx, cz, H } from './plan.js?v=10';
+import { makeBody, pose } from './carcass.js?v=10';
 
 const V = THREE.Vector3;
 
@@ -98,13 +98,18 @@ export function setupTape2(ctx) {
   const bed = ctx.world.hides.find((h) => h.k === 'bed' && Math.hypot(h.x - cx(9.4), h.z - cz(32.6)) < 1.5) || { x: cx(9.4), z: cz(32.6), fx: 0, fz: 1, ang: 0 };
   const strap = { k: 'strap', x: bed.x, z: bed.z, fx: 0, fz: -1, ang: bed.ang };
   return {
-    start() { walker.hide(strap); G.strapped = true; G.struggle = 0; setTimeout(() => say('start'), 1200); setTimeout(() => caption(ctx.vr() ? 'Pull the trigger to struggle against the straps' : 'Press E to struggle against the straps', 4), 4500); },
-    strapLabel: () => `Pull at the straps (${G.struggle}/6)`,
+    start() { walker.hide(strap); G.strapped = true; G.struggle = 0; setTimeout(() => say('start'), 1200); setTimeout(() => caption(ctx.vr() ? 'Mash any button to fight the straps!' : 'Mash any key or click to fight the straps!', 4), 4500); },
+    // you have to keep fighting for about five seconds; stop and the straps win back what you gained
+    strapLabel: () => { const n = Math.round(G.struggle * 12); return 'Struggle! ' + '\u25AE'.repeat(n) + '\u25AF'.repeat(12 - n); },
     struggle() {
-      G.struggle++; sound.rattle(walker.pos.x, walker.pos.z); walker.shake = 0.4; if (G.struggle === 2) say('struggle');
-      if (G.struggle >= 6) { G.strapped = false; walker.unhide(); sound.locker(false, 'bed'); say('free', 0.5); ctx.checkpoint(); }
+      if (!G.strapped) return;
+      G.struggle = Math.min(1, G.struggle + 0.04); walker.shake = Math.max(walker.shake, 0.35);
+      if (!G.rattleT || G.t - G.rattleT > 0.12) { G.rattleT = G.t; sound.rattle(walker.pos.x, walker.pos.z); }
+      if (G.struggle > 0.3 && !G.said.has('struggle')) say('struggle');
+      if (G.struggle >= 1) { G.strapped = false; walker.unhide(); sound.locker(false, 'bed'); sound.thud(walker.pos.clone().setY(0.6), 0.6); say('free', 0.5); ctx.checkpoint(); }
     },
     update(dt) {
+      if (G.strapped) G.struggle = Math.max(0, G.struggle - 0.08 * dt);
       const p = walker.pos;
       if (!G.sawStairs && Math.hypot(p.x - cx(45), p.z - cz(17)) < 3) { G.sawStairs = true; say('stairs'); }
       if (!G.said.has('surgery') && p.z < cz(8.5) && p.x < cx(22.5)) say('surgery');

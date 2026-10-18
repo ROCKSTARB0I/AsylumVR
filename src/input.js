@@ -40,6 +40,7 @@ export class Input {
     I.reload = this.edge('KeyR'); I.pause = this.edge('Escape') || this.edge('KeyP'); I.notes = this.edge('Tab') || this.edge('KeyJ');
     I.freecam = this.edge('KeyV');
     if (k.has('Space')) I.up += 1; if (k.has('KeyZ')) I.up -= 1;
+    I.any = [...this.edges].some((c) => c !== 'Escape' && c !== 'KeyP');   // any key or click this frame (for struggling)
     I.zoom = this.wheel; this.wheel = 0;
     I.lookDx = this.look.dx; I.lookDy = this.look.dy; this.look.dx = this.look.dy = 0;
     this.edges.clear();
@@ -51,6 +52,7 @@ export class Input {
         if (!src.gamepad || !src.handedness) continue;
         const side = src.handedness === 'left' ? 'left' : 'right'; const gp = src.gamepad; const b = gp.buttons.map((x) => x.pressed); const pb = this.prevBtn[side];
         const down = (i) => b[i] && !pb[i];
+        if (b.some((x, i) => x && !pb[i] && i !== 5)) I.any = true;
         const ax = gp.axes.length >= 4 ? [gp.axes[2], gp.axes[3]] : [gp.axes[0] || 0, gp.axes[1] || 0];
         if (side === 'left') {
           if (Math.hypot(ax[0], ax[1]) > 0.15) { I.mx += ax[0]; I.mz -= ax[1]; }
