@@ -2,9 +2,9 @@
 // (Voss has the staff film the patients). Clock in, do the count, take Voss his tray. Then the alarm:
 // the mains die, the beacons turn the building red, every cell door opens, and the staff die.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, H } from './plan.js?v=27';
-import { makeBody, pose } from './carcass.js?v=27';
-import { Talk } from './talk.js?v=27';
+import { cx, cz, H } from './plan.js?v=28';
+import { makeBody, pose } from './carcass.js?v=28';
+import { Talk } from './talk.js?v=28';
 const V = THREE.Vector3;
 
 export const NOTES = {
@@ -534,6 +534,8 @@ export function setupTape3(ctx) {
   return {
     interactables: inter,
     busy: () => talk.busy || CAR.state > 0,
+    // for tools (the trailer): the cast and the props of the set pieces
+    dev: { P, S, chair, ropeA, ropeB, stretch, poolA, poolB, gutting: (a) => gutting(P.okaforDead, [P.p1, P.p2], CAFE, 0.6, a, poolA, 'cafe'), laid, raiseAlarm: () => raiseAlarm(), lever: () => lever },
     // the cells are locked until the alarm
     lockCells() { for (const d of doors.list) if (d.cell) { d.locked = true; d.target = 0; d.angle = 0; d.mesh.rotation.y = 0; } },
     start() { this.lockCells(); if (ctx.LIGHT) this.lights(ctx.LIGHT); setTimeout(() => say('start'), 1200); },

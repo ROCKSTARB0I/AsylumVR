@@ -2,32 +2,32 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=27';
-import { buildSurfaces, T } from './surfaces.js?v=27';
-import { loadPictures, savePictures } from './keep.js?v=27';
-import { VRMenu } from './vrmenu.js?v=27';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=27';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=27';
-import { Doors } from './doors.js?v=27';
-import { Space } from './space.js?v=27';
-import { Input } from './input.js?v=27';
-import { Walker } from './walker.js?v=27';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=27';
-import { makeTape, makeVeil } from './tape.js?v=27';
-import { Slate } from './slate.js?v=27';
-import * as STORY1 from './story.js?v=27';
-import * as TAPE3 from './tape3.js?v=27';
-import * as TAPE2 from './tape2.js?v=27';
-import { Sound } from './dread.js?v=27';
-import { Horrors } from './horrors.js?v=27';
-import { Dressing } from './dressing.js?v=27';
-import { Scares } from './scares.js?v=27';
-import { makeHand } from './hands.js?v=27';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=28';
+import { buildSurfaces, T } from './surfaces.js?v=28';
+import { loadPictures, savePictures } from './keep.js?v=28';
+import { VRMenu } from './vrmenu.js?v=28';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=28';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=28';
+import { Doors } from './doors.js?v=28';
+import { Space } from './space.js?v=28';
+import { Input } from './input.js?v=28';
+import { Walker, MAX_EYE } from './walker.js?v=28';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=28';
+import { makeTape, makeVeil } from './tape.js?v=28';
+import { Slate } from './slate.js?v=28';
+import * as STORY1 from './story.js?v=28';
+import * as TAPE3 from './tape3.js?v=28';
+import * as TAPE2 from './tape2.js?v=28';
+import { Sound } from './dread.js?v=28';
+import { Horrors } from './horrors.js?v=28';
+import { Dressing } from './dressing.js?v=28';
+import { Scares } from './scares.js?v=28';
+import { makeHand } from './hands.js?v=28';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
-const S = { bright: 1, grain: 1, smooth: false };
+const S = { bright: 1, grain: 1, smooth: false, height: 0 };
 try { Object.assign(S, JSON.parse(localStorage.getItem('asylumvr') || '{}')); } catch (e) {}
 const save = () => { try { localStorage.setItem('asylumvr', JSON.stringify(S)); } catch (e) {} };
 // which tape: ?tape=N, else the first one
@@ -350,9 +350,10 @@ let deadT = 0;
 // ---------------------------------------------------------------- fades / pause
 let fade = 1, fadeGoal = 0;
 function fadeTo(v) { fadeGoal = v; }
+function pauseCard() { card.card([['PAUSED', 70], [objectiveText(), 34, '#c8c0b0'], ['', 20], [TAPE === 1 ? `Fuses ${G.fuses}/3   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}` : `Tape ${TAPE}   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}`, 32, '#9a948a'], ['', 20], ['Height ' + heightLabel() + '  \u00b7  left stick \u2191\u2193', 28, '#c8c0b0'], ['', 12], ['B resume   ·   hold trigger 2 s: last checkpoint', 30, '#9a948a']]); placeCard(); }
 function setPaused(p) {
   G.paused = p; $('pause').hidden = !p || renderer.xr.isPresenting;
-  if (p) { sound.duck(true); $('notesList').textContent = G.notes.length ? 'Notes: ' + G.notes.map((n) => NOTES[n].t).join(' · ') : ''; if (renderer.xr.isPresenting) { card.card([['PAUSED', 70], [objectiveText(), 34, '#c8c0b0'], ['', 20], [TAPE === 1 ? `Fuses ${G.fuses}/3   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}` : `Tape 2   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}`, 32, '#9a948a'], ['', 20], ['B resume   ·   hold trigger 2 s: last checkpoint', 30, '#9a948a']]); placeCard(); } }
+  if (p) { sound.duck(true); $('notesList').textContent = G.notes.length ? 'Notes: ' + G.notes.map((n) => NOTES[n].t).join(' · ') : ''; if (renderer.xr.isPresenting) pauseCard(); }
   else { sound.duck(false); card.mesh.visible = false; if (!renderer.xr.isPresenting) input.wantLock = true; }
 }
 $('resume').onclick = () => setPaused(false);
@@ -362,6 +363,10 @@ $('bright').value = S.bright; $('grain').value = S.grain; $('smooth').checked = 
 $('bright').oninput = (e) => { S.bright = +e.target.value; renderer.toneMappingExposure = 2.2 * S.bright; save(); };
 $('grain').oninput = (e) => { S.grain = +e.target.value; save(); };
 $('smooth').onchange = (e) => { S.smooth = e.target.checked; save(); };
+// height: added to your real height in VR (or to the standard eye on desktop), capped at Kroft's eye level
+function heightLabel() { const eyeV = renderer.xr.isPresenting ? camera.position.y + S.height / 100 : 1.64 + S.height / 100; const capped = eyeV > MAX_EYE + 0.005; return `${S.height >= 0 ? '+' : ''}${S.height} cm${capped ? ' (as tall as you can be: Kroft is taller)' : ''}`; }
+function setHeight(cm) { S.height = Math.max(-40, Math.min(40, Math.round(cm))); walker.heightOff = S.height / 100; $('height').value = S.height; $('heightVal').textContent = heightLabel(); save(); }
+$('height').oninput = (e) => setHeight(+e.target.value); setHeight(S.height || 0);
 document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && G.playing && !renderer.xr.isPresenting && !G.reading && !G.paused && input.hadLock) setPaused(true); if (document.pointerLockElement) input.hadLock = true; });
 
 // ---------------------------------------------------------------- the end of Tape 1: Pell
@@ -511,6 +516,8 @@ function frame() {
   // menus
   if (I.pause && !G.reading) setPaused(!G.paused);
   if (G.paused) {
+    // in the headset: the left stick sets your height while paused
+    if (vr) { const up = I.mz > 0.7, dn = I.mz < -0.7; if ((up || dn) && !G.hStick) { setHeight(S.height + (up ? 5 : -5)); sound.click && sound.click(); pauseCard(); } G.hStick = up || dn; }
     if (vr) { if (I.interact) readHold = 0; if (renderer.xr.getSession()) for (const src of renderer.xr.getSession().inputSources) if (src.handedness === 'right' && src.gamepad && src.gamepad.buttons[0].pressed) readHold += dt; if (readHold > 2) { readHold = 0; setPaused(false); respawn(); } }
     draw(dt, vr, I); return;
   }

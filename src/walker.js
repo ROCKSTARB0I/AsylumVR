@@ -4,9 +4,13 @@
 import * as THREE from '../vendor/three.module.js';
 
 const V = THREE.Vector3;
+// Kroft is 2.16 m; his eyes are at about 2.02. However tall you make yourself, you look up at him.
+export const MAX_EYE = 2.02;
+
 export class Walker {
   constructor(dolly, camera, space) {
     this.dolly = dolly; this.camera = camera; this.space = space;
+    this.heightOff = 0;   // your height setting (m); your eyes never go above Kroft's
     this.pos = new V(); this.yaw = 0; this.pitch = 0; this.eye = 1.64; this.crouched = false; this.vel = new V();
     this.health = 100; this.lastHurt = -99; this.alive = true; this.t = 0; this.bob = 0; this.stepPhase = 0; this.speed = 0;
     this.hidden = null; this.freecam = false; this.onStep = null; this.vrCrouch = 0; this.exhaust = 0; this.breath = 0;
@@ -44,7 +48,7 @@ export class Walker {
     this.vel.lerp(want, 1 - Math.exp(-dt * (want.lengthSq() ? 9 : 12)));
     this.pos.addScaledVector(this.vel, dt); this.space.collide(this.pos, 0.3);
     this.speed = Math.hypot(this.vel.x, this.vel.z);
-    this.eye += ((this.crouched ? 0.98 : 1.64) - this.eye) * (1 - Math.exp(-dt * 8));
+    this.eye += ((this.crouched ? 0.98 + this.heightOff * 0.5 : Math.min(MAX_EYE, 1.64 + this.heightOff)) - this.eye) * (1 - Math.exp(-dt * 8));
     this.steps(dt, run);
     // heavy breathing after running sets the bob and the sway
     const bobA = Math.min(1, this.speed / 4.3);
@@ -78,7 +82,8 @@ export class Walker {
     const p = new V(head.x, 0, head.z).addScaledVector(this.vel, dt);
     this.space.collide(p, 0.25);
     this.dolly.position.x += p.x - head.x; this.dolly.position.z += p.z - head.z;
-    this.dolly.position.y += ((this.vrCrouch ? -0.6 : 0) - this.dolly.position.y) * (1 - Math.exp(-dt * 8));
+    const lift = Math.min((this.vrCrouch ? -0.6 : 0) + this.heightOff, MAX_EYE - this.camera.position.y);   // never taller than Kroft
+    this.dolly.position.y += (lift - this.dolly.position.y) * (1 - Math.exp(-dt * 8));
     this.pos.set(p.x, 0, p.z); this.speed = Math.hypot(this.vel.x, this.vel.z);
     this.steps(dt, run);
   }
