@@ -76,3 +76,7 @@ button:hover:not(:disabled), button:focus-visible { border-color: var(--red); co
 #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 0.5s; }
 #fade.on { opacity: 1; }
 @media (max-width: 480px) { #osd { font-size: 20px; } }
+
+#saved { position: fixed; top: 5%; left: 50%; transform: translateX(-50%); font-size: 26px; color: #fff; letter-spacing: 0.1em; text-shadow: 0 0 4px #000, 1px 0 rgba(0,255,255,0.4), -1px 0 rgba(255,0,255,0.4); pointer-events: none; opacity: 0; }
+#saved.on { animation: savedFlash 2.4s steps(1) forwards; }
+@keyframes savedFlash { 0% { opacity: 1 } 15% { opacity: 0.2 } 25% { opacity: 1 } 85% { opacity: 1 } 100% { opacity: 0 } }
