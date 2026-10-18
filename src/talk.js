@@ -5,6 +5,16 @@
 // On desktop: 1 / 2 picks a reply (or W/S then E). In VR: the left stick picks, the trigger says it.
 const CPS = 48;   // characters per second as a line comes out
 
+// the voice: a little square-wave blip every other letter, pitched per person (made once, replayed at a rate)
+let blipBuf = null;
+function blip(sound, f, k = 1) {
+  const c = sound.ctx; if (!c || !sound.on) return;
+  if (!blipBuf) { const n = Math.floor(c.sampleRate * 0.045); blipBuf = c.createBuffer(1, n, c.sampleRate); const d = blipBuf.getChannelData(0); for (let i = 0; i < n; i++) { const t = i / c.sampleRate; const env = Math.min(1, i / 60) * Math.pow(1 - i / n, 1.6); d[i] = (Math.sin(t * 200 * 6.2832) > 0 ? 0.6 : -0.6) * env + Math.sin(t * 400 * 6.2832) * 0.25 * env; } }
+  const s = c.createBufferSource(); s.buffer = blipBuf; s.playbackRate.value = (f / 200) * (0.94 + Math.random() * 0.12);
+  const g = c.createGain(); g.gain.value = 0.11 * k; const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2600;
+  s.connect(lp); lp.connect(g); g.connect(sound.vipDry); s.start();
+}
+
 export class Talk {
   constructor({ G, sound, vr, card, placeCard, onLine }) {
     Object.assign(this, { G, sound, vr, placeCard, onLine }); this._card = card; this.active = null;
@@ -25,7 +35,7 @@ export class Talk {
     A.node = n; A.id = id; A.shown = 0; A.sel = 0; A.wait = 0.25; this.dirty = true;
     if (n.set) Object.assign(this.G.flags, n.set);
     if (n.act) n.act(this.G);
-    this.sound.mutter(); if (this.onLine) this.onLine(A.npc, n);
+    A.blips = 0; if (this.onLine) this.onLine(A.npc, n);
   }
   close() {
     const A = this.active; this.active = null; this.el.hidden = true; if (this.card) this.card.mesh.visible = false;
@@ -36,7 +46,11 @@ export class Talk {
     const A = this.active; if (!A) return false;
     A.t += dt; A.wait -= dt; const n = A.node; const full = n.say.length;
     const before = Math.floor(A.shown); A.shown = Math.min(full, A.shown + dt * CPS);
-    if (Math.floor(A.shown) !== before) this.dirty = true;
+    if (Math.floor(A.shown) !== before) {
+      this.dirty = true;
+      // the blip: on letters, every other one, in this person's pitch
+      for (let i = before; i < Math.floor(A.shown); i++) { const ch = n.say[i]; if (/[A-Za-z0-9]/.test(ch) && (A.blips++ % 2 === 0)) blip(this.sound, (n.voice || A.npc.voice || 200), n.who && !A.npc.voice ? 1 : 1); }
+    }
     const done = A.shown >= full; const ch = n.choices || null;
     if (A.wait <= 0) {
       if (!done && (I.interact || I.pick)) { A.shown = full; this.dirty = true; }

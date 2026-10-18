@@ -2,9 +2,9 @@
 // (Voss has the staff film the patients). Clock in, do the count, take Voss his tray. Then the alarm:
 // the mains die, the beacons turn the building red, every cell door opens, and the staff die.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, H } from './plan.js?v=19';
-import { makeBody, pose } from './carcass.js?v=19';
-import { Talk } from './talk.js?v=19';
+import { cx, cz, H } from './plan.js?v=20';
+import { makeBody, pose } from './carcass.js?v=20';
+import { Talk } from './talk.js?v=20';
 const V = THREE.Vector3;
 
 export const NOTES = {
@@ -139,12 +139,12 @@ export function setupTape3(ctx) {
   };
   // who you can talk to before the alarm, and where they are
   const PEOPLE = {
-    dawes: { name: 'Dawes', b: P.guard, x: 16, y: 30.4, yaw: Math.PI },
-    kelly: { name: 'Nurse Kelly', b: P.nurse, x: 25.5, y: 29.3, yaw: 0 },
-    hale: { name: 'Dr. Hale', b: P.hale, x: 33, y: 18.7, yaw: -Math.PI / 2, pace: 1 },
-    okafor: { name: 'Dr. Okafor', b: P.okafor, x: 14.5, y: 7.2, yaw: Math.PI * 0.9 },
-    brandt: { name: 'Dr. Brandt', b: P.brandt, x: 33, y: 10.6, yaw: Math.PI, anim: 'listen' },
-    voss: { name: 'Dr. Voss', b: P.voss, x: plan.voss.x, y: plan.voss.y, yaw: Math.PI, calm: false },
+    dawes: { name: 'Dawes', voice: 140, b: P.guard, x: 16, y: 30.4, yaw: Math.PI },
+    kelly: { name: 'Nurse Kelly', voice: 390, b: P.nurse, x: 25.5, y: 29.3, yaw: 0 },
+    hale: { name: 'Dr. Hale', voice: 255, b: P.hale, x: 33, y: 18.7, yaw: -Math.PI / 2, pace: 1 },
+    okafor: { name: 'Dr. Okafor', voice: 175, b: P.okafor, x: 14.5, y: 7.2, yaw: Math.PI * 0.9 },
+    brandt: { name: 'Dr. Brandt', voice: 215, b: P.brandt, x: 33, y: 10.6, yaw: Math.PI, anim: 'listen' },
+    voss: { name: 'Dr. Voss', voice: 108, b: P.voss, x: plan.voss.x, y: plan.voss.y, yaw: Math.PI, calm: false },
   };
   // props the scenes need: a chair and two ropes, blood that spreads
   const mat = (c, r = 0.8) => new THREE.MeshStandardMaterial({ color: c, roughness: r });
@@ -294,7 +294,7 @@ export function setupTape3(ctx) {
   // after the alarm the security desk only says one thing
   inter.push({ kind: 't3', pos: () => new V(cx(plan.clock.x), 1.0, cz(plan.clock.y) + 0.4), r: 1.3, label: () => (G.alarm ? 'LOCKDOWN — GATE SEALED' : ''), act: () => { G.sawLockdown = true; } });
   // the count: look through four hatches; two of them talk back
-  const hatchWho = { kroft: { name: 'Kroft', b: null }, rourke: { name: 'Rourke', b: null } };
+  const hatchWho = { kroft: { name: 'Kroft', voice: 78, b: null }, rourke: { name: 'Rourke', voice: 480, b: null } };
   for (const [dx, dy, , , who] of plan.count) {
     inter.push({ kind: 't3', pos: () => new V(cx(dx), 1.5, cz(dy)), r: 1.1, label: () => (G.alarm || !G.sheet || talk.busy ? '' : countDone.has(who) ? 'Counted' : 'Look through the hatch'),
       act: () => {

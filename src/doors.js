@@ -2,9 +2,9 @@
 // swung about its hinge. Collision treats the leaf as a segment, so a half
 // open door still blocks you (and them).
 import * as THREE from '../vendor/three.module.js';
-import { C } from './plan.js?v=19';
-import { T } from './surfaces.js?v=19';
-import { bakedMaterial, Batch } from './mason.js?v=19';
+import { C } from './plan.js?v=20';
+import { T } from './surfaces.js?v=20';
+import { bakedMaterial, Batch } from './mason.js?v=20';
 
 export class Doors {
   constructor(world, scene) {
