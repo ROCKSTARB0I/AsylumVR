@@ -2,23 +2,23 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=8';
-import { buildSurfaces, T } from './surfaces.js?v=8';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=8';
-import { Doors } from './doors.js?v=8';
-import { Space } from './space.js?v=8';
-import { Input } from './input.js?v=8';
-import { Walker } from './walker.js?v=8';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=8';
-import { makeTape, makeVeil } from './tape.js?v=8';
-import { Slate } from './slate.js?v=8';
-import * as STORY1 from './story.js?v=8';
-import * as TAPE2 from './tape2.js?v=8';
-import { Sound } from './dread.js?v=8';
-import { Horrors } from './horrors.js?v=8';
-import { Dressing } from './dressing.js?v=8';
-import { Scares } from './scares.js?v=8';
-import { makeHand } from './hands.js?v=8';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=9';
+import { buildSurfaces, T } from './surfaces.js?v=9';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=9';
+import { Doors } from './doors.js?v=9';
+import { Space } from './space.js?v=9';
+import { Input } from './input.js?v=9';
+import { Walker } from './walker.js?v=9';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=9';
+import { makeTape, makeVeil } from './tape.js?v=9';
+import { Slate } from './slate.js?v=9';
+import * as STORY1 from './story.js?v=9';
+import * as TAPE2 from './tape2.js?v=9';
+import { Sound } from './dread.js?v=9';
+import { Horrors } from './horrors.js?v=9';
+import { Dressing } from './dressing.js?v=9';
+import { Scares } from './scares.js?v=9';
+import { makeHand } from './hands.js?v=9';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);

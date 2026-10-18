@@ -3,7 +3,7 @@
 // station and hydrotherapy sit off one long corridor; the chapel and the
 // surgical theater are locked away to the north; the stairwell down to the
 // basement is chained shut at the east end.
-import { C, W, D, Z, cx, cz } from './plan.js?v=8';
+import { C, W, D, Z, cx, cz } from './plan.js?v=9';
 
 export function makePlan2() {
   const g = new Uint8Array(W * D); const win = new Uint8Array(W * D);
@@ -44,7 +44,7 @@ export function makePlan2() {
   L(8, 23, 'A', { col: 0xcfe8ff, i: 1.0, r: 9, kind: 'tube' }); L(17, 25, 'B', { col: 0xcfe8ff, i: 1.0, r: 9, kind: 'tube' });
   for (const x of [5, 17, 21]) L(x, 28.8, 'S', { col: 0x7088c0, i: 0.8, r: 8, kind: 'none', dir: [0, -0.5, -1] });
   L(13, 24, 'S', { col: 0xff2a10, i: 0.45, r: 7, kind: 'cage' });
-  L(11, 32, 'S', { col: 0xe6f0ff, i: 0.7, r: 5, kind: 'bulb' });                    // the bare bulb over your bed
+  L(9.7, 32.6, 'S', { col: 0xe6f0ff, i: 0.7, r: 5, kind: 'bulb' });                    // the bare bulb over your bed
   L(28, 20, 'S', { col: 0xffb060, i: 0.55, r: 5, kind: 'lamp' });                   // desk lamp, nurses' station
   L(37, 23, 'A', { col: 0xcfe8ff, i: 0.7, r: 7, kind: 'tube' });
   for (const x of [5, 13, 21]) L(x, 12.5, 'S', { col: 0xe6f0ff, i: 0.3, r: 4, kind: 'bulb' });
@@ -54,10 +54,10 @@ export function makePlan2() {
   L(19, 3, 'B', { col: 0xcfe8ff, i: 0.7, r: 6, kind: 'tube' });
 
   const props = []; const P = (k, x, y, r = 0, o = {}) => props.push({ k, x, y, r, ...o });
-  for (let x = 5; x <= 21; x += 2) { P('bed', x, 19.9, 0); P('bed', x, 27.9, 2); }
+  for (let x = 5; x <= 21; x += 2) { P('bed', x, 19.9, 0); if (x !== 11) P('bed', x, 27.9, 2); }   // (no bed in front of the restraint room door)
   P('chair', 9, 24, 1, { tipped: true }); P('wheelchair', 15, 24.5, 2); P('trolley', 20, 23.6, 1, { tipped: true });
-  P('bed', 11, 31.6, 0);                                                         // your restraint bed
-  P('trolley', 12.6, 33.4, 0); P('ivstand', 9.8, 31.2, 0);
+  P('bed', 9.4, 32.6, 0);                                                        // your restraint bed, against the west wall
+  P('trolley', 12.6, 33.6, 0); P('ivstand', 10.3, 31.3, 0);
   for (const x of [4, 8, 12, 16, 20]) { P('bucket', x + 2.2, 11.4, 0); }
   P('secdesk', 28.5, 19.4, 0); P('filing', 26.4, 24.4, 2); P('filing', 27.4, 24.4, 2); P('shelf', 31.6, 22, 3); P('chair', 28.5, 20.6, 2);
   for (const x of [34.5, 37.5, 40.5]) { P('tub', x, 20.8, 0); P('tub', x, 25.6, 0); }
@@ -78,7 +78,7 @@ export function makePlan2() {
     [1.5, 33, 'w', 'DOWN IS WORSE'], [44.4, 25, 'w', 'THE STAIRS DO NOT END'], [33.4, 26, 'w', 'DROWN THE NOISE'], [9, 33.6, 's', 'YOU SIGNED THE FORM']]) G('scrawl', x, y, { wall: w, t });
 
   const items = [
-    { k: 'note', x: 12.4, y: 33.4, id: 'n2_wake' },
+    { k: 'note', x: 12.4, y: 33.6, id: 'n2_wake' },
     { k: 'card', x: 29.4, y: 19.5, id: 'card' },
     { k: 'chapelKey', x: 38.5, y: 4.2, id: 'chapelKey' },
     { k: 'stairKey', x: 14.5, y: 3.5, id: 'stairKey' },
@@ -86,7 +86,7 @@ export function makePlan2() {
     { k: 'note', x: 40.5, y: 25.6, id: 'n2_hydro' }, { k: 'note', x: 34, y: 6.5, id: 'n2_chapel' }, { k: 'note', x: 10, y: 3.2, id: 'n2_surgery' },
     { k: 'note', x: 45.5, y: 25.4, id: 'n2_stairs' }, { k: 'note', x: 8, y: 37.6, id: 'n2_kroft' },
   ];
-  const start = { x: 11, y: 31.6, yaw: Math.PI, strapped: true };
+  const start = { x: 9.4, y: 32.6, yaw: Math.PI, strapped: true };
   const exit = { x: 45, y: 25.5, r: 1.6 };
   // one hunter per segment: Pell until the keycard, Kroft until the chaplain's key, then Voss to the end
   const hunters = [

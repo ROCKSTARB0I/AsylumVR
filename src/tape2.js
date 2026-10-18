@@ -1,8 +1,8 @@
 // Tape 2, The Male Ward: the documents, what you mutter, the objectives,
 // the wake-up, the keys, and this tape's own set-piece scares.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, H } from './plan.js?v=8';
-import { makeBody, pose } from './carcass.js?v=8';
+import { cx, cz, H } from './plan.js?v=9';
+import { makeBody, pose } from './carcass.js?v=9';
 
 const V = THREE.Vector3;
 
@@ -95,7 +95,7 @@ export function setPieces(S) {
 export function setupTape2(ctx) {
   const { G, walker, plan, say, caption, sound, horrors, cam } = ctx;
   G.strapped = true; G.struggle = 0; G.sawStairs = false;
-  const bed = ctx.world.hides.find((h) => h.k === 'bed' && Math.hypot(h.x - cx(11), h.z - cz(31.6)) < 1.5) || { x: cx(11), z: cz(31.6), fx: 0, fz: 1, ang: 0 };
+  const bed = ctx.world.hides.find((h) => h.k === 'bed' && Math.hypot(h.x - cx(9.4), h.z - cz(32.6)) < 1.5) || { x: cx(9.4), z: cz(32.6), fx: 0, fz: 1, ang: 0 };
   const strap = { k: 'strap', x: bed.x, z: bed.z, fx: 0, fz: -1, ang: bed.ang };
   return {
     start() { walker.hide(strap); G.strapped = true; G.struggle = 0; setTimeout(() => say('start'), 1200); setTimeout(() => caption(ctx.vr() ? 'Pull the trigger to struggle against the straps' : 'Press E to struggle against the straps', 4), 4500); },
