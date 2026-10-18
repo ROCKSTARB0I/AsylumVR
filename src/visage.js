@@ -6,8 +6,8 @@
 // bandages, a missing nose, a surgical mask). Both maps share a front
 // projection; the rest of the head keeps procedural vertex colour.
 import * as THREE from '../vendor/three.module.js';
-import { picture, keepPicture } from './keep.js?v=21';
-import { rng, fbm } from './surfaces.js?v=21';
+import { picture, keepPicture } from './keep.js?v=22';
+import { rng, fbm } from './surfaces.js?v=22';
 
 const V = THREE.Vector3;
 const D = 256, T = 512;     // depth map and face texture sizes
@@ -93,11 +93,12 @@ function faceTexture(r, R, skinHex) {
     }
     blob(P, s * 0.5, -0.15, 0.14, 0.1, rgba(150, 60, 60, 0.12), 10);             // a flush on the cheeks
   }
-  blob(P, 0, -0.5, 0.26, 0.09, rgba(110, 50, 50, 0.55), 3);                      // lips
+  blob(P, 0, -0.5, 0.26, 0.09, r.female ? rgba(150, 52, 58, 0.75) : rgba(110, 50, 50, 0.55), 3);                      // lips
+  if (r.female) for (const s of [-1, 1]) { stroke(P, [[s * 0.22, 0.06], [s * 0.36, 0.1], [s * 0.5, 0.07]], 0.018, rgba(25, 15, 15, 0.85), 0.6); blob(P, s * 0.48, -0.17, 0.13, 0.08, rgba(190, 90, 90, 0.18), 10); }   // lashes, a little blush
   stroke(P, [[-0.25, -0.505], [0, -0.495], [0.25, -0.505]], 0.02, rgba(30, 8, 8, 0.9), 1);
   blob(P, 0, -0.24, 0.1, 0.07, rgba(140, 60, 55, 0.18), 5);                      // nose tip, slightly red
   // stubble on the jaw and lip
-  if (!r.dead && r.face !== 'masked') {
+  if (!r.dead && r.face !== 'masked' && !r.female) {
     const R3 = rng(r.seed * 7 + 1); c.fillStyle = 'rgba(30,24,20,0.35)';
     for (let i = 0; i < 2600; i++) { const fx = (R3() - 0.5) * 1.5, fy = -0.3 - R3() * 0.7; if (Math.hypot(fx / 0.75, (fy + 0.6) / 0.5) > 1 || Math.abs(fy + 0.5) < 0.06 && Math.abs(fx) < 0.26) continue; c.fillRect(P.X(fx), P.Y(fy), 1.2, 1.2); }
   }
@@ -135,6 +136,14 @@ function faceTexture(r, R, skinHex) {
       blob(P, 0.1, -0.5, 0.25, 0.18, blood(0.45), 8); blob(P, -0.2, -0.65, 0.1, 0.08, blood(0.6), 4); break;
     case 'lobotomy': for (const s of [-1, 1]) blob(P, s * 0.36, 0.04, 0.2, 0.15, 'rgba(60,20,40,0.5)', 8); break;
     case 'dead': blob(P, 0, -0.5, 0.2, 0.05, 'rgba(40,20,30,0.6)', 3); break;
+  }
+  // hair: the face texture covers the front of the scalp, so the hairline is painted here
+  if (!r.bald && r.face !== 'masked' && r.face !== 'lobotomy' && r.face !== 'bandaged' && r.face !== 'burned') {
+    const hc = r.hair || [0.09, 0.075, 0.06]; const hr = (a) => `rgba(${hc[0] * 255 | 0},${hc[1] * 255 | 0},${hc[2] * 255 | 0},${a})`;
+    blob(P, 0, 0.98, 1.2, 0.42, hr(1), 5);                                          // over the top, down to the hairline
+    blob(P, r.female ? -0.25 : 0.1, 0.6, 0.5, 0.1, hr(0.9), 4);                   // a softer edge, parted to one side
+    if (r.female) for (const s of [-1, 1]) { blob(P, s * 0.86, 0.25, 0.2, 0.55, hr(0.95), 6); blob(P, s * 0.72, 0.55, 0.22, 0.25, hr(0.9), 5); }   // framing the face
+    const R4 = rng((r.seed || 1) * 13 + 2); for (let i = 0; i < 160; i++) { const x = (R4() - 0.5) * 1.6, y = 0.62 + R4() * 0.4; stroke(P, [[x, y], [x + (R4() - 0.5) * 0.06, y - 0.07]], 0.008, `rgba(255,240,220,${0.05 + R4() * 0.06})`, 0); }   // strands catching the light
   }
   c.globalCompositeOperation = 'source-over';
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;

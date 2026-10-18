@@ -5,9 +5,9 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=21';
-import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=21';
-import { renderMenuTheme, THEME_LOOP } from './theme.js?v=21';
+import { Score } from './score.js?v=22';
+import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=22';
+import { renderMenuTheme, THEME_LOOP } from './theme.js?v=22';
 
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
@@ -205,9 +205,8 @@ export class Sound {
     if (!this.on) return; const hard = zone === 4 || zone === 5 ? 1 : zone === 6 || zone === 11 ? 0.5 : zone === 8 || zone === 10 ? 0.3 : 0.7;
     const g = 0.06 + k * 0.22;
     this.burst(null, { f: 180 + hard * 200, q: 1, dur: 0.06, gain: g, type: 'lowpass', brown: true, verb: 0.25 });
-    this.burst(null, { f: 1500 + hard * 2500, q: 1.5, dur: 0.03 + hard * 0.02, gain: g * (0.25 + hard * 0.4), delay: 0.03, verb: 0.3 });
-    if (zone === 4 || Math.random() < 0.15) this.burst(null, { f: 2400, q: 4, dur: 0.06, gain: g * 0.3, delay: 0.05 });   // wet
-    if (zone === 6 && Math.random() < 0.3) this.tone(null, { f: rnd(400, 700), f2: rnd(300, 500), dur: 0.12, gain: 0.03, delay: 0.04 });   // creaking boards
+    // a heel on a hard floor: a short, tight click, no hiss (the old hiss sounded like rustling)
+    this.burst(null, { f: 650 + hard * 450, q: 3.5, dur: 0.016, gain: g * (0.15 + hard * 0.3), delay: 0.022, verb: 0.15 });
   }
   footstep(kind, pos, speed) {
     const p = pos.clone(); p.y = 0.1; const heavy = kind === 'brute' ? 1 : kind === 'surgeon' ? 0.6 : 0.35; const run = speed > 2 ? 1.4 : 1;

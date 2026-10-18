@@ -2,9 +2,9 @@
 // (Voss has the staff film the patients). Clock in, do the count, take Voss his tray. Then the alarm:
 // the mains die, the beacons turn the building red, every cell door opens, and the staff die.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, H } from './plan.js?v=21';
-import { makeBody, pose } from './carcass.js?v=21';
-import { Talk } from './talk.js?v=21';
+import { cx, cz, H } from './plan.js?v=22';
+import { makeBody, pose } from './carcass.js?v=22';
+import { Talk } from './talk.js?v=22';
 const V = THREE.Vector3;
 
 export const NOTES = {
@@ -128,7 +128,7 @@ export function setupTape3(ctx) {
   const P = {
     guard: body(scene, 'orderly', 71, { ...clean, h: 1.84, girth: 1.05, skin: [0.72, 0.56, 0.47] }),
     guardDead: body(scene, 'orderly', 71, { ...clean, h: 1.84, girth: 1.05, skin: [0.72, 0.56, 0.47], blood: 1, dirt: 0.3 }),
-    nurse: body(scene, 'orderly', 74, { ...clean, h: 1.66, girth: 0.78, skin: [0.8, 0.64, 0.54] }),
+    nurse: body(scene, 'orderly', 74, { ...clean, outfit: 'nurse', female: true, h: 1.66, girth: 0.78, lean: 0.1, muscle: 0, skin: [0.82, 0.66, 0.56], hair: [0.16, 0.09, 0.05] }),
     hale: body(scene, 'surgeon', 81, { ...clean, glasses: true, skin: [0.74, 0.58, 0.48] }),
     okafor: body(scene, 'surgeon', 82, { ...clean, glasses: false, skin: [0.36, 0.25, 0.2] }),
     okaforDead: body(scene, 'surgeon', 82, { ...clean, glasses: false, skin: [0.36, 0.25, 0.2], blood: 1, dirt: 0.3 }),
@@ -214,6 +214,24 @@ export function setupTape3(ctx) {
       if (G.delivered && !talk.busy) { S.since = (S.since || 0) + dt; if (S.since > (G.flags.voss ? 8 : 14) || (S.since > (G.flags.voss ? 1.2 : 2.5) && !near(plan.voss.x, plan.voss.y, 5.5))) raiseAlarm(); }
     } else {
       G.alarmT += dt; const a = G.alarmT;
+      // ---- Kroft: out of his cell and straight for you. He doesn't see well; he listens, and keeps
+      // closing in on where you are (less sure of it while you're hidden and keeping still)
+      const kr = horrors.hunter;
+      if (kr && kr.kind === 'brute' && kr.active && !G.inYard) {
+        if (!S.kroftWoke && a > 1.7) {
+          S.kroftWoke = true; S.kroftT = 6; sound.voice('brute', 'chase', kr.pos); horrors.glitchKick(0.6);
+          caption(G.flags.kroft ? 'Kroft: "ORDERLY! I told you! I can HEAR you!"' : 'Kroft: "ORDERLY!"', 3);
+          kr.state = 'investigate'; kr.goal = p.clone(); kr.path = null; kr.wait = 0; kr.aware = 0.6;
+        }
+        S.kroftT = (S.kroftT ?? 6) - dt;
+        const idle = kr.state === 'patrol' || kr.state === 'idle' || (kr.state === 'search' && kr.searchT < 4);
+        if (S.kroftWoke && S.kroftT <= 0 && idle) {
+          const hid = !!walker.hidden, spread = hid ? 11 : walker.speed > 2.5 ? 2.5 : 5.5;
+          S.kroftT = hid ? 12 + Math.random() * 6 : 6 + Math.random() * 4;
+          kr.state = 'investigate'; kr.goal = p.clone().add(new V((Math.random() - 0.5) * spread, 0, (Math.random() - 0.5) * spread)); kr.path = null; kr.wait = 0.3;
+          if (Math.random() < 0.5) sound.voice('brute', 'alert', kr.pos);
+        }
+      }
       // ---- Dr. Hale, on a chair under the pipe in the main corridor, the rope already round his neck
       const hx = cx(HANG.x), hz = cz(HANG.y); const top = new V(hx, H - 0.05, hz);
       if (S.hang === 0 && sees(HANG.x, HANG.y, 10)) { S.hang = 1; S.hangT = a; }
@@ -313,7 +331,7 @@ export function setupTape3(ctx) {
     busy: () => talk.busy,
     // the cells are locked until the alarm
     lockCells() { for (const d of doors.list) if (d.cell) { d.locked = true; d.target = 0; d.angle = 0; d.mesh.rotation.y = 0; } },
-    start() { this.lockCells(); setTimeout(() => say('start'), 1200); },
+    start() { this.lockCells(); if (ctx.LIGHT) this.lights(ctx.LIGHT); setTimeout(() => say('start'), 1200); },
     restore(d) { G.flags = d.flags || {}; G.sheet = !!d.sheet; if (d.alarm) raiseAlarm(true); else this.lockCells(); for (const k of ['kroft', 'rourke', 'a', 'b'].slice(0, d.counted || 0)) countDone.add(k); },
     update(dt, I) { if (talk.busy) talk.update(dt, I); update(dt, I); },
     stopKlaxon() { if (klaxon) { klaxon.out.gain.setTargetAtTime(0, sound.ctx.currentTime, 0.3); } },

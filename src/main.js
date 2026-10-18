@@ -2,27 +2,27 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=21';
-import { buildSurfaces, T } from './surfaces.js?v=21';
-import { loadPictures, savePictures } from './keep.js?v=21';
-import { VRMenu } from './vrmenu.js?v=21';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=21';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=21';
-import { Doors } from './doors.js?v=21';
-import { Space } from './space.js?v=21';
-import { Input } from './input.js?v=21';
-import { Walker } from './walker.js?v=21';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=21';
-import { makeTape, makeVeil } from './tape.js?v=21';
-import { Slate } from './slate.js?v=21';
-import * as STORY1 from './story.js?v=21';
-import * as TAPE3 from './tape3.js?v=21';
-import * as TAPE2 from './tape2.js?v=21';
-import { Sound } from './dread.js?v=21';
-import { Horrors } from './horrors.js?v=21';
-import { Dressing } from './dressing.js?v=21';
-import { Scares } from './scares.js?v=21';
-import { makeHand } from './hands.js?v=21';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=22';
+import { buildSurfaces, T } from './surfaces.js?v=22';
+import { loadPictures, savePictures } from './keep.js?v=22';
+import { VRMenu } from './vrmenu.js?v=22';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=22';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=22';
+import { Doors } from './doors.js?v=22';
+import { Space } from './space.js?v=22';
+import { Input } from './input.js?v=22';
+import { Walker } from './walker.js?v=22';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=22';
+import { makeTape, makeVeil } from './tape.js?v=22';
+import { Slate } from './slate.js?v=22';
+import * as STORY1 from './story.js?v=22';
+import * as TAPE3 from './tape3.js?v=22';
+import * as TAPE2 from './tape2.js?v=22';
+import { Sound } from './dread.js?v=22';
+import { Horrors } from './horrors.js?v=22';
+import { Dressing } from './dressing.js?v=22';
+import { Scares } from './scares.js?v=22';
+import { makeHand } from './hands.js?v=22';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -91,7 +91,7 @@ const dressing = new Dressing(world, plan, scene); mark('dressing');
 const horrors = new Horrors({ scene, plan, world, space, doors, walker, cam, sound, G, camera }); mark('horrors');
 const scares = new Scares({ scene, plan, world, space, doors, walker, cam, sound, G, horrors, camera, dressing });
 if (TAPE === 2) scares.list = TAPE2.setPieces(scares); if (TAPE === 3) { scares.list = []; scares.cool = 1e9; } mark('scares');
-const tapeLogic = TAPE === 3 ? TAPE3.setupTape3({ get card() { return card; }, placeCard: () => placeCard(), G, walker, plan, world, sound, horrors, doors, scene, space, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), save: () => saveGame(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
+const tapeLogic = TAPE === 3 ? TAPE3.setupTape3({ LIGHT, get card() { return card; }, placeCard: () => placeCard(), G, walker, plan, world, sound, horrors, doors, scene, space, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), save: () => saveGame(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
 
 // ---------------------------------------------------------------- hands
 // your own hands, empty, on the controllers' grips in VR (the camcorder is the whole view, not something you hold)

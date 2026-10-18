@@ -3,9 +3,9 @@
 // dark), hears (your steps, doors, things you knock), patrols or keeps to
 // its corner, investigates, chases, searches, checks lockers, and kills.
 import * as THREE from '../vendor/three.module.js';
-import { C, W, D, cx, cz } from './plan.js?v=21';
-import { VAULT_H } from './space.js?v=21';
-import { makeBody, pose, cleaver, bonesaw, flashlight, BODY_LIGHT } from './carcass.js?v=21';
+import { C, W, D, cx, cz } from './plan.js?v=22';
+import { VAULT_H } from './space.js?v=22';
+import { makeBody, pose, cleaver, bonesaw, flashlight, BODY_LIGHT } from './carcass.js?v=22';
 
 const V = THREE.Vector3;
 const tmp = new V(), tmp2 = new V();
@@ -182,7 +182,7 @@ class Horror {
     const see = w.alive ? this.canSee(P) : 0;
     if (see > 0) { this.aware = Math.min(1.5, this.aware + see * dt * (this.state === 'investigate' || this.state === 'search' ? 3.2 : 1.8)); this.lastSeen = P.clone(); this.lostT = 0; }
     else this.aware = Math.max(0, this.aware - dt * 0.25);
-    if (this.aware >= 1 && this.state !== 'chase' && this.state !== 'attack' && this.state !== 'execute' && this.K.run && this.state !== 'eat' && H.mayChase(this)) {
+    if (this.aware >= 1 && this.state !== 'chase' && this.state !== 'spot' && this.state !== 'attack' && this.state !== 'execute' && this.K.run && this.state !== 'eat' && H.mayChase(this)) {   // (not again while it's already roaring at you)
       this.state = 'spot'; this.spotT = 0; this.path = null; H.onChase(this);
     } else if (this.aware > 0.35 && (this.state === 'patrol' || this.state === 'idle') && this.K.run && H.isHunter(this)) { this.state = 'investigate'; this.goal = P.clone(); this.wait = 0.5; }
     let st = this.state; let anim = 'idle', animP = {};

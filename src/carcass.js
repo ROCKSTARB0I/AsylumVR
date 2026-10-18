@@ -5,9 +5,9 @@
 // trousers) and a face damaged in one of several ways. Procedural poses
 // drive the bones: walking, running, stalking, rocking, eating, reaching.
 import * as THREE from '../vendor/three.module.js';
-import { rng, fbm } from './surfaces.js?v=21';
-import { EYE_LAYER } from './camcorder.js?v=21';
-import { buildVisage, headMaterial } from './visage.js?v=21';
+import { rng, fbm } from './surfaces.js?v=22';
+import { EYE_LAYER } from './camcorder.js?v=22';
+import { buildVisage, headMaterial } from './visage.js?v=22';
 
 const V = THREE.Vector3;
 export const BODY_LIGHT = { up: { value: new V(0, 1, 0) } };
@@ -105,13 +105,14 @@ export function makeBody(kind, seed = 1, opts = {}) {
     return withBlood(c, p, n, 0.05 * stains);
   };
   const O = r.outfit;
-  const torsoCloth = O === 'orderly' ? cloth.orderly : O === 'gown' ? cloth.gown : O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : O === 'rags' ? null : null;
-  const legCloth = O === 'orderly' ? cloth.orderly : O === 'trousers' ? cloth.trousers : O === 'surgeon' ? cloth.scrub : O === 'straitjacket' ? cloth.gown : null;
+  const torsoCloth = O === 'orderly' || O === 'nurse' ? cloth.orderly : O === 'gown' ? cloth.gown : O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : O === 'rags' ? null : null;
+  const legCloth = O === 'nurse' ? new THREE.Color(0.86, 0.85, 0.82) : O === 'orderly' ? cloth.orderly : O === 'trousers' ? cloth.trousers : O === 'surgeon' ? cloth.scrub : O === 'straitjacket' ? cloth.gown : null;
 
   // ---- torso: crotch to neck base, elliptical, ribs when starved, pecs and traps when huge
   const torsoR = (t, ang) => {
     const y = t; // 0 crotch .. 1 neck base
-    const prof = [[0, 0.12, 0.1], [0.12, 0.165, 0.115], [0.3, 0.14, 0.1], [0.5, 0.155, 0.11], [0.7, 0.17, 0.12], [0.88, 0.195, 0.11], [0.96, 0.15, 0.09], [1, 0.07, 0.07]];
+    const prof = r.female ? [[0, 0.13, 0.105], [0.12, 0.178, 0.12], [0.3, 0.15, 0.1], [0.5, 0.122, 0.095], [0.7, 0.148, 0.11], [0.88, 0.168, 0.1], [0.96, 0.13, 0.085], [1, 0.062, 0.062]]
+      : [[0, 0.12, 0.1], [0.12, 0.165, 0.115], [0.3, 0.14, 0.1], [0.5, 0.155, 0.11], [0.7, 0.17, 0.12], [0.88, 0.195, 0.11], [0.96, 0.15, 0.09], [1, 0.07, 0.07]];
     let i = 0; while (i < prof.length - 2 && prof[i + 1][0] < y) i++;
     const a = prof[i], b = prof[i + 1]; const k = (y - a[0]) / (b[0] - a[0]); const sk = k * k * (3 - 2 * k);
     let rx = (a[1] + (b[1] - a[1]) * sk) * s, rz = (a[2] + (b[2] - a[2]) * sk) * s;
@@ -120,6 +121,7 @@ export function makeBody(kind, seed = 1, opts = {}) {
     const ca = Math.cos(ang), sa = Math.sin(ang);
     // front (+z, sa < 0 because uz points -z for upward tubes) — pecs / ribs
     const front = Math.max(0, -sa);
+    if (r.female && y > 0.62 && y < 0.84) rz *= 1 + front * 0.34 * Math.pow(Math.sin((y - 0.62) / 0.22 * Math.PI), 1.4) * (0.55 + 0.45 * Math.abs(ca));
     if (r.muscle && y > 0.62 && y < 0.86) rz *= 1 + front * 0.18 * Math.sin((y - 0.62) / 0.24 * Math.PI) * (Math.abs(ca) > 0.15 ? 1 : 0.6);
     if (r.lean > 0.5 && y > 0.45 && y < 0.85) { const rib = Math.sin((y - 0.45) * 52) ; rx *= 1 + rib * 0.018 * r.lean * (0.4 + Math.abs(ca)); rz *= 1 + rib * 0.012 * r.lean; }
     if (y > 0.86 && y < 0.95 && r.muscle) rx *= 1.06;
@@ -145,8 +147,8 @@ export function makeBody(kind, seed = 1, opts = {}) {
   }, true, false);
 
   // gown skirt / apron / straitjacket hang below the hips
-  if (O === 'gown' || O === 'surgeon' || O === 'straitjacket') {
-    const len = O === 'gown' ? 0.42 : O === 'surgeon' ? 0.55 : 0.18;
+  if (O === 'gown' || O === 'surgeon' || O === 'straitjacket' || O === 'nurse') {
+    const len = O === 'gown' ? 0.42 : O === 'surgeon' ? 0.55 : O === 'nurse' ? 0.4 : 0.18;
     tube(new V(0, 0.9 * s, -0.01 * s), new V(0, (0.9 - len) * s, 0), 8, 22, (t, ang) => { const wide = (0.17 + t * 0.05) * s * g * 1.05; const sa = Math.sin(ang); return [wide, (0.13 + t * 0.03) * s * g * (O === 'surgeon' && sa > 0 ? 0.6 : 1)]; },
       (t) => [BI.hips, BI.hips, 0], (p, n, t, ang) => O === 'surgeon' ? (Math.sin(ang) > -0.1 ? clothPaint(cloth.scrub, p, n) : withBlood(clothPaint(cloth.apron, p, n, 0.3), p, n, 0.4)) : clothPaint(torsoCloth, p, n), false, false);
   }
@@ -160,10 +162,10 @@ export function makeBody(kind, seed = 1, opts = {}) {
   const armR = (n0) => 0.05 * s * (0.7 + g * 0.3);
   for (const side of ['L', 'R']) {
     const S = side === 'L' ? 1 : -1;
-    const sleeve = O === 'orderly' ? 0.45 : O === 'gown' ? 0.4 : O === 'straitjacket' ? 1.1 : O === 'surgeon' ? 0.45 : 0;
+    const sleeve = O === 'nurse' ? 0.32 : O === 'orderly' ? 0.45 : O === 'gown' ? 0.4 : O === 'straitjacket' ? 1.1 : O === 'surgeon' ? 0.45 : 0;
     const armPaint = (seg) => (p, n, t) => {
       const along = seg === 'u' ? t : 1 + t;
-      if (along < sleeve * 2) return clothPaint(O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : O === 'orderly' ? cloth.orderly : cloth.gown, p, n);
+      if (along < sleeve * 2) return clothPaint(O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : O === 'orderly' || O === 'nurse' ? cloth.orderly : cloth.gown, p, n);
       let c = skin(p, n);
       if (r.scars > 0.6 && seg === 'f' && t > 0.6) { const cut = Math.sin(p.x * 400 + p.z * 300) > 0.92; if (cut) c.lerp(new THREE.Color(0.5, 0.15, 0.12), 0.8); }    // self-harm on the wrists
       if (r.shackles && seg === 'f' && t > 0.85) c.setRGB(0.18, 0.17, 0.16);
@@ -188,7 +190,7 @@ export function makeBody(kind, seed = 1, opts = {}) {
     limb(P[side + 'thigh'], P[side + 'shin'], lr * (1 + r.muscle * 0.2) * (legCloth ? 1.12 : 1), lr * 0.68 * (legCloth ? 1.12 : 1), BI[side + 'thigh'], BI.hips, legPaint, 0.2, 1, [false, false]);
     limb(P[side + 'shin'], P[side + 'foot'], lr * 0.66 * (legCloth ? 1.1 : 1), lr * 0.42 * (legCloth ? 1.1 : 1), BI[side + 'shin'], BI[side + 'thigh'], legPaint, 0.15);
     // feet: bare and filthy, or shoes for the surgeon and the brute
-    const shod = O === 'surgeon' || O === 'trousers' || O === 'orderly';
+    const shod = O === 'surgeon' || O === 'trousers' || O === 'orderly' || O === 'nurse';
     const fp = (p, n) => shod ? new THREE.Color(0.08, 0.07, 0.06) : skin(p, n).lerp(dirtC, 0.55);
     const f0 = P[side + 'foot'].clone().add(new V(0, -0.02 * s, -0.03 * s)); limb(f0, f0.clone().add(new V(0, -0.03 * s, 0.22 * s)), 0.042 * s, 0.038 * s, BI[side + 'foot'], BI[side + 'foot'], fp, 0.01, 0.55);
   }
@@ -198,7 +200,7 @@ export function makeBody(kind, seed = 1, opts = {}) {
   const c0 = P.head.clone().add(new V(0, 0.065 * s, 0.012 * s)); const HS = s * 1.05 * (r.muscle ? 1.04 : 1);
   const headSkin = (p, n, x, y, z, ph) => {
     let c = skin(p, n);
-    if (!bald && (y > 0.28 || (z < 0.1 && y > -0.25))) { const hn = fbm(x * 40, y * 40 + z * 30, seed, 3, 64); c = new THREE.Color(0.09, 0.075, 0.06).multiplyScalar(0.7 + hn * 0.6); if (fbm(x * 6, y * 6 + z * 5, seed + 4, 3, 64) > 0.62) c = skin(p, n).lerp(soreC, 0.3); }   // patchy, torn-out hair
+    if (!bald && (y > (r.female ? 0.2 : 0.28) || (z < (r.female ? 0.25 : 0.1) && y > (r.female ? -0.45 : -0.25)))) { const hn = fbm(x * 40, y * 40 + z * 30, seed, 3, 64); c = new THREE.Color(...(r.hair || [0.09, 0.075, 0.06])).multiplyScalar(0.7 + hn * 0.6); if (!r.healthy && fbm(x * 6, y * 6 + z * 5, seed + 4, 3, 64) > 0.62) c = skin(p, n).lerp(soreC, 0.3); }   // patchy, torn-out hair
     else if (bald && y > 0.1) { const st = fbm(x * 60, y * 60 + z * 40, seed + 7, 2, 64); c.lerp(new THREE.Color(0.2, 0.17, 0.15), st * 0.25); }
     if (r.face === 'lobotomy' && Math.abs(y - 0.72) < 0.035) c = (Math.floor(ph * 30) % 2) ? new THREE.Color(0.1, 0.05, 0.04) : new THREE.Color(0.5, 0.15, 0.12);
     if (r.face === 'masked' && y > 0.3) c = clothPaint(cloth.scrub, p, n, 0.5);
@@ -250,6 +252,11 @@ export function makeBody(kind, seed = 1, opts = {}) {
     part(new THREE.BoxGeometry(0.006 * s, 0.009 * s, 0.004 * s), m4, () => toothC.clone().multiplyScalar(0.7 + Math.random() * 0.4), BI[bone]);
   }
   { const m = visage.mouth.clone().add(new V(0, 0, -0.025 * s)); part(new THREE.SphereGeometry(0.03 * s, 8, 6), new THREE.Matrix4().makeTranslation(m.x, m.y, m.z).multiply(new THREE.Matrix4().makeScale(1.3, 0.8, 0.8)), () => new THREE.Color(0.03, 0.005, 0.005), BI.head); }
+  if (r.female) {
+    const hairC = new THREE.Color(...(r.hair || [0.2, 0.13, 0.07]));
+    const bun = c0.clone().add(new V(0, 0.035 * s, -0.1 * s)); part(new THREE.SphereGeometry(0.058 * s, 12, 9), new THREE.Matrix4().makeTranslation(bun.x, bun.y, bun.z).multiply(new THREE.Matrix4().makeScale(1.15, 0.95, 0.9)), () => hairC.clone().multiplyScalar(0.8 + Math.random() * 0.3), BI.head);
+    if (O === 'nurse') { const cap = c0.clone().add(new V(0, 0.098 * s, -0.012 * s)); part(new THREE.BoxGeometry(0.115 * s, 0.032 * s, 0.075 * s), new THREE.Matrix4().makeTranslation(cap.x, cap.y, cap.z).multiply(new THREE.Matrix4().makeRotationX(-0.32)), () => new THREE.Color(0.92, 0.92, 0.89), BI.head); }
+  }
   const hg = mergeParts(visage.geo, parts);
   hg.boundingSphere = new THREE.Sphere(new V(0, 1.0 * s, 0), 1.4 * s);
   const headMesh = new THREE.SkinnedMesh(hg, headMaterial(visage.tex, mat.userData.uAmb, BODY_LIGHT.up)); root.add(headMesh); headMesh.bind(skel, mesh.bindMatrix);
