@@ -5,8 +5,8 @@
 // cones and stains are added on top. Light comes in four channels: S always
 // on, A and B the stuttering broken tubes, P the main circuit (generator).
 import * as THREE from '../vendor/three.module.js';
-import { C, H, W, D, Z, cx, cz } from './plan.js?v=22';
-import { T, scrawlTexture, rng } from './surfaces.js?v=22';
+import { C, H, W, D, Z, cx, cz } from './plan.js?v=23';
+import { T, scrawlTexture, rng } from './surfaces.js?v=23';
 
 const V3 = THREE.Vector3;
 export const LIGHT = { A: { value: 1 }, B: { value: 1 }, P: { value: 0 }, S: { value: 1 }, cool: { value: new THREE.Color(0.78, 0.88, 1.0) } };
@@ -172,7 +172,7 @@ export function buildAsylum(plan, scene) {
   // ---- floors and ceilings
   for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) {
     const z = at(x, y); if (!z) continue;
-    const fb = M(FLOOR_OF[z]); const x0 = x * C, z0 = y * C; const h = C / 2;
+    const fb = M((plan.floorOf && plan.floorOf(x, y, z)) || FLOOR_OF[z]); const x0 = x * C, z0 = y * C; const h = C / 2;
     for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) {
       const a = x0 + i * h, b = z0 + j * h;
       fb.quad([a, 0, b + h], [a + h, 0, b + h], [a + h, 0, b], [a, 0, b], [0, 1, 0], [a / 3, -(b + h) / 3], [(a + h) / 3, -(b + h) / 3], [(a + h) / 3, -b / 3], [a / 3, -b / 3]);
@@ -186,6 +186,7 @@ export function buildAsylum(plan, scene) {
     const z = at(x, y); if (!z) continue;
     for (const [dx, dy] of DIRS) {
       const nx = x + dx, ny = y + dy; if (!solid(nx, ny)) continue;
+      if (z === Z.OUT && plan.perimeter && plan.perimeter(nx, ny)) continue;   // open ground: the tape puts a fence here instead
       const wb = M(WALL_OF[z]);
       // the face lies on the cell edge, normal points back into the floor cell
       const n = [-dx, 0, -dy];

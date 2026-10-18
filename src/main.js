@@ -2,27 +2,27 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=22';
-import { buildSurfaces, T } from './surfaces.js?v=22';
-import { loadPictures, savePictures } from './keep.js?v=22';
-import { VRMenu } from './vrmenu.js?v=22';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=22';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=22';
-import { Doors } from './doors.js?v=22';
-import { Space } from './space.js?v=22';
-import { Input } from './input.js?v=22';
-import { Walker } from './walker.js?v=22';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=22';
-import { makeTape, makeVeil } from './tape.js?v=22';
-import { Slate } from './slate.js?v=22';
-import * as STORY1 from './story.js?v=22';
-import * as TAPE3 from './tape3.js?v=22';
-import * as TAPE2 from './tape2.js?v=22';
-import { Sound } from './dread.js?v=22';
-import { Horrors } from './horrors.js?v=22';
-import { Dressing } from './dressing.js?v=22';
-import { Scares } from './scares.js?v=22';
-import { makeHand } from './hands.js?v=22';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=23';
+import { buildSurfaces, T } from './surfaces.js?v=23';
+import { loadPictures, savePictures } from './keep.js?v=23';
+import { VRMenu } from './vrmenu.js?v=23';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=23';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=23';
+import { Doors } from './doors.js?v=23';
+import { Space } from './space.js?v=23';
+import { Input } from './input.js?v=23';
+import { Walker } from './walker.js?v=23';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=23';
+import { makeTape, makeVeil } from './tape.js?v=23';
+import { Slate } from './slate.js?v=23';
+import * as STORY1 from './story.js?v=23';
+import * as TAPE3 from './tape3.js?v=23';
+import * as TAPE2 from './tape2.js?v=23';
+import { Sound } from './dread.js?v=23';
+import { Horrors } from './horrors.js?v=23';
+import { Dressing } from './dressing.js?v=23';
+import { Scares } from './scares.js?v=23';
+import { makeHand } from './hands.js?v=23';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -49,6 +49,28 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x000000);
 scene.fog = new THREE.FogExp2(0x050403, 0.075);     // the damp, close air
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.03, 80);
+// the night sky over anywhere without a ceiling: stars and a hazy moon. It's drawn around whichever eye is
+// looking (so it sits at infinity, in both eyes in VR), ignores the fog, and the ceilings hide it indoors.
+{
+  const n = 1800, pos = new Float32Array(n * 3), col = new Float32Array(n * 3); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < n; i++) {
+    const u = 0.06 + rnd() * 0.94, a = rnd() * Math.PI * 2, r = Math.sqrt(1 - u * u); const d = 70;
+    pos.set([Math.cos(a) * r * d, u * d, Math.sin(a) * r * d], i * 3);
+    const b = 0.25 + Math.pow(rnd(), 3) * 0.75, warm = rnd(); col.set([b * (0.9 + warm * 0.1), b * 0.94, b * (1.05 - warm * 0.15)], i * 3);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const m = new THREE.PointsMaterial({ size: 2, sizeAttenuation: false, vertexColors: true, fog: false, transparent: true, depthWrite: false }); m.userData.noNV = true;
+  const stars = new THREE.Points(g, m); stars.frustumCulled = false; stars.renderOrder = -2; stars.matrixAutoUpdate = false;
+  const moonDir = new THREE.Vector3(-0.45, 0.62, -0.64).normalize().multiplyScalar(66);
+  const moonM = new THREE.MeshBasicMaterial({ color: 0xdcdccc, fog: false, transparent: true }); moonM.userData.noNV = true;
+  const moon = new THREE.Mesh(new THREE.CircleGeometry(2.0, 40), moonM); moon.frustumCulled = false; moon.renderOrder = -1; moon.matrixAutoUpdate = false;
+  const halo = new THREE.Mesh(new THREE.CircleGeometry(7, 40), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, fog: false, uniforms: {}, vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: 'varying vec2 vUv; void main(){ float d = length(vUv - 0.5) * 2.0; gl_FragColor = vec4(0.75, 0.78, 0.85, pow(max(0.0, 1.0 - d), 3.0) * 0.22); }' }));
+  halo.material.userData.noNV = true; halo.frustumCulled = false; halo.renderOrder = -1; halo.matrixAutoUpdate = false;
+  const face = new THREE.Matrix4().lookAt(new THREE.Vector3(), moonDir, new THREE.Vector3(0, 1, 0));   // its face toward us
+  const at = (o, off, rot) => (r, sc, cam) => { const e = cam.matrixWorld.elements; if (rot) o.matrixWorld.copy(rot); else o.matrixWorld.identity(); o.matrixWorld.setPosition(e[12] + off.x, e[13] + off.y, e[14] + off.z); };
+  stars.onBeforeRender = at(stars, new THREE.Vector3(), null); moon.onBeforeRender = at(moon, moonDir, face); halo.onBeforeRender = at(halo, moonDir.clone().multiplyScalar(1.01), face);
+  scene.add(stars, halo, moon);
+}
 const dolly = new THREE.Group(); dolly.add(camera); scene.add(dolly);
 
 // desktop pipeline: the scene goes to a half-float target, then through the tape
@@ -91,7 +113,7 @@ const dressing = new Dressing(world, plan, scene); mark('dressing');
 const horrors = new Horrors({ scene, plan, world, space, doors, walker, cam, sound, G, camera }); mark('horrors');
 const scares = new Scares({ scene, plan, world, space, doors, walker, cam, sound, G, horrors, camera, dressing });
 if (TAPE === 2) scares.list = TAPE2.setPieces(scares); if (TAPE === 3) { scares.list = []; scares.cool = 1e9; } mark('scares');
-const tapeLogic = TAPE === 3 ? TAPE3.setupTape3({ LIGHT, get card() { return card; }, placeCard: () => placeCard(), G, walker, plan, world, sound, horrors, doors, scene, space, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), save: () => saveGame(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
+const tapeLogic = TAPE === 3 ? TAPE3.setupTape3({ LIGHT, setFade: (v, now) => { fadeGoal = v; if (now) fade = v; }, get card() { return card; }, placeCard: () => placeCard(), G, walker, plan, world, sound, horrors, doors, scene, space, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), save: () => saveGame(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
 
 // ---------------------------------------------------------------- hands
 // your own hands, empty, on the controllers' grips in VR (the camcorder is the whole view, not something you hold)
@@ -172,6 +194,12 @@ const itemMeshes = [];
       // a steel tray with a domed cover
       const steel = lit(0x9a9a94, 0.35, 0.8); g.add(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.015, 0.3), steel));
       const dome = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), steel); dome.scale.set(1.2, 0.8, 0.9); dome.position.y = 0.008; g.add(dome);
+    } else if (k === 'file') {
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(0.23, 0.02, 0.31), lit(0xb08a4a, 0.8)));
+      const tab = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.021, 0.03), lit(0xb08a4a, 0.8)); tab.position.set(0.06, 0, -0.165); g.add(tab);
+    } else if (k === 'fencekey') {
+      const steel = lit(0x8a8a84, 0.35, 0.8); const ring = new THREE.Mesh(new THREE.TorusGeometry(0.03, 0.005, 6, 16), steel); ring.rotation.x = Math.PI / 2; g.add(ring);
+      for (let i = 0; i < 4; i++) { const k2 = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.005, 0.07), i ? steel : lit(0x9a7a30, 0.35, 0.8)); k2.position.set(Math.cos(i * 1.4) * 0.05, 0, Math.sin(i * 1.4) * 0.05); k2.rotation.y = -i * 1.4; g.add(k2); }
     } else if (k === 'battery') {
       g.add(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.022, 0.045), lit(0x1a1a1a, 0.5)));
       const lab = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.023, 0.03), lit(0x2a5aa0, 0.4)); g.add(lab);
@@ -237,7 +265,7 @@ function use(o) {
     const it = o.im.it; G.items.add(it.id); o.im.m.visible = false;
     if (it.k === 'fuse') { G.fuses++; sound.pickup('fuse'); say(['', 'fuse1', 'fuse2', 'fuse3'][G.fuses], 0, true); checkpoint(); saveGame(); }
     else if (it.k === 'battery') { cam.spares = Math.min(6, cam.spares + 1); sound.pickup('battery'); say('battery', 0.4); }
-    else if (it.k === 'tray') { sound.pickup('fuse'); say('tray', 0, true); checkpoint(); saveGame(); }
+    else if (it.k === 'tray' || it.k === 'file' || it.k === 'fencekey') { sound.pickup('fuse'); say(it.k, 0, true); checkpoint(); saveGame(); }
     else if (it.k === 'card' || it.k === 'chapelKey' || it.k === 'stairKey') { sound.pickup('fuse'); say(it.k, 0, true); checkpoint(); saveGame(); }
     else { G.notes.push(it.id); read(it.id); sound.pickup('paper'); }
   } else if (o.kind === 'gen') {
@@ -287,14 +315,14 @@ function readSave() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || 
 function saveGame() {
   if (!G.playing || !walker.alive || G.escaped) return;
   const ck = G.checkpoint || { pos: walker.pos, yaw: walker.yaw };
-  const data = { v: 1, tape: TAPE, at: Date.now(), pos: [ck.pos.x, ck.pos.z], yaw: ck.yaw, items: [...G.items], notes: G.notes, fuses: G.fuses, power: G.power, gateOpen: G.gateOpen, clocked: G.clocked, sheet: G.sheet, flags: G.flags, counted: G.counted, delivered: G.delivered, alarm: G.alarm, sawLockdown: G.sawLockdown,
+  const data = { v: 1, tape: TAPE, at: Date.now(), pos: [ck.pos.x, ck.pos.z], yaw: ck.yaw, items: [...G.items], notes: G.notes, fuses: G.fuses, power: G.power, gateOpen: G.gateOpen, clocked: G.clocked, sheet: G.sheet, flags: G.flags, counted: G.counted, mopped: G.mopped, fileGiven: G.fileGiven, breaker: G.breaker, inYard: G.inYard, fenceOpen: G.fenceOpen, delivered: G.delivered, alarm: G.alarm, sawLockdown: G.sawLockdown,
     leftAdmin: G.leftAdmin, sawPanel: G.sawPanel, sawStairs: !!G.sawStairs, strapped: !!G.strapped, obj: G.obj, deaths: G.deaths, t: G.t, said: [...G.said], scares: [...scares.done],
     unlocked: doors.list.filter((d) => d.lock && !d.locked).map((d) => [d.x, d.y]) };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { return; }
   $('saved').classList.remove('on'); void $('saved').offsetWidth; $('saved').classList.add('on'); cam.saveFlash = cam.clock + 2.5; cam.paintOSD(true, '');
 }
 function applySave(d) {
-  for (const k of ['fuses', 'power', 'gateOpen', 'leftAdmin', 'sawPanel', 'sawStairs', 'strapped', 'obj', 'deaths', 't', 'clocked', 'counted', 'delivered', 'sawLockdown']) if (d[k] !== undefined) G[k] = d[k];
+  for (const k of ['fuses', 'power', 'gateOpen', 'leftAdmin', 'sawPanel', 'sawStairs', 'strapped', 'obj', 'deaths', 't', 'clocked', 'counted', 'delivered', 'sawLockdown', 'mopped', 'fileGiven', 'breaker', 'fenceOpen']) if (d[k] !== undefined) G[k] = d[k];
   if (TAPE === 3 && tapeLogic) tapeLogic.restore(d);
   G.items = new Set(d.items || []); G.notes = d.notes || []; G.said = new Set(d.said || []);
   for (const id of d.scares || []) scares.done.add(id);

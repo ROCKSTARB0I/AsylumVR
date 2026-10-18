@@ -1,8 +1,8 @@
 // Space: what is solid. Circle movers (you and them) are pushed out of
 // wall cells, props, door leaves and the gate; sight lines are traced
 // through the grid and closed doors.
-import { C, W, D } from './plan.js?v=22';
-import { circleSeg } from './doors.js?v=22';
+import { C, W, D } from './plan.js?v=23';
+import { circleSeg } from './doors.js?v=23';
 
 // props up to this height (m) can be vaulted by the things chasing you
 export const VAULT_H = 1.15;
@@ -25,7 +25,7 @@ export class Space {
         if (ox * oz > C * C * 0.45 && gx >= 0 && gy >= 0 && gx < W && gy < D) this.blockedCell[gy * W + gx] = 1;
       }
     }
-    this.gateBox = null;
+    this.gateBox = null; this.boxes = [];   // extra solid boxes [x0, z0, x1, z1] (a fence gate, a parked car)
   }
   solid(gx, gy) { return !this.plan.at(gx, gy); }
   // a cell blocked only by tables, beds, crates: a chaser can go over it
@@ -39,6 +39,7 @@ export class Space {
       if (props) for (const c of this.world.colliders) { if (c.y1 <= low + 0.3) continue; if (p.x + r < c.x0 || p.x - r > c.x1 || p.z + r < c.z0 || p.z - r > c.z1) continue; hit = box(p, r, c.x0, c.z0, c.x1, c.z1) || hit; }
       if (doors) for (const d of this.doors.list) { if (Math.abs(d.wx - p.x) > 2.2 || Math.abs(d.wz - p.z) > 2.2) continue; hit = circleSeg(p, r, this.doors.seg(d)) || hit; }
       if (this.gateBox) hit = box(p, r, ...this.gateBox) || hit;
+      for (const b of this.boxes) hit = box(p, r, ...b) || hit;
     }
     return hit;
   }

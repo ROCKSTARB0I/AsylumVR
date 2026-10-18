@@ -2,7 +2,7 @@
 // canvases at load time (tile, plaster, linoleum, concrete, rust, blood,
 // mattress stains, scrawl), with a matching normal map from its height.
 import * as THREE from '../vendor/three.module.js';
-import { picture, keepPicture, keptData, keepData } from './keep.js?v=22';
+import { picture, keepPicture, keptData, keepData } from './keep.js?v=23';
 
 // ---------------------------------------------------------------- noise
 function hash(x, y, s) { let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
@@ -300,6 +300,22 @@ function paintSurfaces() {
       const k = 0.5 + g * 0.6; p.set(i, 0.26 * k, 0.15 * k, 0.08 * k); p.z[i] = g; p.r[i] = 0.5;
     });
     p.grime(181, 0.6); T.wood = set(p, 1.5);
+  }
+  {
+    const p = new Paint(S);   // grass (3 m tile): dense and uneven, bare dirt and dry yellow patches
+    p.each((x, y, i) => {
+      const u = x / S, v = y / S; const n = fbm(u * 6, v * 6, 190, 5, 6), f = fbm(u * 60, v * 60, 191, 3, 60), dirt = fbm(u * 3, v * 3, 192, 4, 3);
+      const blade = hash(x, y, 193); const k = 0.55 + f * 0.6 + blade * 0.25;
+      p.set(i, (0.15 + n * 0.08) * k, (0.24 + n * 0.12) * k, (0.08 + n * 0.04) * k); p.z[i] = f * 0.8 + blade * 0.4; p.r[i] = 0.95;
+      if (dirt > 0.64) p.mix(i, 0.2, 0.16, 0.1, Math.min(1, (dirt - 0.64) * 5) * 0.8);
+      if (n < 0.32) p.mix(i, 0.3, 0.27, 0.14, (0.32 - n) * 2);
+    });
+    T.grass = set(p, 2.5);
+  }
+  {
+    const p = new Paint(S);   // car park tarmac with a painted bay line
+    p.each((x, y, i) => { const u = x / S, v = y / S, n = fbm(u * 20, v * 20, 200, 4, 20), g = hash(x, y, 201); const k = 0.17 + n * 0.08 + g * 0.06; p.set(i, k, k, k * 1.03); p.z[i] = g * 0.5 + n * 0.3; p.r[i] = 0.85; if (Math.abs(u - 0.5) < 0.012) p.set(i, 0.62, 0.6, 0.52); });
+    T.asphalt = set(p, 1.5);
   }
   T.decals = buildDecals();
 }

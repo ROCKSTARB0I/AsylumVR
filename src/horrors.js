@@ -3,9 +3,9 @@
 // dark), hears (your steps, doors, things you knock), patrols or keeps to
 // its corner, investigates, chases, searches, checks lockers, and kills.
 import * as THREE from '../vendor/three.module.js';
-import { C, W, D, cx, cz } from './plan.js?v=22';
-import { VAULT_H } from './space.js?v=22';
-import { makeBody, pose, cleaver, bonesaw, flashlight, BODY_LIGHT } from './carcass.js?v=22';
+import { C, W, D, cx, cz } from './plan.js?v=23';
+import { VAULT_H } from './space.js?v=23';
+import { makeBody, pose, cleaver, bonesaw, flashlight, BODY_LIGHT } from './carcass.js?v=23';
 
 const V = THREE.Vector3;
 const tmp = new V(), tmp2 = new V();
@@ -320,7 +320,7 @@ export class Horrors {
     }
     for (const [i, m] of p.inmates.entries()) {
       const kind = m.kind === 'eater' ? 'eater' : m.kind === 'stalker' ? 'patient' : 'rocker';
-      const h = new Horror(this, kind, cx(m.x), cz(m.y), { huntRoute: m.huntRoute, idle: m.kind === 'eater' ? 'eat' : m.kind === 'stalker' ? 'patrol' : 'rock', yaw: m.facing ?? (i * 1.7), seed: 40 + i, route: m.route, look: m.look, dormant: m.dormant });
+      const h = new Horror(this, kind, cx(m.x), cz(m.y), { huntRoute: m.huntRoute, idle: m.kind === 'eater' ? 'eat' : m.kind === 'stalker' ? 'patrol' : 'rock', yaw: m.facing ?? (i * 1.7), seed: 40 + i, route: m.route, look: m.look, dormant: m.dormant, pack: m.pack });
       this.list.push(h);
       if (m.kind === 'eater') this.feral = h;
     }
@@ -365,8 +365,9 @@ export class Horrors {
   //   2  third fuse to the gate: the feral patient from the morgue
   get segment() { return this.plan.segment ? this.plan.segment(this.G) : this.G.power || this.G.fuses >= 3 ? 2 : this.G.fuses >= 1 ? 1 : 0; }
   get hunter() { return this.hunters[this.segment]; }
-  isHunter(h) { return h === this.hunter; }
-  mayChase(h) { return this.isHunter(h) && !this.list.some((o) => o !== h && (o.state === 'chase' || o.state === 'attack' || o.state === 'execute' || o.state === 'spot')); }
+  packOn(h) { return !!(h && h.opts.pack && this.plan.packOn && this.plan.packOn(this.G)); }
+  isHunter(h) { return h === this.hunter || this.packOn(h); }
+  mayChase(h) { if (this.packOn(h)) return true; return this.isHunter(h) && !this.list.some((o) => o !== h && (o.state === 'chase' || o.state === 'attack' || o.state === 'execute' || o.state === 'spot')); }
   setSegment(seg, instant = false) {
     this.seg = seg;
     for (const h of this.hunters) {

@@ -3,7 +3,7 @@
 // creatures' paths) is derived from this grid.
 export const C = 1.5;          // metres per cell
 export const H = 3.2;          // ceiling height
-export const W = 49, D = 41;   // grid size (x, y). y grows south (+z)
+export const W = 49, D = 64;   // grid size (x, y). y grows south (+z)
 
 // zone codes. 0 is solid wall.
 export const Z = { SOLID: 0, HALL: 1, CELL: 2, CAFE: 3, SHOWER: 4, MORGUE: 5, ADMIN: 6, LOBBY: 7, GEN: 8, DAY: 9, STORE: 10, SEC: 11, DOOR: 12, OUT: 13, CHAPEL: 14, PADDED: 15, SURGERY: 16, DORM: 17, NURSE: 18, STAIR: 19 };
@@ -11,8 +11,8 @@ export const ZNAME = ['', 'Corridor', 'Patient Cell', 'Cafeteria', 'Showers', 'M
 
 export const cx = (x) => (x + 0.5) * C;
 export const cz = (y) => (y + 0.5) * C;
-import { makePlan2 } from './plan2.js?v=22';
-import { makePlan3 } from './plan3.js?v=22';
+import { makePlan2 } from './plan2.js?v=23';
+import { makePlan3 } from './plan3.js?v=23';
 
 export function makePlan(tape = 1) {
   if (tape === 2) return makePlan2();
