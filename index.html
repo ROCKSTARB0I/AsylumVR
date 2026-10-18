@@ -14,7 +14,7 @@
 // Self-update: GitHub Pages caches this page for a few minutes, so a stale copy can load old scripts.
 // Ask for the current version (never cached) and, if it's newer than this page, reload past the cache.
 (function () {
-  var BUILD = 22;
+  var BUILD = 23;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v > BUILD) { var q = new URLSearchParams(location.search); if (q.get('build') === String(j.v)) return; q.set('build', j.v); location.replace(location.pathname + '?' + q.toString()); }
@@ -22,7 +22,7 @@
   } catch (e) {}
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=22">
+<link rel="stylesheet" href="style.css?v=23">
 </head>
 <body>
 <canvas id="view" tabindex="0"></canvas>
@@ -90,6 +90,6 @@
   <div class="osd-bot"><span class="date">OCT.17 1993</span><span class="clock">2:13 AM</span></div>
 </div>
 
-<script type="module" src="src/main.js?v=22"></script>
+<script type="module" src="src/main.js?v=23"></script>
 </body>
 </html>
