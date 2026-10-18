@@ -5,9 +5,9 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=26';
-import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=26';
-import { renderMenuTheme, THEME_LOOP } from './theme.js?v=26';
+import { Score } from './score.js?v=27';
+import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=27';
+import { renderMenuTheme, THEME_LOOP } from './theme.js?v=27';
 
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
@@ -385,7 +385,7 @@ const OV = {
   music(kind, chase) {
     if (!this.rec) return; const want = chase > 0.2 && kind && this.rec.music[kind] ? kind : null; const t = this.t;
     if (want === this.musicKind) return;
-    if (this.musicNow) { const m = this.musicNow; m.g.gain.setTargetAtTime(0, t, want ? 0.15 : 1.4); m.s.stop(t + (want ? 1 : 6)); }
+    if (this.musicNow) { const m = this.musicNow; m.g.gain.setTargetAtTime(0, t, want ? 0.15 : 0.6); m.s.stop(t + (want ? 1 : 4)); }
     this.musicNow = null; this.musicKind = want;
     if (!want) return;
     const s = this.ctx.createBufferSource(); s.buffer = this.rec.music[want]; s.loop = true; const g = this.ctx.createGain(); g.gain.value = 0.0001; g.gain.setTargetAtTime(1, t, 0.06);

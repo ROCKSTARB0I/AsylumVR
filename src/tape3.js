@@ -2,9 +2,9 @@
 // (Voss has the staff film the patients). Clock in, do the count, take Voss his tray. Then the alarm:
 // the mains die, the beacons turn the building red, every cell door opens, and the staff die.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, H } from './plan.js?v=26';
-import { makeBody, pose } from './carcass.js?v=26';
-import { Talk } from './talk.js?v=26';
+import { cx, cz, H } from './plan.js?v=27';
+import { makeBody, pose } from './carcass.js?v=27';
+import { Talk } from './talk.js?v=27';
 const V = THREE.Vector3;
 
 export const NOTES = {
@@ -414,6 +414,9 @@ export function setupTape3(ctx) {
   // ---- out of the window: the grounds
   function toYard(restoring = false) {
     G.inYard = true; S.forcing = false;
+    // Kroft's part is over the moment you're out of the window (and his music with him)
+    for (const h of horrors.hunters) if (h && !h.opts.pack) { h.active = false; h.body.root.visible = false; h.state = 'idle'; h.leaving = false; }
+    horrors.chase = 0;
     if (!restoring) walker.place(cx(plan.windowOut.x), cz(plan.windowOut.y), -Math.PI / 2);
     for (const h of horrors.list) if (h.opts.pack) { h.active = true; h.body.root.visible = true; h.state = 'patrol'; h.ri = 0; h.path = null; }
     if (!restoring) { horrors.glitchKick(1); say('yard', 0.6, true); ctx.checkpoint(); ctx.save(); }
