@@ -5,9 +5,9 @@
 // trousers) and a face damaged in one of several ways. Procedural poses
 // drive the bones: walking, running, stalking, rocking, eating, reaching.
 import * as THREE from '../vendor/three.module.js';
-import { rng, fbm } from './surfaces.js?v=6';
-import { EYE_LAYER } from './camcorder.js?v=6';
-import { buildVisage, headMaterial } from './visage.js?v=6';
+import { rng, fbm } from './surfaces.js?v=7';
+import { EYE_LAYER } from './camcorder.js?v=7';
+import { buildVisage, headMaterial } from './visage.js?v=7';
 
 const V = THREE.Vector3;
 export const BODY_LIGHT = { up: { value: new V(0, 1, 0) } };
@@ -22,6 +22,7 @@ export const RECIPES = {
   surgeon: { h: 1.9, girth: 0.95, muscle: 0.2, lean: 0.3, outfit: 'surgeon', face: 'masked', skin: [0.62, 0.5, 0.43], bald: false, scars: 0.2, blood: 0.95, dirt: 0.3, glasses: true, stare: true },
   gown: { h: 1.74, girth: 0.78, muscle: 0, lean: 0.9, outfit: 'gown', face: 'random', skin: [0.6, 0.48, 0.41], bald: 'random', scars: 0.7, blood: 0.4, dirt: 0.9 },
   jacket: { h: 1.78, girth: 0.82, muscle: 0, lean: 0.7, outfit: 'straitjacket', face: 'random', skin: [0.58, 0.46, 0.39], bald: 'random', scars: 0.6, blood: 0.3, dirt: 0.8 },
+  orderly: { h: 1.96, girth: 0.88, muscle: 0.3, lean: 0.45, outfit: 'orderly', face: 'lobotomy', skin: [0.6, 0.47, 0.4], bald: false, scars: 0.6, blood: 0.9, dirt: 0.6, stare: true },
   corpse: { h: 1.75, girth: 0.85, muscle: 0, lean: 0.6, outfit: 'gown', face: 'dead', skin: [0.55, 0.53, 0.48], bald: 'random', scars: 0.5, blood: 1, dirt: 0.9, dead: true },
   naked: { h: 1.72, girth: 0.72, muscle: 0, lean: 1, outfit: 'rags', face: 'random', skin: [0.56, 0.45, 0.39], bald: true, scars: 1, blood: 0.6, dirt: 1 },
 };
@@ -95,7 +96,7 @@ export function makeBody(kind, seed = 1, opts = {}) {
 
   // ---- clothes
   const cloth = {
-    gown: new THREE.Color(0.4, 0.45, 0.45), jacket: new THREE.Color(0.52, 0.5, 0.42), trousers: new THREE.Color(0.2, 0.2, 0.19), scrub: new THREE.Color(0.25, 0.33, 0.3), apron: new THREE.Color(0.52, 0.5, 0.44), strap: new THREE.Color(0.18, 0.13, 0.08), rag: new THREE.Color(0.45, 0.42, 0.35),
+    gown: new THREE.Color(0.4, 0.45, 0.45), jacket: new THREE.Color(0.52, 0.5, 0.42), trousers: new THREE.Color(0.2, 0.2, 0.19), scrub: new THREE.Color(0.25, 0.33, 0.3), orderly: new THREE.Color(0.68, 0.68, 0.63), apron: new THREE.Color(0.52, 0.5, 0.44), strap: new THREE.Color(0.18, 0.13, 0.08), rag: new THREE.Color(0.45, 0.42, 0.35),
   };
   const clothPaint = (base, p, n, stains = 1) => {
     const c = base.clone(); const w = fbm(p.x * 9 + sd, p.y * 9 + p.z * 9, 41 + seed, 4, 64); c.multiplyScalar(0.8 + w * 0.3);
@@ -104,8 +105,8 @@ export function makeBody(kind, seed = 1, opts = {}) {
     return withBlood(c, p, n, 0.05 * stains);
   };
   const O = r.outfit;
-  const torsoCloth = O === 'gown' ? cloth.gown : O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : O === 'rags' ? null : null;
-  const legCloth = O === 'trousers' ? cloth.trousers : O === 'surgeon' ? cloth.scrub : O === 'straitjacket' ? cloth.gown : null;
+  const torsoCloth = O === 'orderly' ? cloth.orderly : O === 'gown' ? cloth.gown : O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : O === 'rags' ? null : null;
+  const legCloth = O === 'orderly' ? cloth.orderly : O === 'trousers' ? cloth.trousers : O === 'surgeon' ? cloth.scrub : O === 'straitjacket' ? cloth.gown : null;
 
   // ---- torso: crotch to neck base, elliptical, ribs when starved, pecs and traps when huge
   const torsoR = (t, ang) => {
@@ -159,10 +160,10 @@ export function makeBody(kind, seed = 1, opts = {}) {
   const armR = (n0) => 0.05 * s * (0.7 + g * 0.3);
   for (const side of ['L', 'R']) {
     const S = side === 'L' ? 1 : -1;
-    const sleeve = O === 'gown' ? 0.4 : O === 'straitjacket' ? 1.1 : O === 'surgeon' ? 0.45 : 0;
+    const sleeve = O === 'orderly' ? 0.45 : O === 'gown' ? 0.4 : O === 'straitjacket' ? 1.1 : O === 'surgeon' ? 0.45 : 0;
     const armPaint = (seg) => (p, n, t) => {
       const along = seg === 'u' ? t : 1 + t;
-      if (along < sleeve * 2) return clothPaint(O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : cloth.gown, p, n);
+      if (along < sleeve * 2) return clothPaint(O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : O === 'orderly' ? cloth.orderly : cloth.gown, p, n);
       let c = skin(p, n);
       if (r.scars > 0.6 && seg === 'f' && t > 0.6) { const cut = Math.sin(p.x * 400 + p.z * 300) > 0.92; if (cut) c.lerp(new THREE.Color(0.5, 0.15, 0.12), 0.8); }    // self-harm on the wrists
       if (r.shackles && seg === 'f' && t > 0.85) c.setRGB(0.18, 0.17, 0.16);
@@ -172,7 +173,7 @@ export function makeBody(kind, seed = 1, opts = {}) {
     limb(P[side + 'upper'], P[side + 'fore'], ar * (1 + r.muscle * 0.35) * (O === 'straitjacket' ? 1.25 : 1), ar * 0.82 * (1 + r.muscle * 0.3), BI[side + 'upper'], BI[side + 'clav'], armPaint('u'), 0.18, 1, [false, false]);
     limb(P[side + 'fore'], P[side + 'hand'], ar * 0.8 * (1 + r.muscle * 0.35), ar * 0.55 * (1 + r.muscle * 0.2), BI[side + 'fore'], BI[side + 'upper'], armPaint('f'));
     // shoulder cap
-    limb(P[side + 'clav'].clone().add(new V(0, -0.01 * s, 0)), P[side + 'upper'].clone().add(new V(S * 0.02 * s, -0.02 * s, 0)), 0.075 * s * (0.8 + 0.2 * g), ar * 1.15 * (1 + r.muscle * 0.4), BI[side + 'clav'], BI.chest, (p, n) => O === 'straitjacket' || O === 'surgeon' || O === 'gown' ? clothPaint(O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : cloth.gown, p, n) : withBlood(skin(p, n), p, n), 0.4, 0.8);
+    limb(P[side + 'clav'].clone().add(new V(0, -0.01 * s, 0)), P[side + 'upper'].clone().add(new V(S * 0.02 * s, -0.02 * s, 0)), 0.075 * s * (0.8 + 0.2 * g), ar * 1.15 * (1 + r.muscle * 0.4), BI[side + 'clav'], BI.chest, (p, n) => O === 'straitjacket' || O === 'surgeon' || O === 'gown' || O === 'orderly' ? clothPaint(O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : O === 'orderly' ? cloth.orderly : cloth.gown, p, n) : withBlood(skin(p, n), p, n), 0.4, 0.8);
     // hand: palm + fingers, long and thin on starved bodies; gloves on the surgeon
     const hb = BI[side + 'hand']; const h0 = P[side + 'hand']; const hs = s * (r.muscle ? 1.25 : 1);
     const handPaint = (p, n) => O === 'surgeon' ? withBlood(new THREE.Color(0.55, 0.5, 0.42), p, n, 0.5) : O === 'straitjacket' ? clothPaint(cloth.jacket, p, n) : withBlood(skin(p, n), p, n, 0.25);
@@ -187,7 +188,7 @@ export function makeBody(kind, seed = 1, opts = {}) {
     limb(P[side + 'thigh'], P[side + 'shin'], lr * (1 + r.muscle * 0.2) * (legCloth ? 1.12 : 1), lr * 0.68 * (legCloth ? 1.12 : 1), BI[side + 'thigh'], BI.hips, legPaint, 0.2, 1, [false, false]);
     limb(P[side + 'shin'], P[side + 'foot'], lr * 0.66 * (legCloth ? 1.1 : 1), lr * 0.42 * (legCloth ? 1.1 : 1), BI[side + 'shin'], BI[side + 'thigh'], legPaint, 0.15);
     // feet: bare and filthy, or shoes for the surgeon and the brute
-    const shod = O === 'surgeon' || O === 'trousers';
+    const shod = O === 'surgeon' || O === 'trousers' || O === 'orderly';
     const fp = (p, n) => shod ? new THREE.Color(0.08, 0.07, 0.06) : skin(p, n).lerp(dirtC, 0.55);
     const f0 = P[side + 'foot'].clone().add(new V(0, -0.02 * s, -0.03 * s)); limb(f0, f0.clone().add(new V(0, -0.03 * s, 0.22 * s)), 0.042 * s, 0.038 * s, BI[side + 'foot'], BI[side + 'foot'], fp, 0.01, 0.55);
   }
@@ -434,4 +435,12 @@ function glintTex() {
   const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
   const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.18, 'rgba(255,255,255,0.8)'); g.addColorStop(0.45, 'rgba(255,255,255,0.12)'); g.addColorStop(1, 'rgba(255,255,255,0)');
   x.fillStyle = g; x.fillRect(0, 0, 64, 64); _glint = new THREE.CanvasTexture(c); return _glint;
+}
+
+export function flashlight(s = 1) {
+  const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.5, metalness: 0.6 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.2, 10), m); body.rotation.x = Math.PI / 2; body.position.z = 0.06; g.add(body);
+  const head = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.022, 0.06, 12), m); head.rotation.x = Math.PI / 2; head.position.z = 0.18; g.add(head);
+  const lens = new THREE.Mesh(new THREE.CircleGeometry(0.03, 14), new THREE.MeshBasicMaterial({ color: 0xfff6e0, fog: false })); lens.position.z = 0.211; g.add(lens);
+  g.scale.setScalar(s); g.userData.lens = lens; return g;
 }

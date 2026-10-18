@@ -3,8 +3,8 @@
 // hunting you). The worst of them end the same way: a face lunging into
 // the lens, a scream, a burst of dead-channel static.
 import * as THREE from '../vendor/three.module.js';
-import { C, H, cx, cz } from './plan.js?v=6';
-import { makeBody, pose } from './carcass.js?v=6';
+import { C, H, cx, cz } from './plan.js?v=7';
+import { makeBody, pose } from './carcass.js?v=7';
 
 const V = THREE.Vector3;
 const near = (p, x, y, r) => Math.hypot(p.x - cx(x), p.z - cz(y)) < r;
@@ -20,7 +20,7 @@ export class Scares {
     ];
     for (const a of this.actors) { a.root.visible = false; this.scene.add(a.root); }
     this.corpseActor = makeBody('corpse', 504, { face: 'dead', outfit: 'gown' }); this.corpseActor.root.visible = false; this.scene.add(this.corpseActor.root);
-    this.list = [
+    this.list = this.plan.tape !== 1 ? [] : [
       { id: 'window', when: () => near(this.walker.pos, 10, 2.6, 1.9) && this.looking(cx(10), 1.7, cz(1), 0.7), run: this.windowFace },
       { id: 'locker', when: () => near(this.walker.pos, 35, 18.5, 2.2) && this.G.fuses >= 1, run: this.lockerBurst },
       { id: 'drop', when: () => near(this.walker.pos, 24.5, 11.5, 1.6) && this.walker.speed > 0.3, run: this.ceilingDrop },

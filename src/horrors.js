@@ -3,8 +3,8 @@
 // dark), hears (your steps, doors, things you knock), patrols or keeps to
 // its corner, investigates, chases, searches, checks lockers, and kills.
 import * as THREE from '../vendor/three.module.js';
-import { C, W, D, cx, cz } from './plan.js?v=6';
-import { makeBody, pose, cleaver, bonesaw, BODY_LIGHT } from './carcass.js?v=6';
+import { C, W, D, cx, cz } from './plan.js?v=7';
+import { makeBody, pose, cleaver, bonesaw, flashlight, BODY_LIGHT } from './carcass.js?v=7';
 
 const V = THREE.Vector3;
 const tmp = new V(), tmp2 = new V();
@@ -47,9 +47,10 @@ function clearWide(space, a, b) { const dx = b.z - a.z, dz = -(b.x - a.x); const
 // ---------------------------------------------------------------- one of them
 const KINDS = {
   brute: { body: 'brute', walk: 1.25, run: 4.05, fov: 0.6, sight: 1.0, hear: 1.25, dmg: 55, reach: 1.35, wind: 0.55, gait: 'brute', voice: 'brute', weapon: 'cleaver' },
-  surgeon: { body: 'surgeon', walk: 1.15, run: 3.7, fov: 0.45, sight: 1.1, hear: 1.4, dmg: 70, reach: 1.25, wind: 0.5, gait: 'walk', voice: 'surgeon', weapon: 'saw' },
+  surgeon: { body: 'surgeon', walk: 1.15, run: 3.7, fov: 0.45, sight: 1.1, hear: 1.4, dmg: 70, reach: 1.25, wind: 0.5, gait: 'walk', voice: 'surgeon', weapon: 'saw', lamp: 'head' },
   patient: { body: 'gown', walk: 0.9, run: 3.4, fov: 0.35, sight: 0.8, hear: 1.0, dmg: 30, reach: 1.1, wind: 0.35, gait: 'shamble', voice: 'patient' },
   eater: { body: 'naked', walk: 0.9, run: 3.6, fov: 0.3, sight: 0.7, hear: 1.3, dmg: 35, reach: 1.1, wind: 0.3, gait: 'stalk', voice: 'eater' },
+  orderly: { body: 'orderly', walk: 1.35, run: 4.15, fov: 0.55, sight: 1.05, hear: 1.3, dmg: 45, reach: 1.25, wind: 0.4, gait: 'walk', voice: 'orderly', weapon: 'flashlight', lamp: 'hand' },
   rocker: { body: 'jacket', walk: 0.8, run: 0, fov: 0, sight: 0, hear: 0, dmg: 0, gait: 'shamble', voice: 'rocker', harmless: true },
 };
 
@@ -60,6 +61,7 @@ class Horror {
     H.scene.add(this.body.root);
     if (this.K.weapon === 'cleaver') { const w = cleaver(this.body.s); w.position.set(0, -0.1 * this.body.s, 0.02); w.rotation.x = -Math.PI / 2; this.body.bones.Rhand.add(w); }
     if (this.K.weapon === 'saw') { const w = bonesaw(this.body.s); w.position.set(0, -0.1 * this.body.s, 0.02); w.rotation.x = -Math.PI / 2; this.body.bones.Rhand.add(w); }
+    if (this.K.weapon === 'flashlight') { const w = flashlight(this.body.s); w.position.set(0, -0.08 * this.body.s, 0.03); w.rotation.x = -Math.PI / 2 + 0.9; this.body.bones.Rhand.add(w); this.torch = w; }
     this.home = new V(x, 0, z); this.homeYaw = opts.yaw ?? 0; this.route = opts.route || null; this.ri = 0;
     this.reset();
   }
@@ -257,25 +259,39 @@ export class Horrors {
     Object.assign(this, ctx); this.nav = new Nav(this.space); this.list = [];
     this.fear = 0; this.chase = 0; this.glitch = 0; this.lightsOut = false; this.blackout = false; this.static = 0; this.staticT = 0; this.kick = 0; this.face = null;
     const p = this.plan;
-    this.brute = new Horror(this, 'brute', cx(p.brute.x), cz(p.brute.y), { route: p.brute.route, seed: 11 });
-    this.surgeon = new Horror(this, 'surgeon', cx(p.surgeon.x), cz(p.surgeon.y), { route: p.surgeon.route, seed: 23, dormant: true });
-    {
-      const sp = new THREE.SpotLight(0xfff0d0, 0, 14, 0.42, 0.55, 1.6); const tgt = new THREE.Object3D(); this.scene.add(sp, tgt); sp.target = tgt;
-      const disc = new THREE.Mesh(new THREE.CircleGeometry(0.032, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false })); disc.material.userData.noNV = false;
-      const head = this.surgeon.body.bones.head; disc.position.set(0, 0.17 * this.surgeon.body.s, 0.085 * this.surgeon.body.s); head.add(disc);
-      const band = new THREE.Mesh(new THREE.TorusGeometry(0.085 * this.surgeon.body.s, 0.008, 4, 20), new THREE.MeshStandardMaterial({ color: 0x1a1a1a })); band.rotation.x = Math.PI / 2; band.position.set(0, 0.16 * this.surgeon.body.s, 0.005); head.add(band);
-      const v = new V(), q = new THREE.Quaternion();
-      this.surgeon.lamp = { update: (h) => { const on = h.active && h.body.root.visible; sp.intensity = on ? 14 * (0.92 + Math.random() * 0.08) : 0; if (!on) return; disc.getWorldPosition(v); sp.position.copy(v); head.getWorldQuaternion(q); tgt.position.copy(v).add(new V(0, -0.35, 1).applyQuaternion(q)); tgt.updateMatrixWorld(); } };
+    // the hunters, one per segment of the tape
+    if (p.hunters) {
+      this.hunters = p.hunters.map((hd) => { const h = new Horror(this, hd.kind, cx(hd.x), cz(hd.y), { route: hd.route, seed: hd.seed, look: hd.look }); this.list.push(h); return h; });
+      this.brute = this.hunters.find((h) => h.kind === 'brute'); this.surgeon = this.hunters.find((h) => h.kind === 'surgeon');
+    } else {
+      this.brute = new Horror(this, 'brute', cx(p.brute.x), cz(p.brute.y), { route: p.brute.route, seed: 11 });
+      this.surgeon = new Horror(this, 'surgeon', cx(p.surgeon.x), cz(p.surgeon.y), { route: p.surgeon.route, seed: 23 });
+      this.list.push(this.brute, this.surgeon);
     }
-    this.list.push(this.brute, this.surgeon);
     for (const [i, m] of p.inmates.entries()) {
       const kind = m.kind === 'eater' ? 'eater' : m.kind === 'stalker' ? 'patient' : 'rocker';
       const h = new Horror(this, kind, cx(m.x), cz(m.y), { huntRoute: m.huntRoute, idle: m.kind === 'eater' ? 'eat' : m.kind === 'stalker' ? 'patrol' : 'rock', yaw: m.facing ?? (i * 1.7), seed: 40 + i, route: m.route, look: m.look, dormant: m.dormant });
       this.list.push(h);
       if (m.kind === 'eater') this.feral = h;
     }
-    this.brute.active = true; this.surgeon.active = false; this.surgeon.body.root.visible = false;
+    if (!p.hunters) this.hunters = [this.brute, this.surgeon, this.feral];
+    // one real spotlight, carried by whichever lamp-carrying hunter is out (a headlamp or a flashlight)
+    this.beam = new THREE.SpotLight(0xfff0d0, 0, 14, 0.42, 0.55, 1.6); this.beamTgt = new THREE.Object3D(); this.scene.add(this.beam, this.beamTgt); this.beam.target = this.beamTgt;
+    for (const h of this.hunters) if (h.K.lamp) this.fitLamp(h);
+    for (const h of this.hunters) if (!h.opts.idle) { h.active = false; h.body.root.visible = false; }
     this.setSegment(this.segment, true);
+  }
+  fitLamp(h) {
+    const v = new V(), q = new THREE.Quaternion(), fwd = new V(); const B = h.body.bones; let src, aimFn;
+    if (h.K.lamp === 'head') {
+      const disc = new THREE.Mesh(new THREE.CircleGeometry(0.032, 16), new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }));
+      disc.position.set(0, 0.17 * h.body.s, 0.085 * h.body.s); B.head.add(disc);
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.085 * h.body.s, 0.008, 4, 20), new THREE.MeshStandardMaterial({ color: 0x1a1a1a })); band.rotation.x = Math.PI / 2; band.position.set(0, 0.16 * h.body.s, 0.005); B.head.add(band);
+      src = disc; aimFn = () => { B.head.getWorldQuaternion(q); fwd.set(0, -0.35, 1).applyQuaternion(q); };
+    } else {
+      src = h.torch.userData.lens; aimFn = () => { h.torch.getWorldQuaternion(q); fwd.set(0, 0, 1).applyQuaternion(q); };
+    }
+    h.lamp = { update: (hh) => { if (!(hh.active && hh.body.root.visible)) return; src.getWorldPosition(v); aimFn(); this.beam.intensity = 14 * (0.92 + Math.random() * 0.08); this.beam.position.copy(v); this.beamTgt.position.copy(v).addScaledVector(fwd, 3); this.beamTgt.updateMatrixWorld(); } };
   }
   heard(x, z, r) { if (r <= 0) return; for (const h of this.list) h.hear(x, z, r); }
   sawHide(hide) { for (const h of this.list) if (h.state === 'chase' && h.canSee(this.walker.pos, true) > 0) h.sawHide = hide; }
@@ -297,17 +313,17 @@ export class Horrors {
   //   0  before the first fuse: Kroft, the west wing and the cafeteria
   //   1  one or two fuses: Dr. Voss
   //   2  third fuse to the gate: the feral patient from the morgue
-  get segment() { return this.G.power || this.G.fuses >= 3 ? 2 : this.G.fuses >= 1 ? 1 : 0; }
-  get hunter() { return [this.brute, this.surgeon, this.feral][this.segment]; }
+  get segment() { return this.plan.segment ? this.plan.segment(this.G) : this.G.power || this.G.fuses >= 3 ? 2 : this.G.fuses >= 1 ? 1 : 0; }
+  get hunter() { return this.hunters[this.segment]; }
   isHunter(h) { return h === this.hunter; }
   mayChase(h) { return this.isHunter(h) && !this.list.some((o) => o !== h && (o.state === 'chase' || o.state === 'attack' || o.state === 'execute' || o.state === 'spot')); }
   setSegment(seg, instant = false) {
     this.seg = seg;
-    for (const h of [this.brute, this.surgeon, this.feral]) {
+    for (const h of this.hunters) {
       const mine = h === this.hunter;
       if (mine && !h.active) { h.reset(); h.active = true; h.body.root.visible = true; }
-      if (!mine && h !== this.feral && h.active) h.leaving = true;      // gone once it stops chasing
-      if (!mine && h === this.feral) { h.leaving = false; }
+      if (!mine && h.active && !h.opts.idle) h.leaving = true;      // gone once it stops chasing
+      if (!mine && h.opts.idle) h.leaving = false;
     }
     if (instant) for (const h of this.list) if (h.leaving) { h.leaving = false; h.active = false; h.body.root.visible = false; }
   }
@@ -315,11 +331,12 @@ export class Horrors {
   alarm() { const h = this.hunter; if (h && h.state !== 'chase') { h.state = 'investigate'; h.goal = this.walker.pos.clone(); h.path = null; h.wait = 0; } }
   reset() {
     for (const h of this.list) h.reset();
-    this.brute.active = this.surgeon.active = false; this.brute.body.root.visible = this.surgeon.body.root.visible = false;
+    for (const h of this.hunters) if (!h.opts.idle) { h.active = false; h.body.root.visible = false; }
     this.setSegment(this.segment, true); this.face = null; this.kick = 0;
   }
   update(dt) {
     BODY_LIGHT.up.value.set(0, 1, 0).transformDirection(this.camera.matrixWorldInverse);
+    this.beam.intensity = 0;
     if (this.seg !== this.segment) this.setSegment(this.segment);
     for (const h of this.list) if (h.leaving && h.state !== 'chase' && h.state !== 'attack' && h.state !== 'execute') {
       // walk off when you can't see it, then it's gone for good

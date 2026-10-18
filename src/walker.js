@@ -95,28 +95,30 @@ export class Walker {
     this.hidden = h; this.vel.set(0, 0, 0); this.hideT = 0; this.noise = 0;
     this.hideFrom = this.pos.clone();
     if (h.k === 'locker') { this.pos.set(h.x - h.fx * 0.04, 0, h.z - h.fz * 0.04); this.yaw = Math.atan2(-h.fx, -h.fz); this.pitch = 0; }
+    else if (h.k === 'strap') { this.pos.set(h.x, 0, h.z); this.yaw = Math.atan2(-h.fx, -h.fz); this.pitch = 1.15; this.eye = 0.95; }
     else { this.pos.set(h.x, 0, h.z); this.yaw = Math.atan2(-h.fx, -h.fz) + Math.PI / 2; this.pitch = -0.05; }
     this.syncVR = true; this.hideYaw = this.yaw;
   }
   unhide() {
     const h = this.hidden; if (!h) return;
     if (h.k === 'locker') this.pos.set(h.x + h.fx * 0.75, 0, h.z + h.fz * 0.75);
+    else if (h.k === 'strap') { const sx = Math.cos(h.ang), sz = -Math.sin(h.ang); this.pos.set(h.x + sx * 0.9, 0, h.z + sz * 0.9); if (this.space.collide(this.pos.clone(), 0.3)) this.pos.set(h.x - sx * 0.9, 0, h.z - sz * 0.9); this.pitch = 0; }
     else { const sx = Math.cos(h.ang), sz = -Math.sin(h.ang); this.pos.set(h.x + sx * 0.95, 0, h.z + sz * 0.95); if (this.space.collide(this.pos.clone(), 0.3)) this.pos.set(h.x - sx * 0.95, 0, h.z - sz * 0.95); }
     this.space.collide(this.pos, 0.3);
     this.hidden = null; this.syncVR = true; this.vrCrouch = 0;
   }
   hiding(dt, I) {
     const h = this.hidden; this.hideT += dt; this.speed = 0; this.noise = 0;
-    const eye = h.k === 'locker' ? 1.6 : 0.26;
+    const eye = h.k === 'locker' ? 1.6 : h.k === 'strap' ? 0.95 : 0.26;
     if (I.vr) {
       // keep the head inside the locker / under the bed
       const head = this.camera.getWorldPosition(new V());
       if (this.syncVR) { this.syncVR = false; const hl = this.camera.position; const ang = this.yaw - camYaw(this.camera); this.dolly.rotation.y = ang; const off = new V(hl.x, 0, hl.z).applyAxisAngle(new V(0, 1, 0), ang); this.dolly.position.set(this.pos.x - off.x, 0, this.pos.z - off.z); }
       else { this.dolly.position.x += this.pos.x - head.x; this.dolly.position.z += this.pos.z - head.z; }
-      const want = h.k === 'locker' ? 0 : eye - (head.y - this.dolly.position.y); this.dolly.position.y += (want - this.dolly.position.y) * (1 - Math.exp(-dt * 6));
+      const want = h.k === 'locker' ? 0 : h.k === 'strap' ? Math.min(0, eye - (head.y - this.dolly.position.y)) : eye - (head.y - this.dolly.position.y); this.dolly.position.y += (want - this.dolly.position.y) * (1 - Math.exp(-dt * 6));
     } else {
       this.yaw -= I.lookDx * 0.0018; this.pitch -= I.lookDy * 0.0018;
-      const lim = h.k === 'locker' ? 0.45 : 0.9; this.yaw = this.hideYaw + Math.max(-lim, Math.min(lim, this.yaw - this.hideYaw)); this.pitch = Math.max(-0.5, Math.min(0.4, this.pitch));
+      const lim = h.k === 'locker' ? 0.45 : h.k === 'strap' ? 1.1 : 0.9; this.yaw = this.hideYaw + Math.max(-lim, Math.min(lim, this.yaw - this.hideYaw)); this.pitch = h.k === 'strap' ? Math.max(0.2, Math.min(1.45, this.pitch)) : Math.max(-0.5, Math.min(0.4, this.pitch));
       this.eye += (eye - this.eye) * (1 - Math.exp(-dt * 6));
       const br = Math.sin(this.t * 2.2) * 0.006;
       this.dolly.position.set(this.pos.x, 0, this.pos.z); this.camera.position.set(0, this.eye + br, 0); this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');

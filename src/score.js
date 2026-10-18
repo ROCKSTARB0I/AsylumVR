@@ -37,6 +37,16 @@ export const THEMES = {
     drone: ['C2', 'C#2', 'F#2'], screech: { every: 8, at: 6, from: 'C7', to: 'F#6' }, metal: seq('. . x . . . . . . . x . . . . . . . x . . . . . . . x . . x . x'), swell: false,
     lead: null, arp: seq('C5 Eb5 G5 B5 C6 B5 G5 Eb5 C5 Eb5 G5 B5 C6 B5 G5 F#5 C5 Eb5 G5 B5 C6 B5 G5 Eb5 Ab4 C5 Eb5 G5 B4 D5 F5 B5'), arpType: 'saw', color: { cut: 2600, drive: 0.7 } },
 };
+// MR. PELL: a warped calliope playing his whistle over an oom-pah bass, a toy piano running scared
+THEMES.orderly = { bpm: 138, swing: 0.18,
+  bass: seq('C2 . G2 . C2 . G2 . Ab1 . Eb2 . Ab1 . Eb2 . F1 . C2 . F1 . C2 . G1 . D2 . G1 . B1 .'),
+  kick: seq('X . . . x . . . X . . . x . . . X . . . x . . . X . . . x . x .'),
+  snare: seq('. . x . . . x . . . x . . . x . . . x . . . x . . . x . . . X x'),
+  hat: seq('x . x x x . x x x . x x x . x x x . x x x . x x x . x x x . x x'),
+  stab: [[0, ['C4', 'Eb4', 'F#4']], [16, ['Ab3', 'B3', 'D4']]],
+  drone: ['C2', 'Db2', 'G2'], screech: { every: 16, at: 14, from: 'G6', to: 'C#7' }, metal: seq('. . . . . . . x . . . . . . . . . . . . . . . x . . . . . . . .'), swell: true,
+  lead: seq('C6 . E6 . G6 . C7 . B6 . . . G6 . E6 . F6 . E6 . D6 . C6 . . . B5 . . . . . . .'), leadType: 'organ', leadDur: 2,
+  arp: seq('C5 Eb5 F#5 A5 C6 A5 F#5 Eb5 Ab4 B4 D5 F5 Ab5 F5 D5 B4 F4 Ab4 B4 D5 F5 D5 B4 Ab4 G4 B4 D5 F5 Ab5 F5 D5 B4'), arpType: 'box', color: { cut: 2800, drive: 0.55 } };
 THEMES.eater = { ...THEMES.patient, bpm: 140, drone: ['Bb1', 'B1', 'E2'], bass: THEMES.patient.bass.map((n) => n && n - 2), arp: THEMES.patient.arp.map((n) => n && n - 2) };
 
 export class Score {

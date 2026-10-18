@@ -2,22 +2,23 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=6';
-import { buildSurfaces, T } from './surfaces.js?v=6';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=6';
-import { Doors } from './doors.js?v=6';
-import { Space } from './space.js?v=6';
-import { Input } from './input.js?v=6';
-import { Walker } from './walker.js?v=6';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=6';
-import { makeTape, makeVeil } from './tape.js?v=6';
-import { Slate } from './slate.js?v=6';
-import { NOTES, MUTTER, OBJECTIVES } from './story.js?v=6';
-import { Sound } from './dread.js?v=6';
-import { Horrors } from './horrors.js?v=6';
-import { Dressing } from './dressing.js?v=6';
-import { Scares } from './scares.js?v=6';
-import { makeHand } from './hands.js?v=6';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=7';
+import { buildSurfaces, T } from './surfaces.js?v=7';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=7';
+import { Doors } from './doors.js?v=7';
+import { Space } from './space.js?v=7';
+import { Input } from './input.js?v=7';
+import { Walker } from './walker.js?v=7';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=7';
+import { makeTape, makeVeil } from './tape.js?v=7';
+import { Slate } from './slate.js?v=7';
+import * as STORY1 from './story.js?v=7';
+import * as TAPE2 from './tape2.js?v=7';
+import { Sound } from './dread.js?v=7';
+import { Horrors } from './horrors.js?v=7';
+import { Dressing } from './dressing.js?v=7';
+import { Scares } from './scares.js?v=7';
+import { makeHand } from './hands.js?v=7';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -25,6 +26,10 @@ const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const S = { bright: 1, grain: 1, smooth: false };
 try { Object.assign(S, JSON.parse(localStorage.getItem('asylumvr') || '{}')); } catch (e) {}
 const save = () => { try { localStorage.setItem('asylumvr', JSON.stringify(S)); } catch (e) {} };
+// which tape: ?tape=N, else the first one
+let unlocked = 1; try { unlocked = Math.max(1, +(localStorage.getItem('asylumvr_tapes') || 1)); } catch (e) {}
+const TAPE = Math.max(1, Math.min(2, +(new URLSearchParams(location.search).get('tape') || 1)));
+const STORY = TAPE === 2 ? TAPE2 : STORY1; const { NOTES, MUTTER, OBJECTIVES } = STORY;
 
 // ---------------------------------------------------------------- renderer
 const canvas = $('view');
@@ -56,7 +61,7 @@ addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); ca
 $('loading').textContent = 'Rewinding tape… painting walls';
 await new Promise((r) => setTimeout(r, 30));
 buildSurfaces();
-const plan = makePlan();
+const plan = makePlan(TAPE);
 $('loading').textContent = 'Rewinding tape… baking light';
 await new Promise((r) => setTimeout(r, 30));
 const world = buildAsylum(plan, scene);
@@ -78,6 +83,8 @@ await new Promise((r) => setTimeout(r, 30));
 const dressing = new Dressing(world, plan, scene);
 const horrors = new Horrors({ scene, plan, world, space, doors, walker, cam, sound, G, camera });
 const scares = new Scares({ scene, plan, world, space, doors, walker, cam, sound, G, horrors, camera, dressing });
+if (TAPE === 2) scares.list = TAPE2.setPieces(scares);
+const tapeLogic = TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
 
 // ---------------------------------------------------------------- hands
 // your own hands, empty, on the controllers' grips in VR (the camcorder is the whole view, not something you hold)
@@ -145,6 +152,15 @@ const itemMeshes = [];
     if (k === 'fuse') {
       const body = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.12, 14), lit(0x8a6a3a, 0.7)); body.rotation.z = Math.PI / 2; g.add(body);
       for (const s of [-1, 1]) { const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.025, 14), lit(0xb0a890, 0.3, 0.9)); cap.rotation.z = Math.PI / 2; cap.position.x = s * 0.07; g.add(cap); }
+    } else if (k === 'card') {
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.002, 0.054), lit(0xd8d4c8, 0.4)));
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.0025, 0.01), lit(0x111111, 0.3)); strip.position.z = 0.015; g.add(strip);
+    } else if (k === 'chapelKey' || k === 'stairKey') {
+      const brass = lit(k === 'stairKey' ? 0x6a6a64 : 0x9a7a30, 0.35, 0.8);
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.005, 6, 14), brass); ring.rotation.x = Math.PI / 2; g.add(ring);
+      const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.006, 0.07), brass); shaft.position.z = 0.05; g.add(shaft);
+      const bit = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.006, 0.012), brass); bit.position.set(0.01, 0, 0.08); g.add(bit);
+      const tag = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.002, 0.05), lit(0xb8a888, 0.9)); tag.position.set(-0.03, 0, -0.03); g.add(tag);
     } else if (k === 'battery') {
       g.add(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.022, 0.045), lit(0x1a1a1a, 0.5)));
       const lab = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.023, 0.03), lit(0x2a5aa0, 0.4)); g.add(lab);
@@ -163,9 +179,9 @@ const itemMeshes = [];
     itemMeshes.push({ it, m });
   }
 }
-const genPos = new V(cx(plan.generator.x), 1.0, cz(plan.generator.y) + 0.7);
-const panelPos = new V(cx(plan.panel.x), 0.9, cz(plan.panel.y));
-const gateMesh = (() => {
+const genPos = plan.generator ? new V(cx(plan.generator.x), 1.0, cz(plan.generator.y) + 0.7) : new V();
+const panelPos = plan.panel ? new V(cx(plan.panel.x), 0.9, cz(plan.panel.y)) : new V();
+const gateMesh = !plan.gate ? null : (() => {
   const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 0.6, metalness: 0.7 });
   m.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * 0.05;'); };
   const [x0, y0] = plan.gate.cells[0]; const wx = x0 * C, wz = (y0 + 0.5) * C; const w = C * 2;
@@ -177,11 +193,11 @@ const gateMesh = (() => {
 
 // ---------------------------------------------------------------- interaction
 const interactables = [];
-for (const d of doors.list) interactables.push({ kind: 'door', d, pos: () => new V(d.wx, 1.1, d.wz), r: 1.0, label: () => d.locked ? 'Locked' : Math.abs(d.target) > 0.2 ? 'Close door' : 'Open door' });
+for (const d of doors.list) interactables.push({ kind: 'door', d, pos: () => new V(d.wx, 1.1, d.wz), r: 1.0, label: () => d.locked ? (d.lock && G.items.has(d.lock) ? 'Unlock' : d.lock && TAPE2.LOCK_NAME[d.lock] ? `Locked (needs ${TAPE2.LOCK_NAME[d.lock]})` : 'Locked') : Math.abs(d.target) > 0.2 ? 'Close door' : 'Open door' });
 for (const h of world.hides) interactables.push({ kind: 'hide', h, pos: () => h.k === 'locker' ? new V(h.x + h.fx * 0.3, 1.2, h.z + h.fz * 0.3) : new V(h.x, 0.45, h.z), r: h.k === 'locker' ? 0.6 : 0.9, label: () => h.k === 'locker' ? 'Hide in locker' : 'Hide under bed' });
-for (const im of itemMeshes) interactables.push({ kind: 'item', im, pos: () => im.m.position, r: 0.45, label: () => ({ fuse: 'Take fuse', battery: 'Take battery', note: 'Read' })[im.it.k], gone: () => G.items.has(im.it.id) });
-interactables.push({ kind: 'gen', pos: () => genPos, r: 1.2, label: () => G.power ? 'Generator running' : G.fuses >= 3 ? 'Insert fuses and start' : `Generator: needs 3 fuses (${G.fuses}/3)` });
-interactables.push({ kind: 'panel', pos: () => panelPos, r: 1.0, label: () => G.gateOpen ? 'Gate open' : G.power ? 'Open the front gate' : 'Gate panel (no power)' });
+for (const im of itemMeshes) interactables.push({ kind: 'item', im, pos: () => im.m.position, r: 0.45, label: () => ({ fuse: 'Take fuse', battery: 'Take battery', note: 'Read', ...TAPE2.ITEM_LABEL })[im.it.k], gone: () => G.items.has(im.it.id) });
+if (TAPE === 1) interactables.push({ kind: 'gen', pos: () => genPos, r: 1.2, label: () => G.power ? 'Generator running' : G.fuses >= 3 ? 'Insert fuses and start' : `Generator: needs 3 fuses (${G.fuses}/3)` });
+if (TAPE === 1) interactables.push({ kind: 'panel', pos: () => panelPos, r: 1.0, label: () => G.gateOpen ? 'Gate open' : G.power ? 'Open the front gate' : 'Gate panel (no power)' });
 
 let focus = null;
 function pick(origin, dir) {
@@ -200,12 +216,14 @@ function pick(origin, dir) {
 function use(o) {
   if (!o) return;
   if (walker.hidden) { walker.unhide(); sound.locker(false); return; }
+  if (o.kind === 'door' && o.d.locked && o.d.lock && G.items.has(o.d.lock)) { o.d.locked = false; sound.clang(new V(o.d.wx, 1.1, o.d.wz), 700, 0.25, 0.4); sound.door(o.d, 'open', o.d.wx, o.d.wz); doors.push(o.d, walker.pos.x, walker.pos.z); horrors.heard(o.d.wx, o.d.wz, 5); return; }
   if (o.kind === 'door') { const r = doors.push(o.d, walker.pos.x, walker.pos.z); if (r) sound.door(o.d, r, o.d.wx, o.d.wz); else sound.rattle(o.d.wx, o.d.wz); horrors.heard(o.d.wx, o.d.wz, r === 'close' ? 3 : 4); }
   else if (o.kind === 'hide') { horrors.sawHide(o.h); walker.hide(o.h); sound.locker(true, o.h.k); say('hide', 0.3); }
   else if (o.kind === 'item') {
     const it = o.im.it; G.items.add(it.id); o.im.m.visible = false;
     if (it.k === 'fuse') { G.fuses++; sound.pickup('fuse'); say(['', 'fuse1', 'fuse2', 'fuse3'][G.fuses], 0, true); checkpoint(); }
     else if (it.k === 'battery') { cam.spares = Math.min(6, cam.spares + 1); sound.pickup('battery'); say('battery', 0.4); }
+    else if (it.k === 'card' || it.k === 'chapelKey' || it.k === 'stairKey') { sound.pickup('fuse'); say(it.k, 0, true); checkpoint(); }
     else { G.notes.push(it.id); read(it.id); sound.pickup('paper'); }
   } else if (o.kind === 'gen') {
     if (!G.power && G.fuses >= 3) { G.power = true; sound.generator(genPos); horrors.powerOn(genPos); scares.powerOn(); setTimeout(() => say('power', 0, true), 2600); checkpoint(); }
@@ -262,7 +280,7 @@ let fade = 1, fadeGoal = 0;
 function fadeTo(v) { fadeGoal = v; }
 function setPaused(p) {
   G.paused = p; $('pause').hidden = !p || renderer.xr.isPresenting;
-  if (p) { sound.duck(true); $('notesList').textContent = G.notes.length ? 'Notes: ' + G.notes.map((n) => NOTES[n].t).join(' · ') : ''; if (renderer.xr.isPresenting) { card.card([['PAUSED', 70], [objectiveText(), 34, '#c8c0b0'], ['', 20], [`Fuses ${G.fuses}/3   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}`, 32, '#9a948a'], ['', 20], ['B resume   ·   hold trigger 2 s: last checkpoint', 30, '#9a948a']]); placeCard(); } }
+  if (p) { sound.duck(true); $('notesList').textContent = G.notes.length ? 'Notes: ' + G.notes.map((n) => NOTES[n].t).join(' · ') : ''; if (renderer.xr.isPresenting) { card.card([['PAUSED', 70], [objectiveText(), 34, '#c8c0b0'], ['', 20], [TAPE === 1 ? `Fuses ${G.fuses}/3   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}` : `Tape 2   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}`, 32, '#9a948a'], ['', 20], ['B resume   ·   hold trigger 2 s: last checkpoint', 30, '#9a948a']]); placeCard(); } }
   else { sound.duck(false); card.mesh.visible = false; if (!renderer.xr.isPresenting) input.wantLock = true; }
 }
 $('resume').onclick = () => setPaused(false);
@@ -280,11 +298,20 @@ async function begin(vr) {
   sound.init(); await sound.ready;
   $('screen').hidden = true; G.playing = true; fade = 1; fadeTo(0);
   walker.place(cx(plan.start.x), cz(plan.start.y), plan.start.yaw); checkpoint();
+  if (tapeLogic) tapeLogic.start();
   if (!vr) { input.wantLock = true; $('dot').classList.add('on'); try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
-  setTimeout(() => say('start'), 1500);
-  setTimeout(() => { if (!cam.nv) caption(vr ? 'Left trigger: night vision' : 'F: night vision · right mouse: zoom'); }, 6000);
+  if (!tapeLogic) setTimeout(() => say('start'), 1500);
+  setTimeout(() => { if (!cam.nv && !G.strapped) caption(vr ? 'Left trigger: night vision' : 'F: night vision · right mouse: zoom'); }, 6000);
 }
 $('playDesktop').onclick = () => begin(false);
+{
+  const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4${TAPE === 2 ? ' &middot; The Male Ward' : ''}`;
+  {   // both tapes are always selectable
+    const menu = $('menu'); const other = TAPE === 1 ? 2 : 1;
+    const b = document.createElement('button'); b.textContent = other === 2 ? 'Tape 2: The Male Ward' : 'Tape 1: Recovered Footage'; b.onclick = () => { location.href = '?tape=' + other; };
+    menu.insertBefore(b, $('howBtn'));
+  }
+}
 $('howBtn').onclick = () => { $('how').hidden = !$('how').hidden; };
 const vrBtn = $('enterVR');
 if (!navigator.xr) { vrBtn.disabled = true; $('vrNote').textContent = 'WebXR not available here — open this page in the Meta Quest browser to play in VR.'; }
@@ -342,20 +369,22 @@ function frame() {
     deadT += dt; if (deadT > 1.2) { $('dead').hidden = false; fadeTo(1); }
     if (deadT > 4.5) { G.deaths++; respawn(); }
   }
-  if (!G.leftAdmin && plan.at(Math.floor(walker.pos.x / C), Math.floor(walker.pos.z / C)) !== Z.ADMIN && walker.pos.z > 0) { G.leftAdmin = true; }
-  if (G.leftAdmin && !G.said.has('dark') && G.t > 20 && !cam.nv) say('dark');
-  if (!G.sawPanel && walker.pos.distanceTo(panelPos.clone().setY(0)) < 3.5) { G.sawPanel = true; say('security'); }
-  if (!G.said.has('gateChained') && walker.pos.distanceTo(new V(cx(25.5), 0, cz(36))) < 3) say('gateChained');
-  if (G.gateOpen && walker.pos.z > cz(37.6) && !G.escaped) { G.escaped = true; ending(); }
-  if (G.gateOpen) gateMesh.position.y = Math.min(2.9, gateMesh.position.y + dt * 0.6), space.gateBox = gateMesh.position.y > 2.2 ? null : space.gateBox;
+  if (tapeLogic) tapeLogic.update(dt);
+  if (TAPE === 1 && !G.leftAdmin && plan.at(Math.floor(walker.pos.x / C), Math.floor(walker.pos.z / C)) !== Z.ADMIN && walker.pos.z > 0) { G.leftAdmin = true; }
+  if (TAPE === 1 && G.leftAdmin && !G.said.has('dark') && G.t > 20 && !cam.nv) say('dark');
+  if (TAPE === 1 && !G.sawPanel && walker.pos.distanceTo(panelPos.clone().setY(0)) < 3.5) { G.sawPanel = true; say('security'); }
+  if (TAPE === 1 && !G.said.has('gateChained') && walker.pos.distanceTo(new V(cx(25.5), 0, cz(36))) < 3) say('gateChained');
+  if (TAPE === 1 && G.gateOpen && walker.pos.z > cz(37.6) && !G.escaped) { G.escaped = true; ending(); }
+  if (gateMesh && G.gateOpen) gateMesh.position.y = Math.min(2.9, gateMesh.position.y + dt * 0.6), space.gateBox = gateMesh.position.y > 2.2 ? null : space.gateBox;
 
   // interaction ray
   let origin, dir;
   if (vr && hands.right) { origin = hands.right.getWorldPosition(new V()); dir = new V(0, 0, -1).applyQuaternion(hands.right.getWorldQuaternion(tmpQ)); }
   else { origin = camera.getWorldPosition(new V()); dir = new V(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(tmpQ)); }
   const hid = walker.hidden; focus = walker.alive ? (hid ? { kind: 'unhide', label: () => walker.hidden ? (hid.k === 'locker' ? 'Leave locker' : 'Crawl out') : '' } : pick(origin, dir)) : null;
-  if (I.interact && focus) { if (focus.kind === 'unhide') { walker.unhide(); sound.locker(false); } else use(focus); }
-  if (walker.hidden && vr && (Math.abs(I.mx) + Math.abs(I.mz) > 1.3)) { walker.unhide(); sound.locker(false); }
+  if (walker.hidden && walker.hidden.k === 'strap') focus = { kind: 'strap', label: tapeLogic.strapLabel };
+  if (I.interact && focus) { if (focus.kind === 'strap') tapeLogic.struggle(); else if (focus.kind === 'unhide') { walker.unhide(); sound.locker(false); } else use(focus); }
+  if (walker.hidden && walker.hidden.k !== 'strap' && vr && (Math.abs(I.mx) + Math.abs(I.mz) > 1.3)) { walker.unhide(); sound.locker(false); }
   const lab = focus ? focus.label() : '';
   $('prompt').hidden = !lab || vr; $('prompt').textContent = lab ? (vr ? lab : `[E] ${lab}`) : '';
   if (vr && lab) { if (promptSlate.text !== lab) { promptSlate.text = lab; promptSlate.card([[lab, 52]], { top: 62 }); } promptSlate.mesh.visible = true; promptSlate.mesh.position.copy(origin).addScaledVector(dir, 0.35).add(tmpV.set(0, 0.06, 0)); promptSlate.mesh.lookAt(camera.getWorldPosition(tmpV2)); } else promptSlate.mesh.visible = false;
@@ -426,7 +455,7 @@ function draw(dt, vr, I) {
 // the title: a slow drift through the dark lobby on tape
 function renderTitle(dt) {
   const t = performance.now() / 1000;
-  dolly.position.set(cx(25.5) + Math.sin(t * 0.05) * 2, 0, cz(31) + Math.cos(t * 0.04) * 1.5); camera.position.set(0, 1.6, 0); camera.rotation.set(-0.05, Math.PI + Math.sin(t * 0.07) * 0.6, 0, 'YXZ');
+  const tc = plan.titleCam || { x: 25.5, y: 31, yaw: Math.PI }; dolly.position.set(cx(tc.x) + Math.sin(t * 0.05) * 2, 0, cz(tc.y) + Math.cos(t * 0.04) * 1.5); camera.position.set(0, 1.6, 0); camera.rotation.set(-0.05, tc.yaw + Math.sin(t * 0.07) * 0.6, 0, 'YXZ');
   LIGHT.A.value = Math.sin(t * 9) > 0.3 ? 1 : 0.1;
   renderer.setRenderTarget(rtMain); renderer.render(scene, camera); renderer.setRenderTarget(null);
   const u = tape.uniforms; u.t.value = t; u.mode.value = 1; u.fade.value = 0.1; u.glitch.value = Math.max(0, Math.sin(t * 0.7) - 0.9) * 6; u.exposure.value = 2.6 * S.bright; renderer.render(tape.scene, tape.cam);
@@ -437,12 +466,29 @@ function ending() {
   setTimeout(() => {
     G.playing = false; $('screen').hidden = false;
     document.querySelector('.osd-top .play').innerHTML = '&#9632;&#xFE0E; STOP';
-    document.querySelector('.vhs').innerHTML = `<div class="end"><p class="kicker">Mount Harrow State Asylum</p><h1 class="logo">END OF TAPE 1</h1><p class="lede">The gate rose. The courtyard was full of patients, standing in the rain, waiting.<br>None of them were looking at the gate. They were looking at the north building.<br>Somebody behind you said your name.</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${Object.keys(NOTES).length} · Time ${timecode(G.t).slice(3, 8)}</p><p class="lede">Tape 2 — <i>The Male Ward</i> — is next.</p><nav class="menu"><button onclick="location.reload()">Rewind</button></nav></div>`;
+    try { localStorage.setItem('asylumvr_tapes', String(Math.min(2, Math.max(unlocked, TAPE + 1)))); } catch (e) {}
+    if (TAPE === 2) document.querySelector('.vhs').innerHTML = TAPE2.ENDING(G, timecode);
+    else document.querySelector('.vhs').innerHTML = `<div class="end"><p class="kicker">Mount Harrow State Asylum</p><h1 class="logo">END OF TAPE 1</h1><p class="lede">The gate rose. The courtyard was full of patients, standing in the rain, waiting.<br>None of them were looking at the gate. They were looking at the north building.<br>Somebody behind you said your name.</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${Object.keys(NOTES).length} · Time ${timecode(G.t).slice(3, 8)}</p><nav class="menu"><button onclick="location.href='?tape=2'">Play Tape 2: The Male Ward</button><button onclick="location.href='?tape=1'">Rewind</button></nav></div>`;
     if (renderer.xr.isPresenting) renderer.xr.getSession().end();
   }, 2200);
 }
 
-window.__asy = { G, walker, cam, world, plan, doors, horrors, scene, camera, LIGHT, space, sound, renderer, use, interactables, scares, dressing, handL, handR, handLight, NVU,
+// trailer / capture hook: render one frame from an arbitrary camera through the tape (dev tool only)
+function renderTape(o) {
+  const t = o.t; G.t = t; lights(o.dt || 1 / 30);
+  dolly.position.set(0, 0, 0); dolly.rotation.set(0, 0, 0); camera.position.copy(o.pos);
+  camera.up.set(0, 1, 0); camera.lookAt(o.look); if (o.roll) camera.rotateZ(o.roll); camera.fov = o.fov || 70; camera.aspect = o.aspect || camera.aspect; camera.updateProjectionMatrix(); camera.updateMatrixWorld(true);
+  walker.pos.set(o.pos.x, 0, o.pos.z);
+  dressing.update(o.dt || 1 / 30, walker.pos, camera);
+  cam.nv = !!o.nv; if (o.nv) camera.layers.enable(EYE_LAYER); else camera.layers.disable(EYE_LAYER);
+  cam.aim(camera.getWorldPosition(tmpV), camera.getWorldQuaternion(tmpQ), 70); cam.setIR(!!o.nv); if (o.nv && o.ir !== undefined) cam.ir.intensity = o.ir;
+  for (const h of world.hazeCones) h.mesh.visible = true;
+  renderer.setRenderTarget(rtMain); renderer.render(scene, camera); renderer.setRenderTarget(null); cam.setIR(false);
+  const u = tape.uniforms; u.t.value = t; u.mode.value = o.nv ? 2 : 1; u.glitch.value = o.glitch || 0; u.hurt.value = o.hurt || 0; u.fear.value = o.fear || 0; u.battery.value = 1; u.fade.value = o.fade || 0; u.stat.value = o.stat || 0; u.zoom.value = o.zoom || 1; u.exposure.value = 2.6 * (o.bright || 1);
+  renderer.render(tape.scene, tape.cam);
+}
+function setCaptureSize(w, h) { renderer.setPixelRatio(1); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); rtMain.dispose(); rtMain = new THREE.WebGLRenderTarget(Math.round(w * 0.85), Math.round(h * 0.85), { type: THREE.HalfFloatType }); tape.uniforms.src.value = rtMain.texture; tape.uniforms.aspect.value = w / h; }
+window.__asy = { G, walker, renderTape, setCaptureSize, canvas, osdEl: $('osd'), cam, world, plan, doors, horrors, scene, camera, LIGHT, space, sound, renderer, use, interactables, scares, dressing, handL, handR, handLight, NVU,
   // test hook: step the game a few frames by hand (the pane may not be animating) and grab the picture
   snap(steps = 3, w = 560) { const I0 = { mx: 0, mz: 0, turn: 0, lookDx: 0, lookDy: 0 }; for (let i = 0; i < steps; i++) { walker.update(1 / 30, I0); doors.update(1 / 30); lights(1 / 30); horrors.update(1 / 30); dressing.update(1 / 30, walker.pos, camera);  } draw(1, false, I0);
     const c = document.createElement('canvas'); c.width = w; c.height = Math.round(w * canvas.height / canvas.width); c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.72); } };

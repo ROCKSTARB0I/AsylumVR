@@ -1,8 +1,8 @@
 // Space: what is solid. Circle movers (you and them) are pushed out of
 // wall cells, props, door leaves and the gate; sight lines are traced
 // through the grid and closed doors.
-import { C, W, D } from './plan.js?v=6';
-import { circleSeg } from './doors.js?v=6';
+import { C, W, D } from './plan.js?v=7';
+import { circleSeg } from './doors.js?v=7';
 
 export class Space {
   constructor(plan, world, doors) {
@@ -20,7 +20,7 @@ export class Space {
     this.gateBox = null;
   }
   solid(gx, gy) { return !this.plan.at(gx, gy); }
-  walkable(gx, gy) { return !!this.plan.at(gx, gy) && !this.blockedCell[gy * W + gx]; }
+  walkable(gx, gy) { if (!this.plan.at(gx, gy) || this.blockedCell[gy * W + gx]) return false; const d = this.doors.at(gx, gy); return !(d && d.locked); }
   collide(p, r, { props = true, doors = true, low = 0 } = {}) {
     let hit = false;
     for (let pass = 0; pass < 2; pass++) {

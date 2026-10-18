@@ -125,6 +125,22 @@ export function buildSurfaces() {
     }
     p.grime(41, 1.3, true); T.wallCell = set(p, 3);
   }
+  // padded cell: quilted canvas cushions with buttons, yellowed, torn, stained
+  for (const [key, seed, cols] of [['wallPadded', 300, 8], ['floorPadded', 310, 10]]) {
+    const p = new Paint(S);
+    p.each((x, y, i) => {
+      const u = x / S, v = y / S; const qu = (u * cols) % 1, qv = (v * cols) % 1;
+      const d = Math.min(qu, 1 - qu, qv, 1 - qv); const puff = Math.sqrt(Math.min(1, d * 4));
+      const n = fbm(u * 8, v * 8, seed, 5, 8); const k = 0.72 + puff * 0.2 + n * 0.12;
+      p.set(i, 0.66 * k, 0.62 * k, 0.5 * k); p.z[i] = puff; p.r[i] = 0.9;
+      if (d < 0.025) { p.mul(i, 0.6); p.z[i] = 0; }                                          // stitched seams
+      const bx = Math.abs(qu - 0.5) + Math.abs(qv - 0.5); if (bx < 0.05) { p.mul(i, 0.45); p.z[i] = 0.2; }   // buttons
+      const st = fbm(u * 3, v * 3, seed + 1, 4, 3); if (st > 0.56) p.mix(i, 0.42, 0.32, 0.12, Math.min(0.75, (st - 0.56) * 3));
+      const tear = fbm(u * 14, v * 14, seed + 2, 3, 14); if (tear > 0.74) { p.mix(i, 0.25, 0.22, 0.16, 0.9); p.z[i] = -0.3; }   // torn open, stuffing showing
+      const bl = fbm(u * 5, v * 5, seed + 3, 4, 5); if (bl > 0.7) p.mix(i, 0.3, 0.03, 0.02, Math.min(0.85, (bl - 0.7) * 5));
+    });
+    p.grime(seed + 4, key === 'floorPadded' ? 1.3 : 0.9, key === 'wallPadded'); T[key] = set(p, 4);
+  }
   // shower / morgue tile: small white tiles, black mould, rust tears
   for (const [key, col, seed] of [['wallShower', [0.78, 0.8, 0.76], 50], ['wallMorgue', [0.58, 0.66, 0.68], 60]]) {
     const p = new Paint(S);

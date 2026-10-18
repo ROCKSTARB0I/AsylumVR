@@ -4,9 +4,9 @@
 // damp hanging in the beams, water dripping from the ceiling, steam in
 // the showers.
 import * as THREE from '../vendor/three.module.js';
-import { C, H, cx, cz } from './plan.js?v=6';
-import { makeBody, pose } from './carcass.js?v=6';
-import { rng } from './surfaces.js?v=6';
+import { C, H, cx, cz } from './plan.js?v=7';
+import { makeBody, pose } from './carcass.js?v=7';
+import { rng } from './surfaces.js?v=7';
 
 const V = THREE.Vector3;
 
@@ -44,7 +44,7 @@ export class Dressing {
           pose(b, 'hang', 0); b.root.position.y = H - 0.25 - 1.95 * b.s; b.root.rotation.y = R() * 6.28;
           const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.55, 5), new THREE.MeshStandardMaterial({ color: 0x3a3020, roughness: 1 })); rope.position.set(x, H - 0.28, z); scene.add(rope);
           b.swing = { x, z, k: R() * 6 };
-        } else if (gd.on === 'slab') { pose(b, 'lie', 0); b.root.rotation.set(-Math.PI / 2, 0, 0); b.root.position.set(x, 0.93, z + 0.95); }
+        } else if (gd.on === 'slab' || gd.on === 'bed') { pose(b, 'lie', 0); b.root.rotation.set(-Math.PI / 2, 0, 0); b.root.position.set(x, gd.on === 'bed' ? 0.64 : 0.93, z + 0.95); }
         else if (gd.tub) { pose(b, 'slump', 0); b.root.position.set(x, 0.12, z - 0.6); }
         else if (gd.slump) {
           pose(b, 'slump', 0);
@@ -53,7 +53,7 @@ export class Dressing {
           const dx = Math.sin(best * Math.PI / 2), dz = Math.cos(best * Math.PI / 2); b.root.position.set(x + dx * (bd - 0.32), 0, z + dz * (bd - 0.32)); b.root.rotation.y = best * Math.PI / 2 + Math.PI;
         } else { pose(b, 'lie', 0); b.root.rotation.set(-Math.PI / 2, 0, R() * 6.28, 'YXZ'); b.root.position.y = 0.1; }
         scene.add(b.root); this.dead.push(b);
-        if (gd.open) { const o = offal(R, 3, 0.25); o.position.copy(b.root.position); o.position.y += gd.on === 'slab' ? 0.08 : 0.0; if (gd.on === 'slab') o.position.z -= 0.5; scene.add(o); this.mats.push(...o.userData.mats.map((m) => ({ m, x: o.position.x, z: o.position.z }))); }
+        if (gd.open) { const o = offal(R, 3, 0.25); o.position.copy(b.root.position); o.position.y += gd.on === 'slab' ? 0.08 : 0.0; if (gd.on === 'slab' || gd.on === 'bed') { o.position.z -= 0.5; if (gd.on === 'bed') o.position.y = 0.6; } scene.add(o); this.mats.push(...o.userData.mats.map((m) => ({ m, x: o.position.x, z: o.position.z }))); }
         this.addFlies(new V(x, (gd.k === 'hanged' ? 1.4 : 0.7), z));
       }
       if (gd.k === 'pile') { const o = offal(R, 5, 0.5); o.position.set(x, 0, z); scene.add(o); this.mats.push(...o.userData.mats.map((m) => ({ m, x, z }))); this.addFlies(new V(x, 0.4, z)); }

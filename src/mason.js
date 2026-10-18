@@ -5,8 +5,8 @@
 // cones and stains are added on top. Light comes in four channels: S always
 // on, A and B the stuttering broken tubes, P the main circuit (generator).
 import * as THREE from '../vendor/three.module.js';
-import { C, H, W, D, Z, cx, cz } from './plan.js?v=6';
-import { T, scrawlTexture, rng } from './surfaces.js?v=6';
+import { C, H, W, D, Z, cx, cz } from './plan.js?v=7';
+import { T, scrawlTexture, rng } from './surfaces.js?v=7';
 
 const V3 = THREE.Vector3;
 export const LIGHT = { A: { value: 1 }, B: { value: 1 }, P: { value: 0 }, S: { value: 1 }, cool: { value: new THREE.Color(0.78, 0.88, 1.0) } };
@@ -142,8 +142,8 @@ class Baker {
 }
 
 // ------------------------------------------------------------ the build
-const WALL_OF = { [Z.HALL]: 'wallWard', [Z.CAFE]: 'wallWard', [Z.LOBBY]: 'wallWard', [Z.DAY]: 'wallWard', [Z.DOOR]: 'wallWard', [Z.CELL]: 'wallCell', [Z.SHOWER]: 'wallShower', [Z.MORGUE]: 'wallMorgue', [Z.ADMIN]: 'wallOffice', [Z.SEC]: 'wallOffice', [Z.GEN]: 'wallBlock', [Z.STORE]: 'wallBlock', [Z.OUT]: 'wallBlock' };
-const FLOOR_OF = { [Z.HALL]: 'floorWard', [Z.CAFE]: 'floorWard', [Z.LOBBY]: 'floorWard', [Z.DAY]: 'floorWard', [Z.DOOR]: 'floorWard', [Z.CELL]: 'floorWard', [Z.SHOWER]: 'floorShower', [Z.MORGUE]: 'floorShower', [Z.ADMIN]: 'floorWood', [Z.SEC]: 'floorWood', [Z.GEN]: 'floorConcrete', [Z.STORE]: 'floorConcrete', [Z.OUT]: 'floorConcrete' };
+const WALL_OF = { [Z.HALL]: 'wallWard', [Z.CAFE]: 'wallWard', [Z.LOBBY]: 'wallWard', [Z.DAY]: 'wallWard', [Z.DOOR]: 'wallWard', [Z.CELL]: 'wallCell', [Z.SHOWER]: 'wallShower', [Z.MORGUE]: 'wallMorgue', [Z.ADMIN]: 'wallOffice', [Z.SEC]: 'wallOffice', [Z.GEN]: 'wallBlock', [Z.STORE]: 'wallBlock', [Z.OUT]: 'wallBlock', [Z.CHAPEL]: 'wallOffice', [Z.PADDED]: 'wallPadded', [Z.SURGERY]: 'wallMorgue', [Z.DORM]: 'wallWard', [Z.NURSE]: 'wallOffice', [Z.STAIR]: 'wallBlock' };
+const FLOOR_OF = { [Z.HALL]: 'floorWard', [Z.CAFE]: 'floorWard', [Z.LOBBY]: 'floorWard', [Z.DAY]: 'floorWard', [Z.DOOR]: 'floorWard', [Z.CELL]: 'floorWard', [Z.SHOWER]: 'floorShower', [Z.MORGUE]: 'floorShower', [Z.ADMIN]: 'floorWood', [Z.SEC]: 'floorWood', [Z.GEN]: 'floorConcrete', [Z.STORE]: 'floorConcrete', [Z.OUT]: 'floorConcrete', [Z.CHAPEL]: 'floorWood', [Z.PADDED]: 'floorPadded', [Z.SURGERY]: 'floorShower', [Z.DORM]: 'floorWard', [Z.NURSE]: 'floorWard', [Z.STAIR]: 'floorConcrete' };
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 export function buildAsylum(plan, scene) {
@@ -403,6 +403,8 @@ const PROPS = {
   bench: { size: [0.5, 0.5, 1.8], build(c) { c.box('wood', 0.45, 0.05, 1.8, 0, 0.45, 0); for (const s of [-1, 1]) c.box('metal', 0.4, 0.43, 0.05, 0, 0.21, s * 0.8); } },
   plant: { size: [0.5, 1.2, 0.5], build(c) { c.cyl('porcelain', 0.22, 0.16, 0.4, 0, 0.2, 0, null, 12); for (let i = 0; i < 6; i++) c.box('black', 0.02, 0.6 + c.R() * 0.3, 0.02, 0, 0.6, 0, 1, RZ((c.R() - 0.5) * 0.9).multiply(RX((c.R() - 0.5) * 0.9))); } },
   desk: { size: [1.6, 0.8, 0.8], build(c) { c.box('wood', 1.6, 0.05, 0.8, 0, 0.75, 0); c.box('wood', 0.45, 0.72, 0.75, 0.55, 0.36, 0); c.box('wood', 0.05, 0.72, 0.75, -0.77, 0.36, 0); c.box('paper', 0.3, 0.01, 0.22, -0.2, 0.78, 0.1, 1, RY(0.3)); c.cyl('metal', 0.08, 0.1, 0.03, 0.5, 0.79, -0.2, null, 10); c.cyl('metal', 0.012, 0.012, 0.35, 0.5, 0.95, -0.2, RZ(0.4), 6); c.cyl('lampshade', 0.05, 0.12, 0.12, 0.42, 1.12, -0.2, null, 10); } },
+  cross: { size: [1.0, 1.6, 0.12], snap: true, solid: false, build(c) { c.box('wood', 0.12, 1.6, 0.08, 0, 1.6, 0); c.box('wood', 0.9, 0.12, 0.08, 0, 2.0, 0); } },
+  ivstand: { size: [0.4, 1.9, 0.4], solid: false, build(c) { c.cyl('metal', 0.012, 0.012, 1.85, 0, 0.93, 0, null, 6); for (let i = 0; i < 4; i++) c.box('metal', 0.32, 0.02, 0.02, 0, 0.04, 0, 1, RY(i * Math.PI / 4)); c.box('metal', 0.3, 0.015, 0.015, 0, 1.84, 0); c.box('sheet', 0.1, 0.16, 0.04, 0.12, 1.7, 0, 1); c.cyl('rubber', 0.004, 0.004, 0.9, 0.12, 1.15, 0.05, RX(0.1), 4); } },
   trolley: { size: [0.6, 0.9, 1.0], tip: new THREE.Matrix4().makeTranslation(0, 0.3, 0).multiply(RZ(Math.PI / 2)).multiply(new THREE.Matrix4().makeTranslation(0, -0.3, 0)), build(c) { for (const y of [0.25, 0.85]) c.box('metal', 0.56, 0.02, 0.95, 0, y, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) c.box('metal', 0.02, 0.85, 0.02, sx * 0.27, 0.43, sz * 0.46); for (let i = 0; i < 4; i++) c.box(i % 2 ? 'porcelain' : 'metal', 0.08, 0.04, 0.2, -0.15 + i * 0.1, 0.88, -0.2 + (i % 3) * 0.2); } },
 };
 // a few colour-only materials props refer to

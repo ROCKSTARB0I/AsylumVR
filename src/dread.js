@@ -5,7 +5,7 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=6';
+import { Score } from './score.js?v=7';
 
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
@@ -116,6 +116,17 @@ export class Sound {
       else if (what === 'attack') this.voiceSynth(p, { f0: 160, f1: 120, dur: 0.4, vowels: ['uh'], gain: 0.7, rough: 0.3 });
       else if (what === 'pant') this.breathAt(p, 0.25, 0.7, 500);
       else if (what === 'lost') this.syllables(p, 5, 125, { gain: 0.4 });
+    } else if (kind === 'orderly') {
+      if (what === 'idle' || what === 'lost') {   // Pell whistles on his rounds: a cheerful tune that never resolves
+        const tune = [0, 4, 7, 12, 11, 7, 4, 5, 4, 2, 0, -1]; let d = 0;
+        for (let i = 0; i < 9; i++) { const n = tune[(i + (what === 'lost' ? 4 : 0)) % tune.length]; const dur = i % 3 === 2 ? 0.42 : 0.2; const f = 1180 * Math.pow(2, n / 12); this.tone(p, { f, f2: f * 1.01, dur, gain: 0.09, type: 'sine', a: 0.03, delay: d, verb: 0.55 }); this.burst(p, { f: f * 1.02, q: 18, dur, gain: 0.04, delay: d, verb: 0.5 }); d += dur + 0.04; }
+      } else if (what === 'alert') this.voiceSynth(p, { f0: 140, f1: 190, dur: 0.6, vowels: ['m', 'uh'], gain: 0.5, breath: 0.3 });
+      else if (what === 'chase') {   // "rise and shine!" in a sing-song, then a laugh
+        let d = 0; for (const [f0, v1, v2, dur] of [[190, 'a', 'i', 0.22], [210, 'i', 'i', 0.12], [260, 'e', 'a', 0.16], [240, 'a', 'i', 0.4]]) { this.voiceSynth(p, { f0, f1: f0 * 1.1, dur, vowels: [v1, v2], gain: 0.8, rough: 0.35, breath: 0.2, delay: d, a: 0.02 }); d += dur + 0.05; }
+        for (let i = 0; i < 5; i++) this.voiceSynth(p, { f0: 230 - i * 10, dur: 0.11, vowels: ['a'], gain: 0.55, breath: 0.6, rough: 0.4, delay: d + 0.15 + i * 0.15, a: 0.01 });
+      }
+      else if (what === 'attack') this.voiceSynth(p, { f0: 200, f1: 150, dur: 0.4, vowels: ['a', 'uh'], gain: 0.8, rough: 0.6 });
+      else if (what === 'pant') this.breathAt(p, 0.3, 0.6, 520);
     } else if (kind === 'rocker') {
       if (what === 'mutter') this.syllables(p, 4 + ((Math.random() * 5) | 0), rnd(100, 160), { gain: 0.3, breath: 0.5, verb: 0.5 });
       else if (what === 'scream') this.voiceSynth(p, { f0: rnd(500, 700), f1: rnd(800, 1000), dur: 1.3, vowels: ['a', 'i', 'e'], rough: 0.5, breath: 0.3, gain: 0.9, vib: 7, vibD: 0.04 });
@@ -304,7 +315,8 @@ Sound.prototype.record = async function (onProgress) {
   const rec = { one: {}, music: {}, amb: null, fear: null }; const jobs = [];
   const one = (key, dur, n, fn) => { for (let i = 0; i < n; i++) jobs.push(async () => { const b = await render(dur, fn, noiseBuf, brownBuf); (rec.one[key] ||= []).push(b); }); };
   // music: four bars of each theme, plus the sting when a chase starts
-  for (const kind of ['brute', 'surgeon', 'patient', 'eater']) jobs.push(async () => {
+  const musicKinds = ['brute', 'surgeon', 'patient', 'eater', 'orderly'];
+  for (const kind of musicKinds) jobs.push(async () => {
     const len = Score.loopSeconds(kind, 4); const b = await render(len + 2.5, (s) => { const sc = new Score(s); sc.renderLoop(kind, 4); }, noiseBuf, brownBuf, 1); rec.music[kind] = foldLoop(b, len);
   });
   jobs.push(async () => { rec.one['hitIn'] = [await render(2.2, (s) => { const sc = new Score(s); sc.bus.gain.value = 0.62; sc.hitIn(0.02); }, noiseBuf, brownBuf, 1)]; });
@@ -312,7 +324,7 @@ Sound.prototype.record = async function (onProgress) {
   jobs.push(async () => { const b = await render(14, (s) => { Sound.prototype.ambience.call(s); s.fearG.gain.value = 0; }, noiseBuf, brownBuf, 1); rec.amb = foldLoop(b, 12); });
   jobs.push(async () => { const b = await render(7, (s) => { Sound.prototype.ambience.call(s); s.droneG.gain.value = 0; s.fearG.gain.value = 0.05; }, noiseBuf, brownBuf, 1); rec.fear = foldLoop(b, 5); });
   // voices
-  const VO = { brute: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], surgeon: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], rocker: ['mutter', 'scream'], eater: ['chew', 'chase', 'alert', 'attack', 'pant'], patient: ['idle', 'chase', 'alert', 'attack', 'pant', 'lost'] };
+  const VO = { orderly: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], brute: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], surgeon: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], rocker: ['mutter', 'scream'], eater: ['chew', 'chase', 'alert', 'attack', 'pant'], patient: ['idle', 'chase', 'alert', 'attack', 'pant', 'lost'] };
   for (const [kind, whats] of Object.entries(VO)) for (const w of whats) one(`v:${kind}:${w}`, w === 'idle' || w === 'mutter' ? 4.6 : 2.2, w === 'idle' ? 1 : 2, (s) => ORIG.voice.call(s, kind, w, V0));
   for (const k of ['sting', 'scare']) one('j:' + k, 2.6, k === 'scare' ? 3 : 2, (s) => ORIG.jump.call(s, k));
   one('kill', 3, 2, (s) => ORIG.kill.call(s)); one('rip', 2.6, 2, (s) => ORIG.lockerRip.call(s));
@@ -323,7 +335,7 @@ Sound.prototype.record = async function (onProgress) {
   for (const m of [0, 1]) for (const k of ['open', 'close', 'slam']) one(`d:${m}:${k}`, 1.4, 1, (s) => ORIG.door.call(s, { metal: !!m }, k, 0, 0));
   one('whisper', 2.2, 2, (s) => ORIG.syllables.call(s, null, 5, 95, { breath: 0.92, gain: 0.3, verb: 0.3 })); one('mutter', 1.8, 2, (s) => ORIG.mutter.call(s));
   // the beds and the music first: the game can start as soon as those exist
-  const core = jobs.splice(0, 7); await Promise.all(core.map((j) => j().catch(() => {})));
+  const core = jobs.splice(0, musicKinds.length + 3); await Promise.all(core.map((j) => j().catch(() => {})));
   this.rec = rec; if (onProgress) onProgress(1);
   if (this.on && !this.droneLoop) this.swapAmbience();
   // the rest a couple at a time in the background (anything not ready yet is synthesized live)

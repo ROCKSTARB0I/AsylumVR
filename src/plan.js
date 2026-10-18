@@ -6,13 +6,18 @@ export const H = 3.2;          // ceiling height
 export const W = 49, D = 41;   // grid size (x, y). y grows south (+z)
 
 // zone codes. 0 is solid wall.
-export const Z = { SOLID: 0, HALL: 1, CELL: 2, CAFE: 3, SHOWER: 4, MORGUE: 5, ADMIN: 6, LOBBY: 7, GEN: 8, DAY: 9, STORE: 10, SEC: 11, DOOR: 12, OUT: 13 };
-export const ZNAME = ['', 'Corridor', 'Patient Cell', 'Cafeteria', 'Showers', 'Morgue', 'Administration', 'Lobby', 'Generator Room', 'Day Room', 'Storage', 'Security', 'Door', 'Courtyard'];
+export const Z = { SOLID: 0, HALL: 1, CELL: 2, CAFE: 3, SHOWER: 4, MORGUE: 5, ADMIN: 6, LOBBY: 7, GEN: 8, DAY: 9, STORE: 10, SEC: 11, DOOR: 12, OUT: 13, CHAPEL: 14, PADDED: 15, SURGERY: 16, DORM: 17, NURSE: 18, STAIR: 19 };
+export const ZNAME = ['', 'Corridor', 'Patient Cell', 'Cafeteria', 'Showers', 'Morgue', 'Administration', 'Lobby', 'Generator Room', 'Day Room', 'Storage', 'Security', 'Door', 'Courtyard', 'Chapel', 'Padded Cell', 'Surgical Theater', 'Dormitory', 'Nurses\' Station', 'Stairwell'];
 
 export const cx = (x) => (x + 0.5) * C;
 export const cz = (y) => (y + 0.5) * C;
+import { makePlan2 } from './plan2.js?v=7';
 
-export function makePlan() {
+export function makePlan(tape = 1) {
+  if (tape === 2) return makePlan2();
+  return makePlan1();
+}
+function makePlan1() {
   const g = new Uint8Array(W * D);
   const win = new Uint8Array(W * D);          // window in this wall cell
   const rect = (x0, y0, x1, y1, z) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) g[y * W + x] = z; };
@@ -75,16 +80,16 @@ export function makePlan() {
   L(16, 31, 'S', { col: 0x8fff9a, i: 0.25, r: 4, kind: 'monitor' });   // security monitors glow
   L(36, 31.5, 'S', { col: 0xffb060, i: 0.55, r: 5, kind: 'lamp' });    // desk lamp on a battery
   // moonlight in through the windows
-  for (const x of [6, 10, 14, 18]) L(x, 2.2, 'S', { col: 0x7088c0, i: 0.6, r: 7, kind: 'none', y: 2.2, dir: [0, -0.5, 1] });
-  L(38.2, 31, 'S', { col: 0x7088c0, i: 0.55, r: 6, kind: 'none', y: 2.1, dir: [-1, -0.5, 0] });
-  L(38.2, 33, 'S', { col: 0x7088c0, i: 0.45, r: 6, kind: 'none', y: 2.1, dir: [-1, -0.5, 0] });
-  L(21, 36.2, 'S', { col: 0x7088c0, i: 0.4, r: 6, kind: 'none', y: 2.1, dir: [0, -0.5, -1] });
-  L(30, 36.2, 'S', { col: 0x7088c0, i: 0.4, r: 6, kind: 'none', y: 2.1, dir: [0, -0.5, -1] });
-  L(46.2, 12, 'S', { col: 0x7088c0, i: 0.35, r: 6, kind: 'none', y: 2.1, dir: [-1, -0.5, 0] });
+  for (const x of [6, 10, 14, 18]) L(x, 2.2, 'S', { col: 0x7088c0, i: 0.6, r: 7, kind: 'none', dir: [0, -0.5, 1] });
+  L(38.2, 31, 'S', { col: 0x7088c0, i: 0.55, r: 6, kind: 'none', dir: [-1, -0.5, 0] });
+  L(38.2, 33, 'S', { col: 0x7088c0, i: 0.45, r: 6, kind: 'none', dir: [-1, -0.5, 0] });
+  L(21, 36.2, 'S', { col: 0x7088c0, i: 0.4, r: 6, kind: 'none', dir: [0, -0.5, -1] });
+  L(30, 36.2, 'S', { col: 0x7088c0, i: 0.4, r: 6, kind: 'none', dir: [0, -0.5, -1] });
+  L(46.2, 12, 'S', { col: 0x7088c0, i: 0.35, r: 6, kind: 'none', dir: [-1, -0.5, 0] });
   // candles the patients keep
-  L(5, 15.5, 'S', { col: 0xff9a40, i: 0.45, r: 3.5, kind: 'candle', y: 0.25 });
-  L(21, 22, 'S', { col: 0xff9a40, i: 0.45, r: 3.5, kind: 'candle', y: 0.25 });
-  L(30, 25.4, 'S', { col: 0xff9a40, i: 0.5, r: 4, kind: 'candle', y: 0.9 });
+  L(5, 15.5, 'S', { col: 0xff9a40, i: 0.45, r: 3.5, kind: 'candle', h: 0.25 });
+  L(21, 22, 'S', { col: 0xff9a40, i: 0.45, r: 3.5, kind: 'candle', h: 0.25 });
+  L(30, 25.4, 'S', { col: 0xff9a40, i: 0.5, r: 4, kind: 'candle', h: 0.9 });
   // broken fluorescents that stutter
   L(13, 18.5, 'A', { col: 0xcfe8ff, i: 1.0, r: 8, kind: 'tube' });
   L(24.5, 10, 'B', { col: 0xcfe8ff, i: 1.0, r: 8, kind: 'tube' });
@@ -186,5 +191,5 @@ export function makePlan() {
   ];
 
   const at = (x, y) => (x < 0 || y < 0 || x >= W || y >= D) ? 0 : g[y * W + x];
-  return { g, win, at, doors, gate, lamps, props, gore, items, generator, panel, start, brute, surgeon, inmates };
+  return { tape: 1, g, win, at, doors, gate, lamps, props, gore, items, generator, panel, start, brute, surgeon, inmates };
 }
