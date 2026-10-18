@@ -2,23 +2,23 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=7';
-import { buildSurfaces, T } from './surfaces.js?v=7';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=7';
-import { Doors } from './doors.js?v=7';
-import { Space } from './space.js?v=7';
-import { Input } from './input.js?v=7';
-import { Walker } from './walker.js?v=7';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=7';
-import { makeTape, makeVeil } from './tape.js?v=7';
-import { Slate } from './slate.js?v=7';
-import * as STORY1 from './story.js?v=7';
-import * as TAPE2 from './tape2.js?v=7';
-import { Sound } from './dread.js?v=7';
-import { Horrors } from './horrors.js?v=7';
-import { Dressing } from './dressing.js?v=7';
-import { Scares } from './scares.js?v=7';
-import { makeHand } from './hands.js?v=7';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=8';
+import { buildSurfaces, T } from './surfaces.js?v=8';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=8';
+import { Doors } from './doors.js?v=8';
+import { Space } from './space.js?v=8';
+import { Input } from './input.js?v=8';
+import { Walker } from './walker.js?v=8';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=8';
+import { makeTape, makeVeil } from './tape.js?v=8';
+import { Slate } from './slate.js?v=8';
+import * as STORY1 from './story.js?v=8';
+import * as TAPE2 from './tape2.js?v=8';
+import { Sound } from './dread.js?v=8';
+import { Horrors } from './horrors.js?v=8';
+import { Dressing } from './dressing.js?v=8';
+import { Scares } from './scares.js?v=8';
+import { makeHand } from './hands.js?v=8';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -221,9 +221,9 @@ function use(o) {
   else if (o.kind === 'hide') { horrors.sawHide(o.h); walker.hide(o.h); sound.locker(true, o.h.k); say('hide', 0.3); }
   else if (o.kind === 'item') {
     const it = o.im.it; G.items.add(it.id); o.im.m.visible = false;
-    if (it.k === 'fuse') { G.fuses++; sound.pickup('fuse'); say(['', 'fuse1', 'fuse2', 'fuse3'][G.fuses], 0, true); checkpoint(); }
+    if (it.k === 'fuse') { G.fuses++; sound.pickup('fuse'); say(['', 'fuse1', 'fuse2', 'fuse3'][G.fuses], 0, true); checkpoint(); saveGame(); }
     else if (it.k === 'battery') { cam.spares = Math.min(6, cam.spares + 1); sound.pickup('battery'); say('battery', 0.4); }
-    else if (it.k === 'card' || it.k === 'chapelKey' || it.k === 'stairKey') { sound.pickup('fuse'); say(it.k, 0, true); checkpoint(); }
+    else if (it.k === 'card' || it.k === 'chapelKey' || it.k === 'stairKey') { sound.pickup('fuse'); say(it.k, 0, true); checkpoint(); saveGame(); }
     else { G.notes.push(it.id); read(it.id); sound.pickup('paper'); }
   } else if (o.kind === 'gen') {
     if (!G.power && G.fuses >= 3) { G.power = true; sound.generator(genPos); horrors.powerOn(genPos); scares.powerOn(); setTimeout(() => say('power', 0, true), 2600); checkpoint(); }
@@ -259,10 +259,36 @@ let objShown = -1, objT = 0;
 function objectiveText() { const o = OBJECTIVES[G.obj]; if (!o) return ''; return typeof o.text === 'function' ? o.text(G) : o.text; }
 function updateObjectives(dt) {
   while (G.obj < OBJECTIVES.length && OBJECTIVES[G.obj].done(G)) G.obj++;
+  if (G.obj !== lastObj) { const moved = G.obj > lastObj; lastObj = G.obj; if (moved && G.playing && G.obj < OBJECTIVES.length) { checkpoint(); saveGame(); } }
   const txt = objectiveText();
   if (objShown !== G.obj || $('objective').dataset.t !== txt) { objShown = G.obj; $('objective').dataset.t = txt; $('objective').textContent = txt; $('objective').hidden = !txt; $('objective').style.opacity = 1; objT = 7; cam.paintOSD(true, txt); }
   objT -= dt; if (objT < 0) $('objective').style.opacity = 0;
 }
+
+// ---------------------------------------------------------------- autosave
+// Saved to this browser every time you collect a fuse, a key or the keycard, and whenever the objective moves on.
+const SAVE_KEY = 'asylumvr_save_t' + TAPE;
+function readSave() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { return null; } }
+function saveGame() {
+  if (!G.playing || !walker.alive || G.escaped) return;
+  const ck = G.checkpoint || { pos: walker.pos, yaw: walker.yaw };
+  const data = { v: 1, tape: TAPE, at: Date.now(), pos: [ck.pos.x, ck.pos.z], yaw: ck.yaw, items: [...G.items], notes: G.notes, fuses: G.fuses, power: G.power, gateOpen: G.gateOpen,
+    leftAdmin: G.leftAdmin, sawPanel: G.sawPanel, sawStairs: !!G.sawStairs, strapped: !!G.strapped, obj: G.obj, deaths: G.deaths, t: G.t, said: [...G.said], scares: [...scares.done],
+    unlocked: doors.list.filter((d) => d.lock && !d.locked).map((d) => [d.x, d.y]) };
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { return; }
+  $('saved').classList.remove('on'); void $('saved').offsetWidth; $('saved').classList.add('on'); cam.saveFlash = cam.clock + 2.5; cam.paintOSD(true, '');
+}
+function applySave(d) {
+  for (const k of ['fuses', 'power', 'gateOpen', 'leftAdmin', 'sawPanel', 'sawStairs', 'strapped', 'obj', 'deaths', 't']) if (d[k] !== undefined) G[k] = d[k];
+  G.items = new Set(d.items || []); G.notes = d.notes || []; G.said = new Set(d.said || []);
+  for (const id of d.scares || []) scares.done.add(id);
+  for (const im of itemMeshes) if (G.items.has(im.it.id)) im.m.visible = false;
+  for (const [x, y] of d.unlocked || []) { const dd = doors.at(x, y); if (dd) dd.locked = false; }
+  if (G.power) { sound.generator(genPos); }
+  if (G.gateOpen && gateMesh) { gateMesh.position.y = 2.9; space.gateBox = null; }
+  walker.place(d.pos[0], d.pos[1], d.yaw); checkpoint(); horrors.reset();
+}
+let lastObj = 0;
 
 // ---------------------------------------------------------------- checkpoints
 function checkpoint() {
@@ -293,17 +319,24 @@ $('smooth').onchange = (e) => { S.smooth = e.target.checked; save(); };
 document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && G.playing && !renderer.xr.isPresenting && !G.reading && !G.paused && input.hadLock) setPaused(true); if (document.pointerLockElement) input.hadLock = true; });
 
 // ---------------------------------------------------------------- start
-async function begin(vr) {
+async function begin(vr, cont = false) {
   if (!sound.rec) { $('loading').textContent = 'Recording sounds…'; await Promise.race([recording, new Promise((r) => { const iv = setInterval(() => { if (sound.rec) { clearInterval(iv); r(); } }, 100); })]); }
   sound.init(); await sound.ready;
   $('screen').hidden = true; G.playing = true; fade = 1; fadeTo(0);
   walker.place(cx(plan.start.x), cz(plan.start.y), plan.start.yaw); checkpoint();
-  if (tapeLogic) tapeLogic.start();
+  const sv = cont ? readSave() : null;
+  if (sv) { applySave(sv); lastObj = G.obj; caption('Tape resumed.', 2.5); }
+  else if (tapeLogic) tapeLogic.start();
   if (!vr) { input.wantLock = true; $('dot').classList.add('on'); try { const r = canvas.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
-  if (!tapeLogic) setTimeout(() => say('start'), 1500);
+  if (!tapeLogic && !sv) setTimeout(() => say('start'), 1500);
   setTimeout(() => { if (!cam.nv && !G.strapped) caption(vr ? 'Left trigger: night vision' : 'F: night vision · right mouse: zoom'); }, 6000);
 }
-$('playDesktop').onclick = () => begin(false);
+const hasSave = !!readSave();
+$('playDesktop').onclick = () => begin(false, hasSave);
+if (hasSave) {
+  $('playDesktop').textContent = 'Continue on desktop'; $('enterVR').textContent = 'Continue in VR';
+  const nb = document.createElement('button'); nb.textContent = 'New game'; nb.onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); }; $('menu').insertBefore(nb, $('howBtn'));
+}
 {
   const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4${TAPE === 2 ? ' &middot; The Male Ward' : ''}`;
   {   // both tapes are always selectable
@@ -322,7 +355,7 @@ vrBtn.onclick = async () => {
     await renderer.xr.setSession(s); veil.mesh.visible = true;
     s.addEventListener('visibilitychange', () => sound.wake && sound.wake()); s.addEventListener('selectstart', () => sound.wake && sound.wake());
     s.addEventListener('end', () => { veil.mesh.visible = false; capSlate.mesh.visible = false; });
-    begin(true);
+    begin(true, hasSave);
   } catch (e) { $('vrNote').textContent = 'Could not start VR: ' + e.message; }
 };
 nvifyScene(); setInterval(nvifyScene, 3000);
@@ -466,6 +499,7 @@ function ending() {
   setTimeout(() => {
     G.playing = false; $('screen').hidden = false;
     document.querySelector('.osd-top .play').innerHTML = '&#9632;&#xFE0E; STOP';
+    try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
     try { localStorage.setItem('asylumvr_tapes', String(Math.min(2, Math.max(unlocked, TAPE + 1)))); } catch (e) {}
     if (TAPE === 2) document.querySelector('.vhs').innerHTML = TAPE2.ENDING(G, timecode);
     else document.querySelector('.vhs').innerHTML = `<div class="end"><p class="kicker">Mount Harrow State Asylum</p><h1 class="logo">END OF TAPE 1</h1><p class="lede">The gate rose. The courtyard was full of patients, standing in the rain, waiting.<br>None of them were looking at the gate. They were looking at the north building.<br>Somebody behind you said your name.</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${Object.keys(NOTES).length} · Time ${timecode(G.t).slice(3, 8)}</p><nav class="menu"><button onclick="location.href='?tape=2'">Play Tape 2: The Male Ward</button><button onclick="location.href='?tape=1'">Rewind</button></nav></div>`;

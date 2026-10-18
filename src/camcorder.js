@@ -3,7 +3,7 @@
 // raise it to your eye (right mouse / Q); in VR it is in your left hand
 // with its flip-out screen showing what it sees.
 import * as THREE from '../vendor/three.module.js';
-import { makeScreenMaterial } from './tape.js?v=7';
+import { makeScreenMaterial } from './tape.js?v=8';
 
 export const EYE_LAYER = 5;   // things only the camcorder sees (eye-shine)
 
@@ -79,6 +79,7 @@ export class Camcorder {
     // corner brackets
     c.strokeStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = 2; const m = 14, L = 22;
     for (const [x, y, sx, sy] of [[m, m + 44, 1, 1], [w - m, m + 44, -1, 1], [m, h - m - 46, 1, -1], [w - m, h - m - 46, -1, -1]]) { c.beginPath(); c.moveTo(x, y + sy * L); c.lineTo(x, y); c.lineTo(x + sx * L, y); c.stroke(); }
+    if (this.saveFlash && this.clock < this.saveFlash) { c.font = 'bold 18px "Courier New", monospace'; c.fillStyle = '#fff'; c.fillText('\u25CF SAVED', w / 2 - 50, 22); }
     if (objective) { c.font = '14px "Courier New", monospace'; c.fillStyle = 'rgba(255,255,255,0.85)'; c.fillText(objective.slice(0, 44), 22, 50); }
     this.osdTex.needsUpdate = true;
   }

@@ -4,9 +4,9 @@
 // damp hanging in the beams, water dripping from the ceiling, steam in
 // the showers.
 import * as THREE from '../vendor/three.module.js';
-import { C, H, cx, cz } from './plan.js?v=7';
-import { makeBody, pose } from './carcass.js?v=7';
-import { rng } from './surfaces.js?v=7';
+import { C, H, cx, cz } from './plan.js?v=8';
+import { makeBody, pose } from './carcass.js?v=8';
+import { rng } from './surfaces.js?v=8';
 
 const V = THREE.Vector3;
 
