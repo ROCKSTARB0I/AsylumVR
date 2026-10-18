@@ -14,7 +14,7 @@
 // Self-update: GitHub Pages caches this page for a few minutes, so a stale copy can load old scripts.
 // Ask for the current version (never cached) and, if it's newer than this page, reload past the cache.
 (function () {
-  var BUILD = 11;
+  var BUILD = 13;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v > BUILD) { var q = new URLSearchParams(location.search); if (q.get('build') === String(j.v)) return; q.set('build', j.v); location.replace(location.pathname + '?' + q.toString()); }
@@ -22,7 +22,7 @@
   } catch (e) {}
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 <canvas id="view" tabindex="0"></canvas>
@@ -65,7 +65,13 @@
       <button id="playDesktop">Play on desktop</button>
       <button id="selectBtn">Select tape</button>
       <button id="howBtn">How to play</button>
+      <button id="resetBtn" class="reset">Reset progress</button>
     </nav>
+    <div class="confirm" id="confirm" hidden>
+      <p class="shelfTitle">&#9632;&#xFE0E; ERASE ALL TAPES?</p>
+      <p class="confirmSub">Are you sure? This erases every save and unlocked tape. It can't be undone.</p>
+      <nav class="menu"><button id="resetYes">Yes, erase</button><button id="resetNo">No</button></nav>
+    </div>
     <div class="shelf" id="shelf" hidden>
       <p class="shelfTitle">&#9654;&#xFE0E; SELECT TAPE</p>
       <div class="tapes" id="tapes"></div>
@@ -82,6 +88,6 @@
   <div class="osd-bot"><span class="date">OCT.17 1993</span><span class="clock">2:13 AM</span></div>
 </div>
 
-<script type="module" src="src/main.js?v=11"></script>
+<script type="module" src="src/main.js?v=13"></script>
 </body>
 </html>

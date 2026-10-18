@@ -96,7 +96,12 @@ button:hover:not(:disabled), button:focus-visible { border-color: var(--red); co
 .tape .status.done { color: #8f8; border-color: #3a6a3a; } .tape .status.prog { color: #ffcf6a; border-color: #6a5a2a; } .tape .status.now { color: #ff6a5a; border-color: #8a2a22; }
 .tape.locked { cursor: default; opacity: 0.45; filter: grayscale(1); }
 .tape.loaded { border-color: #8a2a22; }
-.menu[hidden], .shelf[hidden] { display: none !important; }
+.menu[hidden], .shelf[hidden], .confirm[hidden] { display: none !important; }
+.menu button.reset { margin-top: 18px; font-size: clamp(18px, 2.2vw, 24px); color: #b9584e; }
+.menu button.reset:hover, .menu button.reset:focus-visible { background: #b9584e; color: #000; }
+.confirm { margin-top: 6px; }
+.confirmSub { font-size: clamp(18px, 2.2vw, 24px); color: #d8d2c6; margin: 0 0 14px; text-shadow: 0 0 6px #000; max-width: 34em; }
+#resetYes:hover, #resetYes:focus-visible { background: #b9584e; }
 .vhs.selecting .kicker { display: none; }
 .vhs.selecting .logo { font-size: clamp(34px, 6vw, 56px); margin-bottom: 10px; }
 @media (max-height: 640px) { .tapes { gap: 6px; } .tape { padding: 6px 10px; } .tape .reels i { width: 24px; height: 24px; } .tape .label { padding: 4px 10px; } .tape .label small { font-size: 14px; } .vhs.selecting .logo { display: none; } .shelfTitle { margin-bottom: 8px; } }
