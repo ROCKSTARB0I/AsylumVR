@@ -4,9 +4,9 @@
 // damp hanging in the beams, water dripping from the ceiling, steam in
 // the showers.
 import * as THREE from '../vendor/three.module.js';
-import { C, H, cx, cz } from './plan.js?v=17';
-import { makeBody, pose } from './carcass.js?v=17';
-import { rng } from './surfaces.js?v=17';
+import { C, H, cx, cz } from './plan.js?v=18';
+import { makeBody, pose } from './carcass.js?v=18';
+import { rng } from './surfaces.js?v=18';
 
 const V = THREE.Vector3;
 
@@ -60,7 +60,8 @@ export class Dressing {
     }
     for (const b of this.dead) b.mat.userData.uAmb.value.copy(world.lightAt(b.root.position.x, b.root.position.z));
     for (const g of this.mats) g.m.userData.uAmb.value.copy(world.lightAt(g.x, g.z));
-    this.motes(); this.drips(plan); this.steam(plan);
+    if (plan.tape !== 3) { this.motes(); this.drips(plan); this.steam(plan); }   // (in 1989 the roof didn't leak yet)
+    else this.steamS = [];
   }
   addFlies(at) {
     const n = 26; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));

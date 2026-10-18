@@ -2,7 +2,7 @@
 // canvases at load time (tile, plaster, linoleum, concrete, rust, blood,
 // mattress stains, scrawl), with a matching normal map from its height.
 import * as THREE from '../vendor/three.module.js';
-import { picture, keepPicture, keptData, keepData } from './keep.js?v=17';
+import { picture, keepPicture, keptData, keepData } from './keep.js?v=18';
 
 // ---------------------------------------------------------------- noise
 function hash(x, y, s) { let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
@@ -25,6 +25,7 @@ class Paint {
   mix(i, r, g, b, t) { const c = this.c; c[i * 3] += (r - c[i * 3]) * t; c[i * 3 + 1] += (g - c[i * 3 + 1]) * t; c[i * 3 + 2] += (b - c[i * 3 + 2]) * t; }
   // grime that pools low on walls and in streaks under the ceiling
   grime(seed, amt = 1, wall = false) {
+    if (CLEAN) amt *= 0.12;
     this.each((x, y, i) => {
       const u = x / this.w, v = y / this.h;
       const n = fbm(u * 6, v * 6, seed, 5, 6);
@@ -83,17 +84,20 @@ function tiles(p, nx, ny, grout, cb) {
 // ---------------------------------------------------------------- the set
 // Wall textures span 3 m horizontally and the full 3.2 m ceiling height.
 export const T = {};
-export function buildSurfaces() {
+// Tape 3 is four years before the others: fresh paint, whole tiles, mopped floors
+let CLEAN = false;
+export function buildSurfaces(clean = false) {
+  CLEAN = clean; const K = clean ? 'texc:' : 'tex:';
   // kept from an earlier run: no painting at all
   const names = keptData('texNames');
-  if (names && names.every((n) => picture('tex:' + n + ':map')) && picture('tex:decals')) {
-    for (const n of names) T[n] = { map: tex(picture('tex:' + n + ':map')), normalMap: tex(picture('tex:' + n + ':normalMap'), false), roughnessMap: tex(picture('tex:' + n + ':roughnessMap'), false) };
+  if (names && names.every((n) => picture(K + n + ':map')) && picture('tex:decals')) {
+    for (const n of names) T[n] = { map: tex(picture(K + n + ':map')), normalMap: tex(picture(K + n + ':normalMap'), false), roughnessMap: tex(picture(K + n + ':roughnessMap'), false) };
     const t = new THREE.CanvasTexture(picture('tex:decals')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; T.decals = { tex: t, cells: keptData('decalCells') };
     return;
   }
   paintSurfaces();
   const list = Object.keys(T).filter((n) => n !== 'decals');
-  for (const n of list) for (const k of ['map', 'normalMap', 'roughnessMap']) keepPicture('tex:' + n + ':' + k, T[n][k].image);
+  for (const n of list) for (const k of ['map', 'normalMap', 'roughnessMap']) keepPicture(K + n + ':' + k, T[n][k].image);
   keepPicture('tex:decals', T.decals.tex.image); keepData('decalCells', T.decals.cells); keepData('texNames', list);
 }
 function paintSurfaces() {
@@ -109,17 +113,17 @@ function paintSurfaces() {
         const tw = S / 20, tx = Math.floor(x / tw), ty = Math.floor((y - tileTop * S) / tw);
         const fx = (x % tw) / tw, fy = (((y - tileTop * S) % tw) + tw) % tw / tw;
         const e = Math.min(fx, 1 - fx, fy, 1 - fy) * tw; const h = hash(tx, ty, 5);
-        const crack = hash(tx, ty, 9) > 0.86;
+        const crack = !CLEAN && hash(tx, ty, 9) > 0.86;
         if (e < 1.3) { p.set(i, 0.16, 0.15, 0.11); p.z[i] = 0; p.r[i] = 0.95; }
         else { const k = 0.85 + h * 0.2 + n * 0.1; p.set(i, 0.32 * k, 0.44 * k, 0.36 * k); p.z[i] = 1; p.r[i] = 0.32 + n * 0.25; }
         if (crack && Math.abs((fx - fy) * tw) < 0.8) { p.set(i, 0.1, 0.1, 0.08); p.z[i] = 0.3; }
-        if (h > 0.95 && e > 1.3) { p.set(i, 0.35, 0.33, 0.27); p.z[i] = 0.15; p.r[i] = 0.95; }    // missing tile
+        if (!CLEAN && h > 0.95 && e > 1.3) { p.set(i, 0.35, 0.33, 0.27); p.z[i] = 0.15; p.r[i] = 0.95; }    // missing tile
         if (v < tileTop + 0.025) { p.set(i, 0.12 + n * 0.05, 0.16, 0.13); p.z[i] = 1.4; p.r[i] = 0.4; }   // the dark cap row
       } else {
         const k = 0.82 + n * 0.25; p.set(i, 0.62 * k, 0.56 * k, 0.4 * k); p.z[i] = 0.6 + n * 0.1; p.r[i] = 0.85;
-        if (peel > 0.6) { const t = Math.min(1, (peel - 0.6) * 10); p.mix(i, 0.36, 0.34, 0.3, t); p.z[i] -= 0.4 * t; }       // bare plaster under the paint
+        if (CLEAN) { /* fresh paint */ } else if (peel > 0.6) { const t = Math.min(1, (peel - 0.6) * 10); p.mix(i, 0.36, 0.34, 0.3, t); p.z[i] -= 0.4 * t; }       // bare plaster under the paint
         else if (peel > 0.57) { p.mul(i, 1.12); p.z[i] += 0.2; }                                                       // curling paint edge
-        const stain = fbm(u * 3, v * 2, 21, 4, 3); if (stain > 0.62) p.mix(i, 0.42, 0.3, 0.12, (stain - 0.62) * 2.2);  // water stains
+        const stain = fbm(u * 3, v * 2, 21, 4, 3); if (!CLEAN && stain > 0.62) p.mix(i, 0.42, 0.3, 0.12, (stain - 0.62) * 2.2);  // water stains
       }
     });
     p.grime(40, 1.1, true); T.wallWard = set(p, 3);
@@ -130,10 +134,10 @@ function paintSurfaces() {
     p.each((x, y, i) => {
       const u = x / S, v = y / S, n = fbm(u * 7, v * 7, 33, 5, 7), m = fbm(u * 2, v * 2, 34, 4, 2);
       const k = 0.7 + n * 0.3; p.set(i, 0.6 * k, 0.58 * k, 0.5 * k); p.z[i] = n; p.r[i] = 0.9;
-      if (m > 0.6) p.mix(i, 0.32, 0.28, 0.18, (m - 0.6) * 2);
+      if (!CLEAN && m > 0.6) p.mix(i, 0.32, 0.28, 0.18, (m - 0.6) * 2);
     });
     // scratches: little gouges and tally groups at hand height
-    for (let s = 0; s < 260; s++) {
+    for (let s = 0; s < (CLEAN ? 0 : 260); s++) {
       const x0 = R() * S, y0 = S * (0.35 + R() * 0.45), len = 4 + R() * 26, a = -1.4 + R() * 0.4;
       for (let t = 0; t < len; t++) { const x = (x0 + Math.cos(a) * t + S) % S | 0, y = Math.min(S - 1, y0 + Math.sin(a) * t * -1) | 0; const i = y * S + x; p.mul(i, 0.55); p.z[i] -= 0.5; }
     }
@@ -149,9 +153,9 @@ function paintSurfaces() {
       p.set(i, 0.66 * k, 0.62 * k, 0.5 * k); p.z[i] = puff; p.r[i] = 0.9;
       if (d < 0.025) { p.mul(i, 0.6); p.z[i] = 0; }                                          // stitched seams
       const bx = Math.abs(qu - 0.5) + Math.abs(qv - 0.5); if (bx < 0.05) { p.mul(i, 0.45); p.z[i] = 0.2; }   // buttons
-      const st = fbm(u * 3, v * 3, seed + 1, 4, 3); if (st > 0.56) p.mix(i, 0.42, 0.32, 0.12, Math.min(0.75, (st - 0.56) * 3));
-      const tear = fbm(u * 14, v * 14, seed + 2, 3, 14); if (tear > 0.74) { p.mix(i, 0.25, 0.22, 0.16, 0.9); p.z[i] = -0.3; }   // torn open, stuffing showing
-      const bl = fbm(u * 5, v * 5, seed + 3, 4, 5); if (bl > 0.7) p.mix(i, 0.3, 0.03, 0.02, Math.min(0.85, (bl - 0.7) * 5));
+      const st = fbm(u * 3, v * 3, seed + 1, 4, 3); if (!CLEAN && st > 0.56) p.mix(i, 0.42, 0.32, 0.12, Math.min(0.75, (st - 0.56) * 3));
+      const tear = fbm(u * 14, v * 14, seed + 2, 3, 14); if (!CLEAN && tear > 0.74) { p.mix(i, 0.25, 0.22, 0.16, 0.9); p.z[i] = -0.3; }   // torn open, stuffing showing
+      const bl = fbm(u * 5, v * 5, seed + 3, 4, 5); if (!CLEAN && bl > 0.7) p.mix(i, 0.3, 0.03, 0.02, Math.min(0.85, (bl - 0.7) * 5));
     });
     p.grime(seed + 4, key === 'floorPadded' ? 1.3 : 0.9, key === 'wallPadded'); T[key] = set(p, 4);
   }
@@ -163,8 +167,8 @@ function paintSurfaces() {
       if (!inside) { p.set(i, 0.25, 0.24, 0.2); p.z[i] = 0; p.r[i] = 0.95; }
       else { const k = 0.88 + h * 0.12; p.set(i, col[0] * k, col[1] * k, col[2] * k); p.z[i] = 0.8 + inside * 0.2; p.r[i] = 0.18 + n * 0.2; }
       const mould = fbm(u * 10, v * 10, seed + 3, 5, 10) * (0.4 + v);
-      if (mould > 0.72) { p.mix(i, 0.04, 0.05, 0.03, Math.min(1, (mould - 0.72) * 6)); p.r[i] = 0.95; }
-      const rust = fbm(u * 60, v * 1.2, seed + 5, 3, 60); if (rust > 0.66 && v > 0.2) p.mix(i, 0.4, 0.18, 0.05, Math.min(0.8, (rust - 0.66) * 4));
+      if (!CLEAN && mould > 0.72) { p.mix(i, 0.04, 0.05, 0.03, Math.min(1, (mould - 0.72) * 6)); p.r[i] = 0.95; }
+      const rust = fbm(u * 60, v * 1.2, seed + 5, 3, 60); if (!CLEAN && rust > 0.66 && v > 0.2) p.mix(i, 0.4, 0.18, 0.05, Math.min(0.8, (rust - 0.66) * 4));
     });
     p.grime(seed + 1, 0.8, true); T[key] = set(p, 2.5);
   }
@@ -177,7 +181,7 @@ function paintSurfaces() {
       else {
         const stripe = Math.sin(u * Math.PI * 2 * 12) > 0.6 ? 1 : 0; const flower = fbm(u * 24, v * 24, 72, 2, 24) > 0.62 ? 1 : 0;
         p.set(i, 0.5 - stripe * 0.06 - flower * 0.08, 0.46 - stripe * 0.05 - flower * 0.1, 0.34 - stripe * 0.02); p.mul(i, 0.8 + n * 0.3); p.z[i] = 0.5; p.r[i] = 0.9;
-        const peel = fbm(u * 4, v * 4, 73, 4, 4); if (peel > 0.63) { p.mix(i, 0.38, 0.34, 0.28, 0.9); p.z[i] = 0.3; }
+        const peel = fbm(u * 4, v * 4, 73, 4, 4); if (!CLEAN && peel > 0.63) { p.mix(i, 0.38, 0.34, 0.28, 0.9); p.z[i] = 0.3; }
       }
     });
     p.grime(74, 1, true); T.wallOffice = set(p, 2.5);
@@ -203,8 +207,8 @@ function paintSurfaces() {
       const dark = (tx + ty) % 2 === 0; const k = 0.8 + n * 0.3;
       if (dark) p.set(i, 0.2 * k, 0.19 * k, 0.15 * k); else p.set(i, 0.56 * k, 0.53 * k, 0.43 * k);
       p.z[i] = inside ? 0.8 : 0.4; p.r[i] = 0.45 + n * 0.3;
-      if (h > 0.9) { const c = fbm(u * 30, v * 30, 91, 3, 30); if (c > 0.55) { p.mix(i, 0.3, 0.28, 0.24, 0.8); p.z[i] = 0.2; p.r[i] = 0.95; } }
-      const wet = fbm(u * 3, v * 3, 92, 4, 3); if (wet > 0.6) { p.r[i] = 0.12; p.mul(i, 0.75); }        // standing damp
+      if (!CLEAN && h > 0.9) { const c = fbm(u * 30, v * 30, 91, 3, 30); if (c > 0.55) { p.mix(i, 0.3, 0.28, 0.24, 0.8); p.z[i] = 0.2; p.r[i] = 0.95; } }
+      const wet = fbm(u * 3, v * 3, 92, 4, 3); if (CLEAN) p.r[i] = 0.3; else if (wet > 0.6) { p.r[i] = 0.12; p.mul(i, 0.75); }        // standing damp
     });
     p.grime(93, 1.2); T.floorWard = set(p, 2);
   }
@@ -213,7 +217,7 @@ function paintSurfaces() {
     p.each((x, y, i) => {
       const u = x / S, v = y / S, n = fbm(u * 10, v * 10, 100, 6, 10), b = fbm(u * 3, v * 3, 101, 4, 3);
       const k = 0.5 + n * 0.3; p.set(i, 0.42 * k, 0.41 * k, 0.38 * k); p.z[i] = n; p.r[i] = 0.85;
-      if (b > 0.62) { p.mix(i, 0.06, 0.05, 0.04, (b - 0.62) * 2.5); p.r[i] = 0.3; }
+      if (!CLEAN && b > 0.62) { p.mix(i, 0.06, 0.05, 0.04, (b - 0.62) * 2.5); p.r[i] = 0.3; }
     });
     p.grime(102, 1.4); T.floorConcrete = set(p, 3);
   }
@@ -223,7 +227,7 @@ function paintSurfaces() {
       const u = x / S, v = y / S, n = fbm(u * 8, v * 8, 110, 5, 8);
       const k = 0.7 + h * 0.25; if (inside) p.set(i, 0.5 * k, 0.52 * k, 0.5 * k); else p.set(i, 0.16, 0.15, 0.12);
       p.z[i] = inside ? 0.9 : 0.2; p.r[i] = inside ? 0.12 + n * 0.15 : 0.7;
-      const w = fbm(u * 4, v * 4, 111, 4, 4); if (w > 0.55) p.mix(i, 0.25, 0.14, 0.06, Math.min(0.7, (w - 0.55) * 3));
+      const w = fbm(u * 4, v * 4, 111, 4, 4); if (!CLEAN && w > 0.55) p.mix(i, 0.25, 0.14, 0.06, Math.min(0.7, (w - 0.55) * 3));
     });
     p.grime(112, 0.9); T.floorShower = set(p, 2);
   }
@@ -233,7 +237,7 @@ function paintSurfaces() {
       const u = x / S, v = y / S; const pw = S / 24, row = Math.floor(x / pw); const g = fbm(u * 3, v * 50 + row * 3.3, 120, 4, 3);
       const k = 0.55 + g * 0.5 + hash(row, Math.floor((y + row * 37) / 128), 121) * 0.2; p.set(i, 0.35 * k, 0.21 * k, 0.11 * k);
       p.z[i] = (x % pw) < 1.2 || ((y + row * 37) % 128) < 1.2 ? 0 : 0.8; p.r[i] = 0.6;
-      const wear = fbm(u * 2, v * 2, 122, 4, 2); if (wear > 0.55) p.mix(i, 0.3, 0.25, 0.2, (wear - 0.55) * 1.5);
+      const wear = fbm(u * 2, v * 2, 122, 4, 2); if (!CLEAN && wear > 0.55) p.mix(i, 0.3, 0.25, 0.2, (wear - 0.55) * 1.5);
     });
     p.grime(123, 1); T.floorWood = set(p, 1.5);
   }
@@ -243,8 +247,8 @@ function paintSurfaces() {
       const u = x / S, v = y / S, n = fbm(u * 30, v * 30, 130, 3, 30);
       if (!inside) { p.set(i, 0.2, 0.19, 0.17); p.z[i] = 0; }
       else { const k = 0.75 + n * 0.2; p.set(i, 0.62 * k, 0.6 * k, 0.53 * k); p.z[i] = 0.7 + n * 0.3; }
-      if (h > 0.88 && inside) { p.set(i, 0.03, 0.03, 0.03); p.z[i] = -0.5; }    // a missing tile: the void above
-      const ring = fbm(u * 3, v * 3, 131, 4, 3); if (ring > 0.58) p.mix(i, 0.38, 0.25, 0.1, Math.min(0.8, (ring - 0.58) * 3));
+      if (!CLEAN && h > 0.88 && inside) { p.set(i, 0.03, 0.03, 0.03); p.z[i] = -0.5; }    // a missing tile: the void above
+      const ring = fbm(u * 3, v * 3, 131, 4, 3); if (!CLEAN && ring > 0.58) p.mix(i, 0.38, 0.25, 0.1, Math.min(0.8, (ring - 0.58) * 3));
       p.r[i] = 0.95;
     });
     p.grime(132, 0.8); T.ceiling = set(p, 2);
@@ -255,7 +259,7 @@ function paintSurfaces() {
     p.each((x, y, i) => {
       const u = x / 256, v = y / 256, n = fbm(u * 8, v * 8, 140, 5, 8), c = fbm(u * 16, v * 16, 141, 4, 16);
       p.set(i, 0.42, 0.45, 0.42); p.mul(i, 0.85 + n * 0.25); p.z[i] = 1; p.r[i] = 0.55;
-      if (c > 0.62) { p.mix(i, 0.35, 0.16, 0.06, Math.min(1, (c - 0.62) * 5)); p.z[i] = 0.6; p.r[i] = 0.9; }
+      if (!CLEAN && c > 0.62) { p.mix(i, 0.35, 0.16, 0.06, Math.min(1, (c - 0.62) * 5)); p.z[i] = 0.6; p.r[i] = 0.9; }
     });
     p.grime(142, 0.9); T.metal = set(p, 2);
   }
@@ -264,7 +268,7 @@ function paintSurfaces() {
     p.each((x, y, i) => {
       const u = x / 256, v = y / 256, g = fbm(u * 2, v * 30, 150, 4, 2), n = fbm(u * 8, v * 8, 151, 5, 8);
       p.set(i, 0.36, 0.4, 0.34); p.mul(i, 0.8 + n * 0.3); p.z[i] = 0.8 + g * 0.1; p.r[i] = 0.7;
-      const chip = fbm(u * 10, v * 10, 152, 4, 10); if (chip > 0.64) { p.mix(i, 0.3, 0.2, 0.12, 0.9); p.z[i] = 0.5; }
+      const chip = fbm(u * 10, v * 10, 152, 4, 10); if (!CLEAN && chip > 0.64) { p.mix(i, 0.3, 0.2, 0.12, 0.9); p.z[i] = 0.5; }
       const kick = v > 0.88 ? 1 : 0; if (kick) { p.mix(i, 0.4, 0.38, 0.3, 0.6); p.r[i] = 0.4; }
     });
     p.grime(153, 1.2, true); T.door = set(p, 2);
@@ -274,8 +278,8 @@ function paintSurfaces() {
     p.each((x, y, i) => {
       const u = x / 256, v = y / 256; const stripe = (x % 16) < 3; const n = fbm(u * 6, v * 6, 160, 5, 6);
       p.set(i, stripe ? 0.4 : 0.62, stripe ? 0.42 : 0.6, stripe ? 0.5 : 0.52); p.mul(i, 0.85 + n * 0.2); p.z[i] = n * 0.5; p.r[i] = 0.95;
-      const s = fbm(u * 3, v * 3, 161, 5, 3); if (s > 0.55) p.mix(i, 0.45, 0.32, 0.12, Math.min(0.8, (s - 0.55) * 3));
-      const b = fbm(u * 4, v * 4, 162, 5, 4); if (b > 0.68) p.mix(i, 0.25, 0.03, 0.02, Math.min(0.9, (b - 0.68) * 5));
+      const s = fbm(u * 3, v * 3, 161, 5, 3); if (!CLEAN && s > 0.55) p.mix(i, 0.45, 0.32, 0.12, Math.min(0.8, (s - 0.55) * 3));
+      const b = fbm(u * 4, v * 4, 162, 5, 4); if (!CLEAN && b > 0.68) p.mix(i, 0.25, 0.03, 0.02, Math.min(0.9, (b - 0.68) * 5));
     });
     T.mattress = set(p, 1);
   }
@@ -284,8 +288,8 @@ function paintSurfaces() {
     p.each((x, y, i) => {
       const u = x / 256, v = y / 256, n = fbm(u * 6, v * 6, 170, 5, 6); const weave = ((x + y) % 3 === 0) ? 0.96 : 1;
       p.set(i, 0.72 * weave, 0.72 * weave, 0.66 * weave); p.mul(i, 0.85 + n * 0.2); p.z[i] = n * 0.3; p.r[i] = 0.95;
-      const s = fbm(u * 3, v * 3, 171, 5, 3); if (s > 0.58) p.mix(i, 0.5, 0.38, 0.16, Math.min(0.7, (s - 0.58) * 3));
-      const b = fbm(u * 5, v * 5, 172, 5, 5); if (b > 0.66) p.mix(i, 0.32, 0.02, 0.01, Math.min(0.95, (b - 0.66) * 4));
+      const s = fbm(u * 3, v * 3, 171, 5, 3); if (!CLEAN && s > 0.58) p.mix(i, 0.5, 0.38, 0.16, Math.min(0.7, (s - 0.58) * 3));
+      const b = fbm(u * 5, v * 5, 172, 5, 5); if (!CLEAN && b > 0.66) p.mix(i, 0.32, 0.02, 0.01, Math.min(0.95, (b - 0.66) * 4));
     });
     T.sheet = set(p, 0.8);
   }

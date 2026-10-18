@@ -106,8 +106,12 @@ export function makeVeil() {
       void main(){ vec2 q = vUv - 0.5; float r = length(q) * 1.6;
         float g = h1(vUv * 900.0 + fract(t * 37.0) * 50.0);
         float vig = smoothstep(0.35, 1.0, r);
-        vec3 col = mix(vec3(g * 0.5), vec3(0.4, 0.0, 0.0), hurt * vig);
-        float a = 0.05 + 0.03 * fear + vig * (0.55 + hurt * 0.4);
+        // VHS: scanlines, a slow tracking band rolling up the picture, a little warm cast
+        float scan = step(0.5, fract(vUv.y * 360.0)) * 0.09;
+        float by = fract(t * 0.085); float band = (1.0 - smoothstep(0.0, 0.035, abs(vUv.y - by))) * (0.16 + 0.1 * h1(vec2(floor(vUv.x * 160.0), floor(t * 30.0))));
+        vec3 col = mix(vec3(g * 0.5) + vec3(0.03, 0.02, 0.0), vec3(g), band * 2.5);
+        col = mix(col, vec3(0.4, 0.0, 0.0), hurt * vig);
+        float a = 0.05 + scan + band + 0.03 * fear + vig * (0.55 + hurt * 0.4);
         a = max(a, fade);
         col = mix(col, vec3(g), stat); a = max(a, stat * 0.95);
         gl_FragColor = vec4(col * (1.0 - fade), a); }` });

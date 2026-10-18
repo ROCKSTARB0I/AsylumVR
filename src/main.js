@@ -2,26 +2,27 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=17';
-import { buildSurfaces, T } from './surfaces.js?v=17';
-import { loadPictures, savePictures } from './keep.js?v=17';
-import { VRMenu } from './vrmenu.js?v=17';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=17';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=17';
-import { Doors } from './doors.js?v=17';
-import { Space } from './space.js?v=17';
-import { Input } from './input.js?v=17';
-import { Walker } from './walker.js?v=17';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=17';
-import { makeTape, makeVeil } from './tape.js?v=17';
-import { Slate } from './slate.js?v=17';
-import * as STORY1 from './story.js?v=17';
-import * as TAPE2 from './tape2.js?v=17';
-import { Sound } from './dread.js?v=17';
-import { Horrors } from './horrors.js?v=17';
-import { Dressing } from './dressing.js?v=17';
-import { Scares } from './scares.js?v=17';
-import { makeHand } from './hands.js?v=17';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=18';
+import { buildSurfaces, T } from './surfaces.js?v=18';
+import { loadPictures, savePictures } from './keep.js?v=18';
+import { VRMenu } from './vrmenu.js?v=18';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=18';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=18';
+import { Doors } from './doors.js?v=18';
+import { Space } from './space.js?v=18';
+import { Input } from './input.js?v=18';
+import { Walker } from './walker.js?v=18';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=18';
+import { makeTape, makeVeil } from './tape.js?v=18';
+import { Slate } from './slate.js?v=18';
+import * as STORY1 from './story.js?v=18';
+import * as TAPE3 from './tape3.js?v=18';
+import * as TAPE2 from './tape2.js?v=18';
+import { Sound } from './dread.js?v=18';
+import { Horrors } from './horrors.js?v=18';
+import { Dressing } from './dressing.js?v=18';
+import { Scares } from './scares.js?v=18';
+import { makeHand } from './hands.js?v=18';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -31,8 +32,8 @@ try { Object.assign(S, JSON.parse(localStorage.getItem('asylumvr') || '{}')); } 
 const save = () => { try { localStorage.setItem('asylumvr', JSON.stringify(S)); } catch (e) {} };
 // which tape: ?tape=N, else the first one
 let unlocked = 1; try { unlocked = Math.max(1, +(localStorage.getItem('asylumvr_tapes') || 1)); } catch (e) {}
-const TAPE = Math.max(1, Math.min(2, +(new URLSearchParams(location.search).get('tape') || 1)));
-const STORY = TAPE === 2 ? TAPE2 : STORY1; const { NOTES, MUTTER, OBJECTIVES } = STORY;
+const TAPE = Math.max(1, Math.min(3, +(new URLSearchParams(location.search).get('tape') || 1)));
+const STORY = TAPE === 2 ? TAPE2 : TAPE === 3 ? TAPE3 : STORY1; const { NOTES, MUTTER, OBJECTIVES } = STORY;
 
 // ---------------------------------------------------------------- renderer
 const canvas = $('view');
@@ -64,7 +65,7 @@ addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); ca
 const T0 = performance.now(); const mark = (k) => (window.__boot ||= []).push([k, Math.round(performance.now() - T0)]);
 $('loading').textContent = 'Rewinding tape… painting walls';
 await loadPictures();
-buildSurfaces();
+buildSurfaces(TAPE === 3);
 const plan = makePlan(TAPE);
 $('loading').textContent = 'Rewinding tape… baking light';
 await new Promise((r) => setTimeout(r, 30));
@@ -89,8 +90,8 @@ await new Promise((r) => setTimeout(r, 30));
 const dressing = new Dressing(world, plan, scene); mark('dressing');
 const horrors = new Horrors({ scene, plan, world, space, doors, walker, cam, sound, G, camera }); mark('horrors');
 const scares = new Scares({ scene, plan, world, space, doors, walker, cam, sound, G, horrors, camera, dressing });
-if (TAPE === 2) scares.list = TAPE2.setPieces(scares); mark('scares');
-const tapeLogic = TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
+if (TAPE === 2) scares.list = TAPE2.setPieces(scares); if (TAPE === 3) { scares.list = []; scares.cool = 1e9; } mark('scares');
+const tapeLogic = TAPE === 3 ? TAPE3.setupTape3({ G, walker, plan, world, sound, horrors, doors, scene, space, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), save: () => saveGame(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
 
 // ---------------------------------------------------------------- hands
 // your own hands, empty, on the controllers' grips in VR (the camcorder is the whole view, not something you hold)
@@ -167,6 +168,10 @@ const itemMeshes = [];
       const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.006, 0.07), brass); shaft.position.z = 0.05; g.add(shaft);
       const bit = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.006, 0.012), brass); bit.position.set(0.01, 0, 0.08); g.add(bit);
       const tag = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.002, 0.05), lit(0xb8a888, 0.9)); tag.position.set(-0.03, 0, -0.03); g.add(tag);
+    } else if (k === 'tray') {
+      // a steel tray with a domed cover
+      const steel = lit(0x9a9a94, 0.35, 0.8); g.add(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.015, 0.3), steel));
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), steel); dome.scale.set(1.2, 0.8, 0.9); dome.position.y = 0.008; g.add(dome);
     } else if (k === 'battery') {
       g.add(new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.022, 0.045), lit(0x1a1a1a, 0.5)));
       const lab = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.023, 0.03), lit(0x2a5aa0, 0.4)); g.add(lab);
@@ -201,7 +206,8 @@ const gateMesh = !plan.gate ? null : (() => {
 const interactables = [];
 for (const d of doors.list) interactables.push({ kind: 'door', d, pos: () => new V(d.wx, 1.1, d.wz), r: 1.0, label: () => d.locked ? (d.lock && G.items.has(d.lock) ? 'Unlock' : d.lock && TAPE2.LOCK_NAME[d.lock] ? `Locked (needs ${TAPE2.LOCK_NAME[d.lock]})` : 'Locked') : Math.abs(d.target) > 0.2 ? 'Close door' : 'Open door' });
 for (const h of world.hides) interactables.push({ kind: 'hide', h, pos: () => h.k === 'locker' ? new V(h.x + h.fx * 0.3, 1.2, h.z + h.fz * 0.3) : new V(h.x, 0.45, h.z), r: h.k === 'locker' ? 0.6 : 0.9, label: () => h.k === 'locker' ? 'Hide in locker' : 'Hide under bed' });
-for (const im of itemMeshes) interactables.push({ kind: 'item', im, pos: () => im.m.position, r: 0.45, label: () => ({ fuse: 'Take fuse', battery: 'Take battery', note: 'Read', ...TAPE2.ITEM_LABEL })[im.it.k], gone: () => G.items.has(im.it.id) });
+for (const im of itemMeshes) interactables.push({ kind: 'item', im, pos: () => im.m.position, r: 0.45, label: () => ({ fuse: 'Take fuse', battery: 'Take battery', note: 'Read', ...TAPE2.ITEM_LABEL, ...TAPE3.ITEM_LABEL })[im.it.k], gone: () => G.items.has(im.it.id) });
+if (TAPE === 3) interactables.push(...tapeLogic.interactables);
 if (TAPE === 1) interactables.push({ kind: 'gen', pos: () => genPos, r: 1.2, label: () => G.power ? 'Generator running' : G.fuses >= 3 ? 'Insert fuses and start' : `Generator: needs 3 fuses (${G.fuses}/3)` });
 if (TAPE === 1) interactables.push({ kind: 'panel', pos: () => panelPos, r: 1.0, label: () => G.gateOpen ? 'Gate open' : G.power ? 'Open the front gate' : 'Gate panel (no power)' });
 
@@ -210,6 +216,7 @@ function pick(origin, dir) {
   let best = null, bs = 0;
   for (const o of interactables) {
     if (o.gone && o.gone()) continue;
+    if (o.kind === 't3' && !o.label()) continue;
     const p = o.pos(); const to = new V().subVectors(p, origin); const d = to.length(); if (d > 2.3 + o.r * 0.3) continue;
     const along = to.dot(dir); if (along < 0) continue;
     const off = Math.sqrt(Math.max(0, d * d - along * along));
@@ -222,6 +229,7 @@ function pick(origin, dir) {
 function use(o) {
   if (!o) return;
   if (walker.hidden) { walker.unhide(); sound.locker(false); return; }
+  if (o.kind === 't3') { o.act(); return; }
   if (o.kind === 'door' && o.d.locked && o.d.lock && G.items.has(o.d.lock)) { o.d.locked = false; sound.clang(new V(o.d.wx, 1.1, o.d.wz), 700, 0.25, 0.4); sound.door(o.d, 'open', o.d.wx, o.d.wz); doors.push(o.d, walker.pos.x, walker.pos.z); horrors.heard(o.d.wx, o.d.wz, 5); return; }
   if (o.kind === 'door') { const r = doors.push(o.d, walker.pos.x, walker.pos.z); if (r) sound.door(o.d, r, o.d.wx, o.d.wz); else sound.rattle(o.d.wx, o.d.wz); horrors.heard(o.d.wx, o.d.wz, r === 'close' ? 3 : 4); }
   else if (o.kind === 'hide') { horrors.sawHide(o.h); walker.hide(o.h); sound.locker(true, o.h.k); say('hide', 0.3); }
@@ -229,6 +237,7 @@ function use(o) {
     const it = o.im.it; G.items.add(it.id); o.im.m.visible = false;
     if (it.k === 'fuse') { G.fuses++; sound.pickup('fuse'); say(['', 'fuse1', 'fuse2', 'fuse3'][G.fuses], 0, true); checkpoint(); saveGame(); }
     else if (it.k === 'battery') { cam.spares = Math.min(6, cam.spares + 1); sound.pickup('battery'); say('battery', 0.4); }
+    else if (it.k === 'tray') { sound.pickup('fuse'); say('tray', 0, true); checkpoint(); saveGame(); }
     else if (it.k === 'card' || it.k === 'chapelKey' || it.k === 'stairKey') { sound.pickup('fuse'); say(it.k, 0, true); checkpoint(); saveGame(); }
     else { G.notes.push(it.id); read(it.id); sound.pickup('paper'); }
   } else if (o.kind === 'gen') {
@@ -278,14 +287,15 @@ function readSave() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || 
 function saveGame() {
   if (!G.playing || !walker.alive || G.escaped) return;
   const ck = G.checkpoint || { pos: walker.pos, yaw: walker.yaw };
-  const data = { v: 1, tape: TAPE, at: Date.now(), pos: [ck.pos.x, ck.pos.z], yaw: ck.yaw, items: [...G.items], notes: G.notes, fuses: G.fuses, power: G.power, gateOpen: G.gateOpen,
+  const data = { v: 1, tape: TAPE, at: Date.now(), pos: [ck.pos.x, ck.pos.z], yaw: ck.yaw, items: [...G.items], notes: G.notes, fuses: G.fuses, power: G.power, gateOpen: G.gateOpen, clocked: G.clocked, counted: G.counted, delivered: G.delivered, alarm: G.alarm, sawLockdown: G.sawLockdown,
     leftAdmin: G.leftAdmin, sawPanel: G.sawPanel, sawStairs: !!G.sawStairs, strapped: !!G.strapped, obj: G.obj, deaths: G.deaths, t: G.t, said: [...G.said], scares: [...scares.done],
     unlocked: doors.list.filter((d) => d.lock && !d.locked).map((d) => [d.x, d.y]) };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { return; }
   $('saved').classList.remove('on'); void $('saved').offsetWidth; $('saved').classList.add('on'); cam.saveFlash = cam.clock + 2.5; cam.paintOSD(true, '');
 }
 function applySave(d) {
-  for (const k of ['fuses', 'power', 'gateOpen', 'leftAdmin', 'sawPanel', 'sawStairs', 'strapped', 'obj', 'deaths', 't']) if (d[k] !== undefined) G[k] = d[k];
+  for (const k of ['fuses', 'power', 'gateOpen', 'leftAdmin', 'sawPanel', 'sawStairs', 'strapped', 'obj', 'deaths', 't', 'clocked', 'counted', 'delivered', 'sawLockdown']) if (d[k] !== undefined) G[k] = d[k];
+  if (TAPE === 3 && tapeLogic) tapeLogic.restore(d);
   G.items = new Set(d.items || []); G.notes = d.notes || []; G.said = new Set(d.said || []);
   for (const id of d.scares || []) scares.done.add(id);
   for (const im of itemMeshes) if (G.items.has(im.it.id)) im.m.visible = false;
@@ -348,12 +358,14 @@ if (hasSave) {
   const nb = document.createElement('button'); nb.textContent = 'New game'; nb.onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); }; $('menu').insertBefore(nb, $('selectBtn'));
 }
 {
-  const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4 &middot; ${TAPE === 2 ? 'The Male Ward' : 'Recovered Footage'}`;
+  const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4 &middot; ${TAPE === 3 ? 'The Fall' : TAPE === 2 ? 'The Male Ward' : 'Recovered Footage'}`;
+  // the prequel is a different night
+  if (TAPE === 3) { const d = document.querySelector('.osd-bot .date'), c = document.querySelector('.osd-bot .clock'); if (d) d.textContent = 'OCT.14 1989'; if (c) c.textContent = '11:40 PM'; }
   // the tape shelf
   const TAPES = [
     { n: 1, name: 'Tape 1: Recovered Footage', sub: 'Ground floor. Administration, the cafeteria, the morgue.' },
     { n: 2, name: 'Tape 2: The Male Ward', sub: 'The north building. Dormitory, chapel, surgical theater.' },
-    { n: 3, name: 'Tape 3: The Fall', sub: 'Not yet recovered.', locked: true },
+    { n: 3, name: 'Tape 3: The Fall', sub: '14 October 1989. The night it all came apart.' },
     { n: 4, name: 'Tape 4', sub: 'Not yet recovered.', locked: true },
   ];
   const status = (n) => {
@@ -500,7 +512,7 @@ function frame() {
     deadT += dt; if (deadT > 1.2) { $('dead').hidden = false; fadeTo(1); }
     if (deadT > 4.5) { G.deaths++; respawn(); }
   }
-  if (tapeLogic) tapeLogic.update(dt);
+  if (tapeLogic) tapeLogic.update(dt, I);
   if (TAPE === 1 && !G.leftAdmin && plan.at(Math.floor(walker.pos.x / C), Math.floor(walker.pos.z / C)) !== Z.ADMIN && walker.pos.z > 0) { G.leftAdmin = true; }
   if (TAPE === 1 && G.leftAdmin && !G.said.has('dark') && G.t > 20 && !cam.nv) say('dark');
   if (TAPE === 1 && !G.sawPanel && walker.pos.distanceTo(panelPos.clone().setY(0)) < 3.5) { G.sawPanel = true; say('security'); }
@@ -541,6 +553,12 @@ walker.onStep = (k, p) => { sound.step(k, plan.at(Math.floor(p.x / C), Math.floo
 let powerT = -1;
 function lights(dt) {
   const t = G.t;
+  if (TAPE === 3 && tapeLogic) {
+    tapeLogic.lights(LIGHT);
+    for (const f of Object.values(world.fixtureMats)) { const v = LIGHT[f.ch].value; f.m.color.copy(f.col).multiplyScalar(f.ch === 'S' ? 0.03 + v * 1.4 : 0.04 + v * 1.6); }
+    for (const h of world.hazeCones) h.m.uniforms.k.value = LIGHT[h.ch].value * 0.25;   // it isn't derelict yet: hardly any dust in the air
+    return;
+  }
   const stutter = (seed) => { const n = Math.sin(t * 13.1 + seed) * Math.sin(t * 7.3 + seed * 2.1) + Math.sin(t * 31.7 + seed * 5); const off = Math.sin(t * 0.37 + seed) > 0.55 ? 0.02 : 1; return Math.max(0, Math.min(1, (n > -0.6 ? 1 : 0.05) * off * (0.85 + 0.15 * Math.sin(t * 120)))); };
   const out = horrors.lightsOut || horrors.blackout ? 0 : 1; LIGHT.S.value = horrors.blackout ? 0.02 : 1;
   LIGHT.A.value = stutter(1.3) * out; LIGHT.B.value = stutter(4.7) * out;
@@ -639,7 +657,9 @@ function ending() {
     document.querySelector('.osd-top .play').innerHTML = '&#9632;&#xFE0E; STOP';
     try { localStorage.removeItem(SAVE_KEY); localStorage.setItem('asylumvr_done_t' + TAPE, '1'); } catch (e) {}
     try { localStorage.setItem('asylumvr_tapes', String(Math.min(2, Math.max(unlocked, TAPE + 1)))); } catch (e) {}
-    if (TAPE === 2) document.querySelector('.vhs').innerHTML = TAPE2.ENDING(G, timecode);
+    if (TAPE === 3 && tapeLogic) tapeLogic.stopKlaxon();
+    if (TAPE === 3) document.querySelector('.vhs').innerHTML = TAPE3.ENDING(G, timecode, Object.keys(NOTES).length);
+    else if (TAPE === 2) document.querySelector('.vhs').innerHTML = TAPE2.ENDING(G, timecode);
     else document.querySelector('.vhs').innerHTML = `<div class="end"><p class="kicker">Mount Harrow State Asylum</p><h1 class="logo">END OF TAPE 1</h1><p class="lede">${ABDUCT_TEXT.join('<br><br>')}</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${Object.keys(NOTES).length} · Time ${timecode(G.t).slice(3, 8)}</p><nav class="menu"><button onclick="location.href='?tape=2'">Play Tape 2: The Male Ward</button><button onclick="location.href='?tape=1'">Rewind</button></nav></div>`;
     if (renderer.xr.isPresenting) renderer.xr.getSession().end();
   }, 2200);
@@ -660,7 +680,7 @@ function renderTape(o) {
   renderer.render(tape.scene, tape.cam);
 }
 function setCaptureSize(w, h) { renderer.setPixelRatio(1); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); rtMain.dispose(); rtMain = new THREE.WebGLRenderTarget(Math.round(w * 0.85), Math.round(h * 0.85), { type: THREE.HalfFloatType }); tape.uniforms.src.value = rtMain.texture; tape.uniforms.aspect.value = w / h; }
-window.__asy = { abduct, vrMenu, ctlL: left, ctlR: right, dolly, G, walker, renderTape, setCaptureSize, canvas, osdEl: $('osd'), cam, world, plan, doors, horrors, scene, camera, LIGHT, space, sound, renderer, use, interactables, scares, dressing, handL, handR, handLight, NVU,
+window.__asy = { tapeLogic, abduct, vrMenu, ctlL: left, ctlR: right, dolly, G, walker, renderTape, setCaptureSize, canvas, osdEl: $('osd'), cam, world, plan, doors, horrors, scene, camera, LIGHT, space, sound, renderer, use, interactables, scares, dressing, handL, handR, handLight, NVU,
   // test hook: step the game a few frames by hand (the pane may not be animating) and grab the picture
   snap(steps = 3, w = 560) { const I0 = { mx: 0, mz: 0, turn: 0, lookDx: 0, lookDy: 0 }; for (let i = 0; i < steps; i++) { walker.update(1 / 30, I0); doors.update(1 / 30); lights(1 / 30); horrors.update(1 / 30); dressing.update(1 / 30, walker.pos, camera);  } draw(1, false, I0);
     const c = document.createElement('canvas'); c.width = w; c.height = Math.round(w * canvas.height / canvas.width); c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.72); } };

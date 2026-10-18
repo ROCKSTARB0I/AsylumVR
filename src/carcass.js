@@ -5,9 +5,9 @@
 // trousers) and a face damaged in one of several ways. Procedural poses
 // drive the bones: walking, running, stalking, rocking, eating, reaching.
 import * as THREE from '../vendor/three.module.js';
-import { rng, fbm } from './surfaces.js?v=17';
-import { EYE_LAYER } from './camcorder.js?v=17';
-import { buildVisage, headMaterial } from './visage.js?v=17';
+import { rng, fbm } from './surfaces.js?v=18';
+import { EYE_LAYER } from './camcorder.js?v=18';
+import { buildVisage, headMaterial } from './visage.js?v=18';
 
 const V = THREE.Vector3;
 export const BODY_LIGHT = { up: { value: new V(0, 1, 0) } };
@@ -305,7 +305,7 @@ export function pose(body, st, t, p = {}) {
   const sp = p.speed ?? 0;      // m/s
   const ph = p.phase ?? 0;      // gait phase (radians)
   const twK = p.twitch ?? 0.4;
-  const tw = (k) => Math.sin(t * 23 + k) * Math.sin(t * 7.1 + k * 3) > 0.92 - twK * 0.15 ? (Math.sin(t * 61 + k) * (0.25 + twK * 0.35)) : 0;   // twitches; hunters jerk harder
+  const tw = p.calm ? () => 0 : (k) => Math.sin(t * 23 + k) * Math.sin(t * 7.1 + k * 3) > 0.92 - twK * 0.15 ? (Math.sin(t * 61 + k) * (0.25 + twK * 0.35)) : 0;   // twitches; hunters jerk harder
   if (st === 'walk' || st === 'run' || st === 'stalk' || st === 'shamble' || st === 'brute') {
     const run = st === 'run'; const amp = run ? 0.85 : st === 'stalk' ? 0.35 : st === 'brute' ? 0.45 : 0.42;
     const sw = Math.sin(ph), cw = Math.cos(ph);
