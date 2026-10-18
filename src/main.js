@@ -2,27 +2,27 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=23';
-import { buildSurfaces, T } from './surfaces.js?v=23';
-import { loadPictures, savePictures } from './keep.js?v=23';
-import { VRMenu } from './vrmenu.js?v=23';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=23';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=23';
-import { Doors } from './doors.js?v=23';
-import { Space } from './space.js?v=23';
-import { Input } from './input.js?v=23';
-import { Walker } from './walker.js?v=23';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=23';
-import { makeTape, makeVeil } from './tape.js?v=23';
-import { Slate } from './slate.js?v=23';
-import * as STORY1 from './story.js?v=23';
-import * as TAPE3 from './tape3.js?v=23';
-import * as TAPE2 from './tape2.js?v=23';
-import { Sound } from './dread.js?v=23';
-import { Horrors } from './horrors.js?v=23';
-import { Dressing } from './dressing.js?v=23';
-import { Scares } from './scares.js?v=23';
-import { makeHand } from './hands.js?v=23';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=24';
+import { buildSurfaces, T } from './surfaces.js?v=24';
+import { loadPictures, savePictures } from './keep.js?v=24';
+import { VRMenu } from './vrmenu.js?v=24';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=24';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=24';
+import { Doors } from './doors.js?v=24';
+import { Space } from './space.js?v=24';
+import { Input } from './input.js?v=24';
+import { Walker } from './walker.js?v=24';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=24';
+import { makeTape, makeVeil } from './tape.js?v=24';
+import { Slate } from './slate.js?v=24';
+import * as STORY1 from './story.js?v=24';
+import * as TAPE3 from './tape3.js?v=24';
+import * as TAPE2 from './tape2.js?v=24';
+import { Sound } from './dread.js?v=24';
+import { Horrors } from './horrors.js?v=24';
+import { Dressing } from './dressing.js?v=24';
+import { Scares } from './scares.js?v=24';
+import { makeHand } from './hands.js?v=24';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -118,7 +118,9 @@ const tapeLogic = TAPE === 3 ? TAPE3.setupTape3({ LIGHT, setFade: (v, now) => { 
 // ---------------------------------------------------------------- hands
 // your own hands, empty, on the controllers' grips in VR (the camcorder is the whole view, not something you hold)
 const handLight = { value: new THREE.Color(0.02, 0.02, 0.02) };
-const handL = makeHand('left', handLight), handR = makeHand('right', handLight);
+// Tape 3 is Marsh, the orderly: short sleeves, bare forearms, a cheap watch. Everywhere else, Ward's jacket.
+const armLook = (side) => (TAPE === 3 ? { bare: true, skin: [0.64, 0.49, 0.4], watch: side === 'left' } : {});
+const handL = makeHand('left', handLight, armLook('left')), handR = makeHand('right', handLight, armLook('right'));
 const left = renderer.xr.getController(0), right = renderer.xr.getController(1);
 const gripL = renderer.xr.getControllerGrip(0), gripR = renderer.xr.getControllerGrip(1);
 dolly.add(left, right, gripL, gripR);

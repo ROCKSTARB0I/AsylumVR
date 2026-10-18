@@ -5,7 +5,7 @@
 // handle toward the thumb, +Y back along the forearm, palm facing -X on
 // the right hand and +X on the left), so it sits on the controller as is.
 import * as THREE from '../vendor/three.module.js';
-import { fbm } from './surfaces.js?v=23';
+import { fbm } from './surfaces.js?v=24';
 
 const V = THREE.Vector3;
 const FINGERS = [   // z along the handle (index nearest the thumb), knuckle drop, phalanx lengths, base radius
@@ -15,7 +15,8 @@ const FINGERS = [   // z along the handle (index nearest the thumb), knuckle dro
   { z: 0.0245, ky: -0.012, L: [0.035, 0.02, 0.018], r: 0.008 },
 ];
 
-export function makeHand(side, light) {
+// o.bare: no sleeve, a bare forearm to the elbow (Tape 3's orderly); o.skin: skin colour; o.watch: a wristwatch
+export function makeHand(side, light, o = {}) {
   const S = side === 'right' ? 1 : -1;    // mirror on X for the left hand
   const bones = []; const B = {};
   const bone = (name, parent, pos) => { const b = new THREE.Bone(); b.name = name; b.position.copy(pos); (parent || null) && parent.add(b); bones.push(b); B[name] = b; return b; };
@@ -40,10 +41,18 @@ export function makeHand(side, light) {
   const W = (n) => B[n].getWorldPosition(new V());
 
   const pos = [], nor = [], col = [], si = [], sw = [], idx = []; let vc = 0;
-  const skin = new THREE.Color(0.56, 0.42, 0.35);
+  const skin = new THREE.Color(...(o.skin || [0.56, 0.42, 0.35]));
   const paint = (p, kind, t, ang) => {
     let c;
     if (kind === 'sleeve') { const n = fbm(p.x * 60, p.y * 60 + p.z * 40, 3, 4, 64); c = new THREE.Color(0.2, 0.17, 0.11).multiplyScalar(0.75 + n * 0.5); if (t < 0.12) c.multiplyScalar(0.7); }
+    else if (kind === 'arm') {
+      // a bare forearm: skin, fine dark hair on the back of it, a vein or two toward the wrist
+      const back = Math.cos(ang) * S; const n = fbm(p.x * 70, p.y * 50 + p.z * 70, 17, 4, 64);
+      c = skin.clone().multiplyScalar(0.88 + n * 0.18); if (back < -0.2) c.lerp(new THREE.Color(...(o.skin || [0.56, 0.42, 0.35])).multiplyScalar(1.12), 0.5);
+      const hair = fbm(p.x * 900, p.y * 140 + p.z * 900, 19, 2, 256); if (back > -0.1 && hair > 0.62) c.multiplyScalar(0.72 + (1 - t) * 0.1);
+      const vein = Math.abs(Math.sin(p.z * 180 * S + p.y * 30) * 0.5 + Math.sin(p.y * 47) * 0.3); if (t > 0.45 && back < 0.3 && back > -0.6 && vein < 0.04) c.lerp(new THREE.Color(0.38, 0.4, 0.55), 0.35);
+    }
+    else if (kind === 'watch') { c = new THREE.Color(0.5, 0.5, 0.48).multiplyScalar(0.75 + fbm(p.x * 200, p.y * 200, 21, 2, 64) * 0.4); }
     else if (kind === 'cuff') { c = new THREE.Color(0.55, 0.56, 0.6).multiplyScalar(0.8 + fbm(p.x * 80, p.y * 80, 5, 3, 64) * 0.3); }
     else {
       // kind: palm | finger | thumb ; ang 0 = back of the hand; t along the piece; extra info in paint.j / paint.v / paint.z
@@ -96,8 +105,14 @@ export function makeHand(side, light) {
     }
   };
   // sleeve and cuff on the forearm
-  tube(new V(0.006 * S, 0.34, 0), wristP.clone().add(new V(0, 0.04, 0)), 6, 18, (t) => [0.045 + t * 0.004, 0.05 + t * 0.004], () => [BI.fore, BI.fore, 0], 'sleeve', false, true);
-  tube(wristP.clone().add(new V(0, 0.07, 0)), wristP.clone().add(new V(0, 0.015, 0)), 3, 16, () => [0.036, 0.04], () => [BI.fore, BI.fore, 0], 'cuff', false, false);
+  if (o.bare) {
+    // the bare forearm, elbow to wrist, tapering, closed off at the elbow end
+    tube(new V(0.006 * S, 0.43, 0), wristP.clone().add(new V(0, 0.004, 0)), 10, 18, (t) => [0.047 - t * 0.016, 0.051 - t * 0.024], () => [BI.fore, BI.fore, 0], 'arm', true, false);
+    if (o.watch) tube(wristP.clone().add(new V(0, 0.043, 0)), wristP.clone().add(new V(0, 0.026, 0)), 2, 18, () => [0.0345, 0.0305], () => [BI.fore, BI.fore, 0], 'watch', false, false);
+  } else {
+    tube(new V(0.006 * S, 0.34, 0), wristP.clone().add(new V(0, 0.04, 0)), 6, 18, (t) => [0.045 + t * 0.004, 0.05 + t * 0.004], () => [BI.fore, BI.fore, 0], 'sleeve', false, true);
+    tube(wristP.clone().add(new V(0, 0.07, 0)), wristP.clone().add(new V(0, 0.015, 0)), 3, 16, () => [0.036, 0.04], () => [BI.fore, BI.fore, 0], 'cuff', false, false);
+  }
   // ---- the palm: a rounded slab, wider at the knuckles, with the thenar and hypothenar pads and a hollow
   const pe = (c, n = 2.6) => Math.sign(c) * Math.pow(Math.abs(c), 2 / n);
   const g2 = (x, y, sx, sy) => Math.exp(-((x / sx) ** 2) - ((y / sy) ** 2));
@@ -181,6 +196,13 @@ export function makeHand(side, light) {
       B.t0.rotation.set(-0.1 - thumb * 0.25, (0.35 + thumb * 0.5) * S, 0); B.t1.rotation.set(0, (0.15 + thumb * 0.5) * S, 0); B.t2.rotation.set(0, (0.2 + thumb * 0.65) * S, 0);
     },
   };
+  // the watch face, on the back of the wrist
+  if (o.bare && o.watch) {
+    const face = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.007, 20), new THREE.MeshBasicMaterial({ color: 0x8e8a7e })); face.rotation.z = Math.PI / 2;
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.016, 0.0028, 6, 20), new THREE.MeshBasicMaterial({ color: 0x3a3a38 })); rim.rotation.y = Math.PI / 2;
+    const w = new THREE.Group(); w.add(face, rim); for (const [a, l] of [[0.6, 0.009], [2.2, 0.012]]) { const h = new THREE.Mesh(new THREE.BoxGeometry(0.001, 0.0015, l), new THREE.MeshBasicMaterial({ color: 0x111111 })); h.position.set(0.0042 * S, Math.cos(a) * l / 2, Math.sin(a) * l / 2); h.rotation.x = -a + Math.PI / 2; w.add(h); }
+    w.position.set(0.033 * S, 0.034, 0); B.wrist.add(w); hand.watch = w;
+  }
   hand.pose(0.4, 0.6);
   return hand;
 }
