@@ -2,9 +2,9 @@
 // (Voss has the staff film the patients). Clock in, do the count, take Voss his tray. Then the alarm:
 // the mains die, the beacons turn the building red, every cell door opens, and the staff die.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, H } from './plan.js?v=25';
-import { makeBody, pose } from './carcass.js?v=25';
-import { Talk } from './talk.js?v=25';
+import { cx, cz, H } from './plan.js?v=26';
+import { makeBody, pose } from './carcass.js?v=26';
+import { Talk } from './talk.js?v=26';
 const V = THREE.Vector3;
 
 export const NOTES = {
@@ -203,6 +203,16 @@ export function setupTape3(ctx) {
   car.position.set(cx(plan.car.x), 0, cz(plan.car.y)); scene.add(car);
   const carBox = [car.position.x - 0.95, car.position.z - 2.3, car.position.x + 0.95, car.position.z + 2.3]; ctx.space.boxes.push(carBox);
   const CAR = { state: 0, ign: 0, coughs: 0, t: 0, engine: null, grab: [] };
+  // the breaker panel on the generator room's east wall: a grey box, a big lever, a red lamp
+  const breaker = new THREE.Group(); let lever;
+  { const steel = mat(0x6a6e68, 0.5); steel.metalness = 0.5; steel.emissive = new THREE.Color(0x1a1c1a);
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.62, 0.46), steel); breaker.add(box);
+    const plate = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.12, 0.3), new THREE.MeshBasicMaterial({ color: 0xc8b030 })); plate.position.set(-0.075, 0.2, 0); breaker.add(plate);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.022, 10, 8), new THREE.MeshBasicMaterial({ color: 0xff2010 })); lamp.position.set(-0.08, 0.2, 0.17); breaker.add(lamp); breaker.userData.lamp = lamp;
+    lever = new THREE.Group(); const arm = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.26, 0.03), mat(0x2a2a28, 0.4)); arm.position.y = 0.13; lever.add(arm);
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.12, 10), mat(0xa01810, 0.5)); grip.rotation.x = Math.PI / 2; grip.position.y = 0.26; lever.add(grip);
+    lever.position.set(-0.09, -0.08, 0); lever.rotation.z = 0.5; breaker.add(lever); }
+  breaker.position.set((47) * 1.5 - 0.08, 1.35, cz(plan.breaker.y)); scene.add(breaker);
   // ---- the grounds: a chain-link fence on the open perimeter, grass you can see, the dark beyond
   {
     const W = plan.W, at = plan.at, Cc = 1.5;
@@ -329,6 +339,8 @@ export function setupTape3(ctx) {
         else G.pull = Math.max(0, (G.pull || 0) - dt * 0.06);   // (only slips back while you're not pulling)
         if (G.pull >= 1) { G.breaker = true; S.pulling = false; sound.thud(new V(cx(plan.breaker.x), 1.4, cz(plan.breaker.y)), 1.4); sound.burst(new V(cx(plan.breaker.x), 1.6, cz(plan.breaker.y)), { f: 3000, q: 0.5, dur: 0.4, gain: 0.4 }); horrors.glitchKick(1.2); say('breaker', 1.2, true); S.rockScream = a; ctx.checkpoint(); ctx.save(); }
       }
+      // the lever follows your pull; down when it's done
+      lever.rotation.z = G.breaker ? -1.1 : 0.5 - (G.pull || 0) * 1.4; breaker.userData.lamp.material.color.setHex(G.breaker ? 0x103010 : (Math.sin(a * 6) > 0 ? 0xff2010 : 0x400806));
       // the patient on the generator
       if (!G.inYard) { const rb = P.rocker; rb.root.visible = true; rb.root.rotation.set(0, Math.PI, 0); pose(rb, 'rock', a); rb.root.position.set(cx(43), 1.62 - 0.42 * rb.s, cz(24)); rb.mat.userData.uAmb.value.copy(world.lightAt(cx(43), cz(23))).multiplyScalar(1.4);
         if (S.rockScream !== undefined && a - S.rockScream < 2.5) { rb.bones.head.rotation.x = -0.6; rb.bones.jaw.rotation.x = 0.7; if (!S.rockScreamed) { S.rockScreamed = true; sound.voice('rocker', 'scream', rb.root.position); } }

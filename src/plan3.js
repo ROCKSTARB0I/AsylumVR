@@ -2,7 +2,7 @@
 // it all came apart. Clean, lit, staffed. The mains are channel 'P' (white, on until the alarm); the
 // alarm beacons are channel 'S' (red, dark until the alarm, then pulsing). Cells start locked.
 
-import { W, Z } from './plan.js?v=25';
+import { W, Z } from './plan.js?v=26';
 
 export function makePlan3(base) {
   const p = base;
@@ -24,7 +24,7 @@ export function makePlan3(base) {
   p.perimeter = (x, y) => !(x >= 0 && y >= 0 && x < W && y * W + x < g.length) || !building.has(y * W + x);
   p.car = { x: 25, y: 58.6 };
   p.windowOut = { x: 40.6, y: 31 };   // where you land outside
-  p.breaker = { x: 45.6, y: 22.2 };   // on the generator room's east wall
+  p.breaker = { x: 46.2, y: 21.6 };   // on the generator room's east wall, near the door end
   p.adminDoor = { x: 32, y: 31 };
   p.groundsman = { x: 6.5, y: 47.5 };
   // tidy: nothing tipped over yet, no blood, no bodies, nobody has written on the walls

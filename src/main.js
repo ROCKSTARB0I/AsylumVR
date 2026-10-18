@@ -2,27 +2,27 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=25';
-import { buildSurfaces, T } from './surfaces.js?v=25';
-import { loadPictures, savePictures } from './keep.js?v=25';
-import { VRMenu } from './vrmenu.js?v=25';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=25';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=25';
-import { Doors } from './doors.js?v=25';
-import { Space } from './space.js?v=25';
-import { Input } from './input.js?v=25';
-import { Walker } from './walker.js?v=25';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=25';
-import { makeTape, makeVeil } from './tape.js?v=25';
-import { Slate } from './slate.js?v=25';
-import * as STORY1 from './story.js?v=25';
-import * as TAPE3 from './tape3.js?v=25';
-import * as TAPE2 from './tape2.js?v=25';
-import { Sound } from './dread.js?v=25';
-import { Horrors } from './horrors.js?v=25';
-import { Dressing } from './dressing.js?v=25';
-import { Scares } from './scares.js?v=25';
-import { makeHand } from './hands.js?v=25';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=26';
+import { buildSurfaces, T } from './surfaces.js?v=26';
+import { loadPictures, savePictures } from './keep.js?v=26';
+import { VRMenu } from './vrmenu.js?v=26';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=26';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=26';
+import { Doors } from './doors.js?v=26';
+import { Space } from './space.js?v=26';
+import { Input } from './input.js?v=26';
+import { Walker } from './walker.js?v=26';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=26';
+import { makeTape, makeVeil } from './tape.js?v=26';
+import { Slate } from './slate.js?v=26';
+import * as STORY1 from './story.js?v=26';
+import * as TAPE3 from './tape3.js?v=26';
+import * as TAPE2 from './tape2.js?v=26';
+import { Sound } from './dread.js?v=26';
+import { Horrors } from './horrors.js?v=26';
+import { Dressing } from './dressing.js?v=26';
+import { Scares } from './scares.js?v=26';
+import { makeHand } from './hands.js?v=26';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
