@@ -109,3 +109,13 @@ button:hover:not(:disabled), button:focus-visible { border-color: var(--red); co
 #soundHint { font-size: clamp(18px, 2.2vw, 24px); color: #e8e2d4; letter-spacing: 0.08em; text-transform: uppercase; margin: 10px 0 0; animation: hintBlink 1.2s steps(2, start) infinite; }
 #soundHint[hidden] { display: none; }
 @keyframes hintBlink { to { visibility: hidden; } }
+
+/* conversations (Tape 3) */
+#talk { position: fixed; left: 50%; bottom: 7%; transform: translateX(-50%); width: min(760px, 92vw); background: rgba(6,6,6,0.82); border-left: 3px solid #b3241b; padding: 14px 20px 12px; z-index: 30; pointer-events: none; box-shadow: 0 0 30px rgba(0,0,0,0.6); }
+#talk[hidden] { display: none; }
+#talk .who { margin: 0 0 6px; font-family: 'Special Elite', serif; font-size: 17px; color: #d2483c; letter-spacing: 0.06em; text-transform: uppercase; }
+#talk .line { margin: 0 0 10px; font-family: 'Special Elite', serif; font-size: 21px; line-height: 1.45; color: #f0eadc; min-height: 1.45em; }
+#talk .replies { margin: 0; padding-left: 26px; font-family: 'VT323', monospace; font-size: 25px; color: #a39c8f; }
+#talk .replies li { padding: 1px 8px; }
+#talk .replies li.sel { background: #e8e2d4; color: #000; }
+#talk .hint { margin: 8px 0 0; font-family: 'VT323', monospace; font-size: 17px; color: #6f695f; letter-spacing: 0.08em; text-transform: uppercase; }
