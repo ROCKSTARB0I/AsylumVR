@@ -105,3 +105,7 @@ button:hover:not(:disabled), button:focus-visible { border-color: var(--red); co
 .vhs.selecting .kicker { display: none; }
 .vhs.selecting .logo { font-size: clamp(34px, 6vw, 56px); margin-bottom: 10px; }
 @media (max-height: 640px) { .tapes { gap: 6px; } .tape { padding: 6px 10px; } .tape .reels i { width: 24px; height: 24px; } .tape .label { padding: 4px 10px; } .tape .label small { font-size: 14px; } .vhs.selecting .logo { display: none; } .shelfTitle { margin-bottom: 8px; } }
+
+#soundHint { font-size: clamp(18px, 2.2vw, 24px); color: #e8e2d4; letter-spacing: 0.08em; text-transform: uppercase; margin: 10px 0 0; animation: hintBlink 1.2s steps(2, start) infinite; }
+#soundHint[hidden] { display: none; }
+@keyframes hintBlink { to { visibility: hidden; } }
