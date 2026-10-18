@@ -2,27 +2,27 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=18';
-import { buildSurfaces, T } from './surfaces.js?v=18';
-import { loadPictures, savePictures } from './keep.js?v=18';
-import { VRMenu } from './vrmenu.js?v=18';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=18';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=18';
-import { Doors } from './doors.js?v=18';
-import { Space } from './space.js?v=18';
-import { Input } from './input.js?v=18';
-import { Walker } from './walker.js?v=18';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=18';
-import { makeTape, makeVeil } from './tape.js?v=18';
-import { Slate } from './slate.js?v=18';
-import * as STORY1 from './story.js?v=18';
-import * as TAPE3 from './tape3.js?v=18';
-import * as TAPE2 from './tape2.js?v=18';
-import { Sound } from './dread.js?v=18';
-import { Horrors } from './horrors.js?v=18';
-import { Dressing } from './dressing.js?v=18';
-import { Scares } from './scares.js?v=18';
-import { makeHand } from './hands.js?v=18';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=19';
+import { buildSurfaces, T } from './surfaces.js?v=19';
+import { loadPictures, savePictures } from './keep.js?v=19';
+import { VRMenu } from './vrmenu.js?v=19';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=19';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=19';
+import { Doors } from './doors.js?v=19';
+import { Space } from './space.js?v=19';
+import { Input } from './input.js?v=19';
+import { Walker } from './walker.js?v=19';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=19';
+import { makeTape, makeVeil } from './tape.js?v=19';
+import { Slate } from './slate.js?v=19';
+import * as STORY1 from './story.js?v=19';
+import * as TAPE3 from './tape3.js?v=19';
+import * as TAPE2 from './tape2.js?v=19';
+import { Sound } from './dread.js?v=19';
+import { Horrors } from './horrors.js?v=19';
+import { Dressing } from './dressing.js?v=19';
+import { Scares } from './scares.js?v=19';
+import { makeHand } from './hands.js?v=19';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -91,7 +91,7 @@ const dressing = new Dressing(world, plan, scene); mark('dressing');
 const horrors = new Horrors({ scene, plan, world, space, doors, walker, cam, sound, G, camera }); mark('horrors');
 const scares = new Scares({ scene, plan, world, space, doors, walker, cam, sound, G, horrors, camera, dressing });
 if (TAPE === 2) scares.list = TAPE2.setPieces(scares); if (TAPE === 3) { scares.list = []; scares.cool = 1e9; } mark('scares');
-const tapeLogic = TAPE === 3 ? TAPE3.setupTape3({ G, walker, plan, world, sound, horrors, doors, scene, space, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), save: () => saveGame(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
+const tapeLogic = TAPE === 3 ? TAPE3.setupTape3({ get card() { return card; }, placeCard: () => placeCard(), G, walker, plan, world, sound, horrors, doors, scene, space, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), save: () => saveGame(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
 
 // ---------------------------------------------------------------- hands
 // your own hands, empty, on the controllers' grips in VR (the camcorder is the whole view, not something you hold)
@@ -287,7 +287,7 @@ function readSave() { try { return JSON.parse(localStorage.getItem(SAVE_KEY) || 
 function saveGame() {
   if (!G.playing || !walker.alive || G.escaped) return;
   const ck = G.checkpoint || { pos: walker.pos, yaw: walker.yaw };
-  const data = { v: 1, tape: TAPE, at: Date.now(), pos: [ck.pos.x, ck.pos.z], yaw: ck.yaw, items: [...G.items], notes: G.notes, fuses: G.fuses, power: G.power, gateOpen: G.gateOpen, clocked: G.clocked, counted: G.counted, delivered: G.delivered, alarm: G.alarm, sawLockdown: G.sawLockdown,
+  const data = { v: 1, tape: TAPE, at: Date.now(), pos: [ck.pos.x, ck.pos.z], yaw: ck.yaw, items: [...G.items], notes: G.notes, fuses: G.fuses, power: G.power, gateOpen: G.gateOpen, clocked: G.clocked, sheet: G.sheet, flags: G.flags, counted: G.counted, delivered: G.delivered, alarm: G.alarm, sawLockdown: G.sawLockdown,
     leftAdmin: G.leftAdmin, sawPanel: G.sawPanel, sawStairs: !!G.sawStairs, strapped: !!G.strapped, obj: G.obj, deaths: G.deaths, t: G.t, said: [...G.said], scares: [...scares.done],
     unlocked: doors.list.filter((d) => d.lock && !d.locked).map((d) => [d.x, d.y]) };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { return; }
@@ -506,7 +506,9 @@ function frame() {
   if (cam.battery < 0.2 && cam.nv) say('lowBattery');
 
   // the body
-  walker.update(dt, I);
+  // in a conversation you stand still (you can still look around)
+  const talking = !!(tapeLogic && tapeLogic.busy && tapeLogic.busy());
+  walker.update(dt, talking ? { ...I, mx: 0, mz: 0, run: false, crouch: false, interact: false, snap: 0 } : I);
   updateHands(dt, vr);
   if (!walker.alive) {
     deadT += dt; if (deadT > 1.2) { $('dead').hidden = false; fadeTo(1); }
@@ -527,7 +529,7 @@ function frame() {
   const hid = walker.hidden; focus = walker.alive ? (hid ? { kind: 'unhide', label: () => walker.hidden ? (hid.k === 'locker' ? 'Leave locker' : 'Crawl out') : '' } : pick(origin, dir)) : null;
   if (walker.hidden && walker.hidden.k === 'strap') focus = { kind: 'strap', label: tapeLogic.strapLabel };
   if (G.strapped && tapeLogic && I.any) tapeLogic.struggle();
-  if (I.interact && focus && focus.kind !== 'strap') { if (focus.kind === 'unhide') { walker.unhide(); sound.locker(false); } else use(focus); }
+  if (I.interact && focus && focus.kind !== 'strap' && !talking) { if (focus.kind === 'unhide') { walker.unhide(); sound.locker(false); } else use(focus); }
   if (walker.hidden && walker.hidden.k !== 'strap' && vr && (Math.abs(I.mx) + Math.abs(I.mz) > 1.3)) { walker.unhide(); sound.locker(false); }
   const lab = focus ? focus.label() : '';
   $('prompt').hidden = !lab || vr; $('prompt').textContent = lab ? (vr ? lab : `[E] ${lab}`) : '';

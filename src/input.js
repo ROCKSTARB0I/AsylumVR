@@ -40,7 +40,8 @@ export class Input {
     I.reload = this.edge('KeyR'); I.pause = this.edge('Escape') || this.edge('KeyP'); I.notes = this.edge('Tab') || this.edge('KeyJ');
     I.freecam = this.edge('KeyV');
     if (k.has('Space')) I.up += 1; if (k.has('KeyZ')) I.up -= 1;
-    I.any = [...this.edges].some((c) => c !== 'Escape' && c !== 'KeyP');   // any key or click this frame (for struggling)
+    I.any = [...this.edges].some((c) => c !== 'Escape' && c !== 'KeyP');
+    I.pick = this.edge('Digit1') || this.edge('Numpad1') ? 1 : this.edge('Digit2') || this.edge('Numpad2') ? 2 : 0;   // dialogue replies   // any key or click this frame (for struggling)
     I.zoom = this.wheel; this.wheel = 0;
     I.lookDx = this.look.dx; I.lookDy = this.look.dy; this.look.dx = this.look.dy = 0;
     this.edges.clear();
