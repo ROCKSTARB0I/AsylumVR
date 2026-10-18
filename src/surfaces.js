@@ -2,6 +2,7 @@
 // canvases at load time (tile, plaster, linoleum, concrete, rust, blood,
 // mattress stains, scrawl), with a matching normal map from its height.
 import * as THREE from '../vendor/three.module.js';
+import { picture, keepPicture, keptData, keepData } from './keep.js?v=16';
 
 // ---------------------------------------------------------------- noise
 function hash(x, y, s) { let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
@@ -83,6 +84,19 @@ function tiles(p, nx, ny, grout, cb) {
 // Wall textures span 3 m horizontally and the full 3.2 m ceiling height.
 export const T = {};
 export function buildSurfaces() {
+  // kept from an earlier run: no painting at all
+  const names = keptData('texNames');
+  if (names && names.every((n) => picture('tex:' + n + ':map')) && picture('tex:decals')) {
+    for (const n of names) T[n] = { map: tex(picture('tex:' + n + ':map')), normalMap: tex(picture('tex:' + n + ':normalMap'), false), roughnessMap: tex(picture('tex:' + n + ':roughnessMap'), false) };
+    const t = new THREE.CanvasTexture(picture('tex:decals')); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; T.decals = { tex: t, cells: keptData('decalCells') };
+    return;
+  }
+  paintSurfaces();
+  const list = Object.keys(T).filter((n) => n !== 'decals');
+  for (const n of list) for (const k of ['map', 'normalMap', 'roughnessMap']) keepPicture('tex:' + n + ':' + k, T[n][k].image);
+  keepPicture('tex:decals', T.decals.tex.image); keepData('decalCells', T.decals.cells); keepData('texNames', list);
+}
+function paintSurfaces() {
   const S = 512;
   // ward corridor wall: sick green tile to 1.35 m with a dark cap, nicotine cream paint above, peeling
   {

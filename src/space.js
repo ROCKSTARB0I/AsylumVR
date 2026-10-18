@@ -1,16 +1,24 @@
 // Space: what is solid. Circle movers (you and them) are pushed out of
 // wall cells, props, door leaves and the gate; sight lines are traced
 // through the grid and closed doors.
-import { C, W, D } from './plan.js?v=15';
-import { circleSeg } from './doors.js?v=15';
+import { C, W, D } from './plan.js?v=16';
+import { circleSeg } from './doors.js?v=16';
+
+// props up to this height (m) can be vaulted by the things chasing you
+export const VAULT_H = 1.15;
 
 export class Space {
   constructor(plan, world, doors) {
     this.plan = plan; this.world = world; this.doors = doors;
     // prop footprint per cell, for the walk grid
-    this.blockedCell = new Uint8Array(W * D);
+    this.blockedCell = new Uint8Array(W * D); this.tallCell = new Uint8Array(W * D);
     for (const c of world.colliders) {
       if (c.y1 < 0.4) continue;
+      // anything above the hip can't be vaulted: mark every cell it really occupies
+      if (c.y1 > VAULT_H) for (let gy = Math.floor(c.z0 / C); gy <= Math.floor(c.z1 / C); gy++) for (let gx = Math.floor(c.x0 / C); gx <= Math.floor(c.x1 / C); gx++) {
+        const ox = Math.min(c.x1, (gx + 1) * C) - Math.max(c.x0, gx * C), oz = Math.min(c.z1, (gy + 1) * C) - Math.max(c.z0, gy * C);
+        if (ox * oz > C * C * 0.2 && gx >= 0 && gy >= 0 && gx < W && gy < D) this.tallCell[gy * W + gx] = 1;
+      }
       for (let gy = Math.floor(c.z0 / C); gy <= Math.floor(c.z1 / C); gy++) for (let gx = Math.floor(c.x0 / C); gx <= Math.floor(c.x1 / C); gx++) {
         // only block the cell if the prop covers most of it
         const ox = Math.min(c.x1, (gx + 1) * C) - Math.max(c.x0, gx * C), oz = Math.min(c.z1, (gy + 1) * C) - Math.max(c.z0, gy * C);
@@ -20,6 +28,8 @@ export class Space {
     this.gateBox = null;
   }
   solid(gx, gy) { return !this.plan.at(gx, gy); }
+  // a cell blocked only by tables, beds, crates: a chaser can go over it
+  vaultable(gx, gy) { if (!this.plan.at(gx, gy) || !this.blockedCell[gy * W + gx] || this.tallCell[gy * W + gx]) return false; const d = this.doors.at(gx, gy); return !(d && d.locked); }
   walkable(gx, gy) { if (!this.plan.at(gx, gy) || this.blockedCell[gy * W + gx]) return false; const d = this.doors.at(gx, gy); return !(d && d.locked); }
   collide(p, r, { props = true, doors = true, low = 0 } = {}) {
     let hit = false;

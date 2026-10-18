@@ -5,8 +5,9 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=15';
-import { renderMenuTheme, THEME_LOOP } from './theme.js?v=15';
+import { Score } from './score.js?v=16';
+import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=16';
+import { renderMenuTheme, THEME_LOOP } from './theme.js?v=16';
 
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
@@ -312,6 +313,16 @@ function foldLoop(buf, loopLen) {
 const V0 = new THREE.Vector3(0, 0, 0);
 Sound.prototype.record = async function (onProgress) {
   if (this.rec) return this.rec;
+  // recorded on an earlier run with this same sound code: just unpack it
+  const hash = await sourceHash('dread.js', 'score.js', 'theme.js');
+  const kept = hash && await keepGet('snd');
+  if (kept && kept.hash === hash) {
+    try {
+      const rec = unpackSound(kept.rec); this.menuBuf = rec.menu; this.rec = rec; if (onProgress) onProgress(1);
+      if (this.on && this.menuWanted) this.playMenu(); if (this.on && !this.droneLoop) this.swapAmbience();
+      return rec;
+    } catch (e) {}
+  }
   const tmp = new OfflineAudioContext(1, 1, SR); const fake = { ctx: tmp }; const noiseBuf = Sound.prototype.noise.call(fake, 2, 'white'), brownBuf = Sound.prototype.noise.call(fake, 4, 'brown');
   const rec = { one: {}, music: {}, amb: null, fear: null }; const jobs = [];
   const one = (key, dur, n, fn) => { for (let i = 0; i < n; i++) jobs.push(async () => { const b = await render(dur, fn, noiseBuf, brownBuf); (rec.one[key] ||= []).push(b); }); };
@@ -338,12 +349,16 @@ Sound.prototype.record = async function (onProgress) {
   one('whisper', 2.2, 2, (s) => ORIG.syllables.call(s, null, 5, 95, { breath: 0.92, gain: 0.3, verb: 0.3 })); one('mutter', 1.8, 2, (s) => ORIG.mutter.call(s));
   // the beds and the music first: the game can start as soon as those exist
   // the menu theme renders alone first so the title screen has music as soon as possible
-  const menuJob = jobs.shift(); await menuJob().catch(() => {});
+  // the menu theme renders alongside the game's core sounds, so it never holds up starting the game
+  const menuJob = jobs.shift(); const menuP = menuJob().catch(() => {});
   const core = jobs.splice(0, musicKinds.length + 3); await Promise.all(core.map((j) => j().catch(() => {})));
   this.rec = rec; if (onProgress) onProgress(1);
   if (this.on && !this.droneLoop) this.swapAmbience();
   // the rest a couple at a time in the background (anything not ready yet is synthesized live)
   for (let i = 0; i < jobs.length; i += 2) await Promise.all(jobs.slice(i, i + 2).map((j) => j().catch(() => {})));
+  await menuP;
+  // keep it for next time
+  if (hash) { try { await keepPut('snd', { hash, rec: packSound(rec) }); } catch (e) {} }
   return rec;
 };
 Sound.prototype.has = function (key) { return this.rec && this.rec.one[key] && this.rec.one[key].length; };

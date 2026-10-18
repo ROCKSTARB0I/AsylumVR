@@ -6,7 +6,8 @@
 // bandages, a missing nose, a surgical mask). Both maps share a front
 // projection; the rest of the head keeps procedural vertex colour.
 import * as THREE from '../vendor/three.module.js';
-import { rng, fbm } from './surfaces.js?v=15';
+import { picture, keepPicture } from './keep.js?v=16';
+import { rng, fbm } from './surfaces.js?v=16';
 
 const V = THREE.Vector3;
 const D = 256, T = 512;     // depth map and face texture sizes
@@ -140,7 +141,10 @@ export function buildVisage({ r, seed, c0, HS, skinFn, BIhead, BIjaw, bald }) {
   const R = rng(seed * 31 + 5); r.seed = seed;
   const depth = depthMap(r, R);
   const sk = r.skin; const skinHex = `rgb(${Math.round(sk[0] * 220)},${Math.round(sk[1] * 220)},${Math.round(sk[2] * 220)})`;
-  const tex = faceTexture(r, R, skinHex);
+  // the painted face is kept after the first run (nothing after this draws from R, so skipping it changes nothing)
+  const fkey = 'face:' + seed + ':' + JSON.stringify(r); const kept = picture(fkey); let tex;
+  if (kept) { tex = new THREE.CanvasTexture(kept); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4; }
+  else { tex = faceTexture(r, R, skinHex); keepPicture(fkey, tex.image); }
   const sampleD = (fx, fy) => { const x = Math.max(0, Math.min(D - 1.001, (fx * 0.5 + 0.5) * D)), y = Math.max(0, Math.min(D - 1.001, (0.5 - fy * 0.5) * D)); const xi = x | 0, yi = y | 0, tx = x - xi, ty = y - yi; const a = depth[yi * D + xi], b = depth[yi * D + xi + 1], c = depth[(yi + 1) * D + xi], d = depth[(yi + 1) * D + xi + 1]; return a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty; };
   const SX = 0.079, SY = 0.112, SZ = 0.097;
   const segW = 64, segH = 48;

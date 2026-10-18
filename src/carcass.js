@@ -5,9 +5,9 @@
 // trousers) and a face damaged in one of several ways. Procedural poses
 // drive the bones: walking, running, stalking, rocking, eating, reaching.
 import * as THREE from '../vendor/three.module.js';
-import { rng, fbm } from './surfaces.js?v=15';
-import { EYE_LAYER } from './camcorder.js?v=15';
-import { buildVisage, headMaterial } from './visage.js?v=15';
+import { rng, fbm } from './surfaces.js?v=16';
+import { EYE_LAYER } from './camcorder.js?v=16';
+import { buildVisage, headMaterial } from './visage.js?v=16';
 
 const V = THREE.Vector3;
 export const BODY_LIGHT = { up: { value: new V(0, 1, 0) } };
@@ -332,6 +332,24 @@ export function pose(body, st, t, p = {}) {
         E(B[S + 'hand'], st === 'stalk' ? 0.4 : 0, 0, 0);
       }
     }
+  } else if (st === 'vault') {
+    // p.k 0..1: hands slap down on the top, the legs swing up and over to one side, it drops and keeps coming
+    const k = p.k ?? 0; const sm = (a, b) => { const x = Math.min(1, Math.max(0, (k - a) / (b - a))); return x * x * (3 - 2 * x); };
+    const lean = sm(0, 0.22) * (1 - sm(0.72, 1)), up = sm(0.12, 0.4) * (1 - sm(0.62, 0.86)), land = sm(0.7, 0.86) * (1 - sm(0.9, 1));
+    E(B.hips, 0.35 * up + 0.2 * land, 0.3 * up, 0.6 * up); B.hips.position.y = body.rest.hips.y - (0.1 * up + 0.2 * land) * s;
+    E(B.spine, 0.5 * lean + 0.25 * land, -0.2 * up, -0.3 * up); E(B.chest, 0.3 * lean, 0, 0);
+    E(B.neck, -0.6 * lean - 0.35 * land, 0, 0); E(B.head, -0.2 + tw(1) * 0.5, tw(2), tw(3));
+    for (const [S, sd] of [['L', 1], ['R', -1]]) {
+      E(B[S + 'thigh'], -0.35 * lean * (S === 'L' ? 1.4 : 0.4) - 1.5 * up - 0.75 * land, 0, sd * 0.12 * up);
+      E(B[S + 'shin'], 0.3 + 1.6 * up + 1.1 * land, 0, 0); E(B[S + 'foot'], 0.3 * up - 0.4 * land, 0, 0);
+    }
+    if (body.recipe.outfit === 'straitjacket') armsBound(B);
+    else {
+      // one hand plants and pushes, the other is already reaching for you
+      E(B.Lupper, -1.15 * lean + 0.55 * up - 0.9 * land, 0, 0.2); E(B.Lfore, -0.15, 0, 0); E(B.Lhand, 1.0 * lean, 0, 0);
+      E(B.Rupper, -1.35 * lean - 0.4 * up - 1.2 * land, 0, -0.2); E(B.Rfore, -0.3 - 0.4 * up, 0, 0); E(B.Rhand, 0.6 * lean, 0, 0);
+    }
+    B.jaw.rotation.x = 0.3 + land * 0.25;
   } else if (st === 'crawl') {
     // on all fours, fast, the head held up and forward like an animal
     const sw = Math.sin(ph), cw = Math.cos(ph); const amp = Math.min(1, sp / 3) * 0.75 + 0.15;

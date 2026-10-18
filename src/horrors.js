@@ -3,8 +3,9 @@
 // dark), hears (your steps, doors, things you knock), patrols or keeps to
 // its corner, investigates, chases, searches, checks lockers, and kills.
 import * as THREE from '../vendor/three.module.js';
-import { C, W, D, cx, cz } from './plan.js?v=15';
-import { makeBody, pose, cleaver, bonesaw, flashlight, BODY_LIGHT } from './carcass.js?v=15';
+import { C, W, D, cx, cz } from './plan.js?v=16';
+import { VAULT_H } from './space.js?v=16';
+import { makeBody, pose, cleaver, bonesaw, flashlight, BODY_LIGHT } from './carcass.js?v=16';
 
 const V = THREE.Vector3;
 const tmp = new V(), tmp2 = new V();
@@ -13,7 +14,10 @@ const tmp = new V(), tmp2 = new V();
 class Nav {
   constructor(space) { this.space = space; }
   ok(x, y) { return x >= 0 && y >= 0 && x < W && y < D && this.space.walkable(x, y); }
-  find(x0, z0, x1, z1) {
+  find(x0, z0, x1, z1, vault = false) {
+    // chasers may cut over low furniture, at a price, so they still prefer the floor
+    const ok = vault ? (x, y) => this.ok(x, y) || (x >= 0 && y >= 0 && x < W && y < D && this.space.vaultable(x, y)) : (x, y) => this.ok(x, y);
+    const cost = (i) => (vault && this.space.blockedCell[i] ? 2.5 : 0);
     const sx = Math.floor(x0 / C), sy = Math.floor(z0 / C); let tx = Math.floor(x1 / C), ty = Math.floor(z1 / C);
     if (!this.ok(tx, ty)) { let best = null, bd = 1e9; for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) if (this.ok(tx + i, ty + j)) { const d = i * i + j * j; if (d < bd) { bd = d; best = [tx + i, ty + j]; } } if (!best) return null; [tx, ty] = best; }
     const N = W * D; const g = new Float32Array(N).fill(1e9), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
@@ -26,9 +30,9 @@ class Nav {
       if (cur === goal) break;
       const x = cur % W, y = Math.floor(cur / W);
       for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        if (!dx && !dy) continue; const nx = x + dx, ny = y + dy; if (!this.ok(nx, ny)) continue;
-        if (dx && dy && (!this.ok(x + dx, y) || !this.ok(x, y + dy))) continue;
-        const ni = ny * W + nx; const ng = g[cur] + (dx && dy ? 1.414 : 1);
+        if (!dx && !dy) continue; const nx = x + dx, ny = y + dy; if (!ok(nx, ny)) continue;
+        if (dx && dy && (!ok(x + dx, y) || !ok(x, y + dy))) continue;
+        const ni = ny * W + nx; const ng = g[cur] + (dx && dy ? 1.414 : 1) + cost(ni);
         if (ng < g[ni]) { g[ni] = ng; from[ni] = cur; open.push([ng + h(ni), ni]); }
       }
     }
@@ -98,11 +102,13 @@ class Horror {
   }
   goTo(p, dt, speed) {
     this.repath -= dt;
-    if (!this.path || this.repath <= 0 || !this.pathGoal || this.pathGoal.distanceTo(p) > 1.2) { this.path = this.H.nav.find(this.pos.x, this.pos.z, p.x, p.z) || []; this.pathGoal = p.clone(); this.repath = this.state === 'chase' ? 0.35 : 1.2; }
+    if (!this.path || this.repath <= 0 || !this.pathGoal || this.pathGoal.distanceTo(p) > 1.2) { this.path = this.H.nav.find(this.pos.x, this.pos.z, p.x, p.z, this.mayVault()) || []; this.pathGoal = p.clone(); this.repath = this.state === 'chase' ? 0.35 : 1.2; }
     // straight at it when we can see it
     let tgt = this.path[0] || p;
     if (this.state === 'chase' && this.H.space.los(this.pos.x, this.pos.z, p.x, p.z, false) && clearWide(this.H.space, this.pos, p)) tgt = p;
     else if (this.path[0] && this.pos.distanceTo(this.path[0]) < 0.45) { this.path.shift(); tgt = this.path[0] || p; }
+    // a table or a bed in the way: over it
+    if (!this.vault && (this.vaultCool || 0) <= 0 && this.mayVault()) { const v = this.tryVault(tgt, p); if (v) { this.startVault(v); return Math.hypot(p.x - this.pos.x, p.z - this.pos.z); } }
     // doors in the way
     const d = this.H.doors.near(this.pos.x + Math.sin(this.yaw) * 0.6, this.pos.z + Math.cos(this.yaw) * 0.6, 1.1);
     if (d && Math.abs(d.target) < 0.2 && Math.abs(d.angle) < 1.0 && !d.locked) {
@@ -123,8 +129,51 @@ class Horror {
     if (moved < sp * dt * 0.25 && sp > 0.3) { this.stuck += dt; if (this.stuck > 1.2) { this.path = null; this.stuck = 0; this.yaw += (Math.random() - 0.5) * 2; } } else this.stuck = 0;
     return Math.hypot(p.x - this.pos.x, p.z - this.pos.z);
   }
+  // ---- vaulting: only when it's after you
+  mayVault() { return this.K.run && (this.state === 'chase' || (this.state === 'investigate' && this.H.isHunter(this))); }
+  tryVault(tgt, goal) {
+    const dx = tgt.x - this.pos.x, dz = tgt.z - this.pos.z, l = Math.hypot(dx, dz); if (l < 0.3) return null;
+    const ux = dx / l, uz = dz / l, r = 0.34, px = this.pos.x, pz = this.pos.z; const cols = this.H.world.colliders;
+    // where along our heading a collider (grown by our radius) starts and ends
+    const ray = (c) => {
+      let tn = -1e9, tf = 1e9;
+      for (const [o, u, a0, a1] of [[px, ux, c.x0 - r, c.x1 + r], [pz, uz, c.z0 - r, c.z1 + r]]) {
+        if (Math.abs(u) < 1e-6) { if (o < a0 || o > a1) return null; continue; }
+        let a = (a0 - o) / u, b = (a1 - o) / u; if (a > b) [a, b] = [b, a]; tn = Math.max(tn, a); tf = Math.min(tf, b);
+      }
+      return tn <= tf ? [tn, tf] : null;
+    };
+    let first = null, h = 0;
+    for (const c of cols) { if (c.y1 < 0.4 || c.y1 > VAULT_H) continue; const t = ray(c); if (t && t[1] > 0 && t[0] < 0.55 && (!first || t[0] < first[0])) { first = t; h = c.y1; } }
+    if (!first) return null;
+    // keep going over anything else low that's in the way (a chair pushed up to the table)
+    let far = first[1];
+    for (let n = 0; n < 3; n++) { let ext = far; for (const c of cols) { if (c.y1 < 0.4) continue; const t = ray(c); if (t && t[0] < far + 0.15 && t[1] > far) { if (c.y1 > VAULT_H) return null; ext = Math.max(ext, t[1]); h = Math.max(h, c.y1); } } if (ext === far) break; far = ext; }
+    if (far - Math.max(0, first[0]) > 2.3) return null;        // too long to go over (a bed the long way)
+    const land = new V(px + ux * (far + 0.1), 0, pz + uz * (far + 0.1));
+    if (Math.hypot(goal.x - land.x, goal.z - land.z) > Math.hypot(goal.x - px, goal.z - pz) + 0.2) return null;   // it would take us away from you
+    const chk = land.clone(); this.H.space.collide(chk, 0.32, { doors: true }); if (chk.distanceTo(land) > 0.12) return null;
+    if (!this.H.space.los(px, pz, land.x, land.z, true)) return null;
+    return { from: this.pos.clone(), to: land, h, k: 0, yaw: Math.atan2(ux, uz) };
+  }
+  startVault(v) {
+    v.dur = this.kind === 'brute' ? 0.95 : this.kind === 'eater' ? 0.5 : this.kind === 'surgeon' ? 0.7 : 0.62;
+    this.vault = v; this.yaw = v.yaw; this.path = null; this.stuck = 0;
+    if (Math.random() < 0.6) this.H.sound.voice(this.K.voice, this.kind === 'eater' ? 'alert' : 'attack', this.pos);
+  }
+  vaulting(dt) {
+    const v = this.vault, H = this.H; const k0 = v.k; v.k = Math.min(1, v.k + dt / v.dur); const k = v.k;
+    const e = Math.min(1, Math.max(0, (k - 0.18) / 0.62)); const sm = e * e * (3 - 2 * e);
+    this.pos.lerpVectors(v.from, v.to, sm);
+    this.vaultY = Math.sin(Math.PI * Math.min(1, Math.max(0, (k - 0.12) / 0.76))) * Math.max(0.2, v.h - 0.3);
+    if (k0 < 0.2 && k >= 0.2) H.sound.thud(this.pos.clone().setY(v.h), 0.55);            // hands slap down on the top
+    if (k0 < 0.82 && k >= 0.82) { H.sound.thud(this.pos, this.kind === 'brute' ? 1.2 : 0.75); H.sound.footstep(this.kind, this.pos, 3); if (this.kind === 'brute') H.shake(this.pos.x, this.pos.z, 0.3); }
+    this.speed = 0;
+    if (k >= 1) { this.vault = null; this.vaultY = 0; this.vaultCool = 0.5; this.path = null; this.burst = Math.max(this.burst || 0, 0.5); }
+  }
   update(dt) {
     if (!this.active) return;
+    this.vaultCool = (this.vaultCool || 0) - dt;
     const H = this.H, w = H.walker, P = w.pos; this.t += dt; this.voiceT -= dt; this.cool -= dt;
     // the feral patient gets up from its meal when its segment begins
     if (this.opts.huntRoute && H.isHunter(this) && this.state === 'eat') { this.state = 'patrol'; this.route = this.opts.huntRoute; this.ri = 0; this.path = null; H.sound.voice('eater', 'chase', this.pos); }
@@ -137,7 +186,8 @@ class Horror {
       this.state = 'spot'; this.spotT = 0; this.path = null; H.onChase(this);
     } else if (this.aware > 0.35 && (this.state === 'patrol' || this.state === 'idle') && this.K.run && H.isHunter(this)) { this.state = 'investigate'; this.goal = P.clone(); this.wait = 0.5; }
     let st = this.state; let anim = 'idle', animP = {};
-    switch (st) {
+    if (this.vault) { this.vaulting(dt); anim = 'vault'; animP = { k: this.vault ? this.vault.k : 1 }; }
+    else switch (st) {
       case 'rock': anim = 'rock'; if (this.voiceT < 0) { this.voiceT = 3 + Math.random() * 5; H.sound.voice('rocker', 'mutter', this.pos); } if (dist < 2.2 && !this.flinched) { this.flinched = true; H.sound.voice('rocker', 'scream', this.pos); H.scare(0.5); } if (dist > 4) this.flinched = false; break;
       case 'eat': anim = 'eat'; if (!H.isHunter(this) && dist < 1.8 && !this.hissed) { this.hissed = true; H.sound.voice('eater', 'alert', this.pos); H.scare(0.6); } if (dist > 4) this.hissed = false; if (this.voiceT < 0) { this.voiceT = 1.5 + Math.random() * 2; H.sound.voice('eater', 'chew', this.pos); } if (H.mayChase(this) && (this.aware > 0.5 || (dist < 3 && w.speed > 1.5 && !w.hidden))) { this.state = 'chase'; this.aware = 1.2; H.sound.voice('eater', 'chase', this.pos); H.onChase(this); } break;
       case 'idle': anim = 'idle'; break;
@@ -245,7 +295,7 @@ class Horror {
     this.frameT = (this.frameT || 0) - dt;
     if (!jerky || this.frameT <= 0 || this.state === 'execute') {
       this.frameT = jerky ? 0.06 + Math.random() * 0.1 : 0;
-      b.root.position.set(this.pos.x, 0, this.pos.z); b.root.rotation.y = this.yaw;
+      b.root.position.set(this.pos.x, this.vaultY || 0, this.pos.z); b.root.rotation.y = this.yaw;
       pose(b, anim, this.t, { speed: this.speed, phase: this.phase, reach: this.state === 'chase' && dist < 3 && this.kind !== 'brute', twitch: this.K.run ? 1 : 0.4, ...animP });
     }
     if (this.lamp) this.lamp.update(this);

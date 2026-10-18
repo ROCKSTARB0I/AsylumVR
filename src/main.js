@@ -2,23 +2,25 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=15';
-import { buildSurfaces, T } from './surfaces.js?v=15';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=15';
-import { Doors } from './doors.js?v=15';
-import { Space } from './space.js?v=15';
-import { Input } from './input.js?v=15';
-import { Walker } from './walker.js?v=15';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=15';
-import { makeTape, makeVeil } from './tape.js?v=15';
-import { Slate } from './slate.js?v=15';
-import * as STORY1 from './story.js?v=15';
-import * as TAPE2 from './tape2.js?v=15';
-import { Sound } from './dread.js?v=15';
-import { Horrors } from './horrors.js?v=15';
-import { Dressing } from './dressing.js?v=15';
-import { Scares } from './scares.js?v=15';
-import { makeHand } from './hands.js?v=15';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=16';
+import { buildSurfaces, T } from './surfaces.js?v=16';
+import { loadPictures, savePictures } from './keep.js?v=16';
+import { VRMenu } from './vrmenu.js?v=16';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=16';
+import { Doors } from './doors.js?v=16';
+import { Space } from './space.js?v=16';
+import { Input } from './input.js?v=16';
+import { Walker } from './walker.js?v=16';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=16';
+import { makeTape, makeVeil } from './tape.js?v=16';
+import { Slate } from './slate.js?v=16';
+import * as STORY1 from './story.js?v=16';
+import * as TAPE2 from './tape2.js?v=16';
+import { Sound } from './dread.js?v=16';
+import { Horrors } from './horrors.js?v=16';
+import { Dressing } from './dressing.js?v=16';
+import { Scares } from './scares.js?v=16';
+import { makeHand } from './hands.js?v=16';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -58,13 +60,15 @@ sizeRT();
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); sizeRT(); });
 
 // ---------------------------------------------------------------- build
+const T0 = performance.now(); const mark = (k) => (window.__boot ||= []).push([k, Math.round(performance.now() - T0)]);
 $('loading').textContent = 'Rewinding tape… painting walls';
-await new Promise((r) => setTimeout(r, 30));
+await loadPictures();
 buildSurfaces();
 const plan = makePlan(TAPE);
 $('loading').textContent = 'Rewinding tape… baking light';
 await new Promise((r) => setTimeout(r, 30));
-const world = buildAsylum(plan, scene);
+mark('surfaces');
+const world = buildAsylum(plan, scene); mark('world');
 laydecals(world, plan, scene);
 const doors = new Doors(world, scene);
 const space = new Space(plan, world, doors);
@@ -72,18 +76,19 @@ const input = new Input(canvas, renderer);
 const walker = new Walker(dolly, camera, space);
 const cam = new Camcorder(scene);
 const sound = new Sound();
+mark('setup');
 const recording = sound.record((k) => { if (!G || !G.playing) $('loading').textContent = k < 1 ? `Recording sounds… ${Math.round(k * 100)}%` : ''; });
 const veil = makeVeil(); camera.add(veil.mesh); veil.mesh.visible = false;
 const G = {   // game state
   leftAdmin: false, sawPanel: false, fuses: 0, power: false, gateOpen: false, escaped: false, items: new Set(), notes: [], obj: 0,
   t: 0, playing: false, paused: false, reading: null, said: new Set(), checkpoint: null, deaths: 0, chased: 0,
 };
-$('loading').textContent = 'Rewinding tape… waking the patients';
+mark('preHorrors'); $('loading').textContent = 'Rewinding tape… waking the patients';
 await new Promise((r) => setTimeout(r, 30));
-const dressing = new Dressing(world, plan, scene);
-const horrors = new Horrors({ scene, plan, world, space, doors, walker, cam, sound, G, camera });
+const dressing = new Dressing(world, plan, scene); mark('dressing');
+const horrors = new Horrors({ scene, plan, world, space, doors, walker, cam, sound, G, camera }); mark('horrors');
 const scares = new Scares({ scene, plan, world, space, doors, walker, cam, sound, G, horrors, camera, dressing });
-if (TAPE === 2) scares.list = TAPE2.setPieces(scares);
+if (TAPE === 2) scares.list = TAPE2.setPieces(scares); mark('scares');
 const tapeLogic = TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
 
 // ---------------------------------------------------------------- hands
@@ -95,7 +100,7 @@ const gripL = renderer.xr.getControllerGrip(0), gripR = renderer.xr.getControlle
 dolly.add(left, right, gripL, gripR);
 const hands = { left: null, right: null, gripLeft: null, gripRight: null, pads: {} };
 [[left, gripL], [right, gripR]].forEach(([c, g]) => {
-  c.addEventListener('connected', (e) => { const side = e.data.handedness; hands[side] = c; c.userData.side = side; hands[side === 'left' ? 'gripLeft' : 'gripRight'] = g; hands.pads[side] = e.data; attachHand(c, g, side); });
+  c.addEventListener('connected', (e) => { const side = e.data.handedness; hands[side] = c; c.userData.side = side; c.userData.src = e.data; hands[side === 'left' ? 'gripLeft' : 'gripRight'] = g; hands.pads[side] = e.data; attachHand(c, g, side); });
   c.addEventListener('disconnected', () => { for (const k of ['left', 'right']) if (hands[k] === c) hands[k] = null; });
 });
 const ray = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new V(0, 0, 0), new V(0, 0, -1)]), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18 }));
@@ -321,7 +326,7 @@ document.addEventListener('pointerlockchange', () => { if (!document.pointerLock
 // ---------------------------------------------------------------- start
 async function begin(vr, cont = false) {
   if (!sound.rec) { $('loading').textContent = 'Recording sounds…'; await Promise.race([recording, new Promise((r) => { const iv = setInterval(() => { if (sound.rec) { clearInterval(iv); r(); } }, 100); })]); }
-  sound.init(); await sound.ready; sound.stopMenu();
+  sound.init(); await sound.ready; sound.stopMenu(); vrMenu.close(); handLight.lock = false;
   $('screen').hidden = true; G.playing = true; fade = 1; fadeTo(0);
   walker.place(cx(plan.start.x), cz(plan.start.y), plan.start.yaw); checkpoint();
   const sv = cont ? readSave() : null;
@@ -332,6 +337,7 @@ async function begin(vr, cont = false) {
   setTimeout(() => { if (!cam.nv && !G.strapped) caption(vr ? 'Left trigger: night vision' : 'F: night vision · right mouse: zoom'); }, 6000);
 }
 const hasSave = !!readSave();
+let shelfTapes = [], tapeStatus = () => ['', ''];
 $('playDesktop').onclick = () => begin(false, hasSave);
 if (hasSave) {
   $('playDesktop').textContent = 'Continue on desktop'; $('enterVR').textContent = 'Continue in VR';
@@ -352,6 +358,7 @@ if (hasSave) {
     if (done) return ['done', 'COMPLETED'];
     return ['', 'NEW'];
   };
+  shelfTapes = TAPES; tapeStatus = status;
   const shelf = $('tapes');
   for (const tp of TAPES) {
     const b = document.createElement('button'); b.className = 'tape' + (tp.locked ? ' locked' : '') + (tp.n === TAPE ? ' loaded' : ''); b.disabled = !!tp.locked;
@@ -381,19 +388,64 @@ for (const ev of ['pointerdown', 'pointerup', 'mousedown', 'click', 'touchstart'
 try { titleSound(); } catch (e) {}
 $('screen').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || b.disabled) return; if (b.classList.contains('tape')) sound.tapeLoad(); else sound.tapeClick(); }, true);
 const vrBtn = $('enterVR');
-if (!navigator.xr) { vrBtn.disabled = true; $('vrNote').textContent = 'WebXR not available here — open this page in the Meta Quest browser to play in VR.'; }
-else navigator.xr.isSessionSupported('immersive-vr').then((ok) => { if (!ok) { vrBtn.disabled = true; $('vrNote').textContent = 'No VR headset found — play on desktop, or open this page on your Quest.'; } }).catch(() => {});
+if (!navigator.xr) { vrBtn.disabled = true; $('vrMenuBtn').disabled = true; $('vrNote').textContent = 'WebXR not available here — open this page in the Meta Quest browser to play in VR.'; }
+else navigator.xr.isSessionSupported('immersive-vr').then((ok) => { if (!ok) { vrBtn.disabled = true; $('vrMenuBtn').disabled = true; $('vrNote').textContent = 'No VR headset found — play on desktop, or open this page on your Quest.'; } }).catch(() => {});
+async function startSession() {
+  const s = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] });
+  await renderer.xr.setSession(s); veil.mesh.visible = true;
+  s.addEventListener('visibilitychange', () => sound.wake && sound.wake()); s.addEventListener('selectstart', () => sound.wake && sound.wake());
+  s.addEventListener('end', () => { veil.mesh.visible = false; capSlate.mesh.visible = false; vrMenu.close(); handLight.lock = false; ray.visible = true; });
+  return s;
+}
 vrBtn.onclick = async () => {
+  try { await startSession(); begin(true, hasSave); } catch (e) { $('vrNote').textContent = 'Could not start VR: ' + e.message; }
+};
+
+// ---------------------------------------------------------------- the title screen in the headset
+// the same menu, hanging in the dark lobby; point with either hand, pull the trigger
+const vrMenu = new VRMenu({ dolly, controllers: [left, right], sound, pages: {
+  main: () => ({
+    logo: true, kicker: `Recovered footage · Mount Harrow State Asylum · Tape ${TAPE} of 4`,
+    items: [
+      { label: hasSave ? 'Continue' : 'Play', act: () => playInVR(hasSave) },
+      ...(hasSave ? [{ label: 'New game', act: () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} playInVR(false); } }] : []),
+      { label: 'Select tape', page: 'tapes' },
+      { label: 'How to play', page: 'how' },
+      { label: 'Reset progress', page: 'reset', danger: true, small: true },
+      { label: 'Exit VR', small: true, act: () => { const s = renderer.xr.getSession(); if (s) s.end(); } },
+    ],
+  }),
+  tapes: () => ({
+    title: '\u25B6\uFE0E SELECT TAPE',
+    items: [
+      ...shelfTapes.map((tp) => {
+        const [cls, txt] = tp.locked ? ['', 'LOCKED'] : tapeStatus(tp.n); const now = tp.n === TAPE && !tp.locked;
+        return { tape: true, label: tp.name, sub: tp.sub, locked: !!tp.locked, status: now ? 'LOADED' : txt.split(' · ')[0], statusColor: cls === 'done' ? '#2f5a2a' : now ? '#7a2a22' : '#3b372f',
+          act: () => { if (now) vrMenu.go('main'); else setTimeout(() => { location.href = '?tape=' + tp.n; }, 650); } };
+      }),
+      { label: 'Back', page: 'main', small: true },
+    ],
+  }),
+  how: () => ({ title: 'HOW TO PLAY', text: [...document.querySelectorAll('#how p')].filter((p) => !/^Desktop/.test(p.textContent)).map((p) => { const b = p.querySelector('b'); const head = b ? b.textContent.trim() : ''; const body = p.textContent.trim().slice(head.length).trim(); return head ? `${head.toUpperCase()}: ${body}` : body; }), items: [{ label: 'Back', page: 'main', small: true }] }),
+  reset: () => ({
+    title: '\u25A0\uFE0E ERASE ALL TAPES?', text: ['Are you sure? This erases every save and unlocked tape. It can\'t be undone.'],
+    items: [
+      { label: 'Yes, erase', danger: true, act: () => { try { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && k.startsWith('asylumvr_')) localStorage.removeItem(k); } } catch (e) {} setTimeout(() => { location.href = location.pathname; }, 650); } },
+      { label: 'No', page: 'main' },
+    ],
+  }),
+} });
+function playInVR(cont) { vrMenu.close(); handLight.lock = false; ray.visible = true; begin(true, cont); }
+$('vrMenuBtn').onclick = async () => {
   try {
-    const s = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'] });
-    await renderer.xr.setSession(s); veil.mesh.visible = true;
-    s.addEventListener('visibilitychange', () => sound.wake && sound.wake()); s.addEventListener('selectstart', () => sound.wake && sound.wake());
-    s.addEventListener('end', () => { veil.mesh.visible = false; capSlate.mesh.visible = false; });
-    begin(true, hasSave);
+    await startSession();
+    handLight.lock = true; handLight.value.setRGB(0.22, 0.2, 0.18);    // the panel's glow on your hands
+    ray.visible = false; vrMenu.open('main'); titleSound();
   } catch (e) { $('vrNote').textContent = 'Could not start VR: ' + e.message; }
 };
 nvifyScene(); setInterval(nvifyScene, 3000);
-$('loading').textContent = '';
+mark('ready'); $('loading').textContent = '';
+setTimeout(() => savePictures(), 2500);   // keep the painted walls and faces for next time
 setInterval(() => { if (!G.playing) { const s = Math.floor(performance.now() / 1000); $('titleTc').textContent = `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; } }, 250);
 
 // ---------------------------------------------------------------- frame
@@ -487,6 +539,37 @@ function lights(dt) {
 }
 
 let camFrame = 0;
+// the camcorder's auto gain: anything right up against the lens would burn out to solid green under the IR
+// lamp, so the lamp backs off for whatever is closest in front of it (a face, a wall, a door, a table)
+// and close things keep their detail at about the brightness they'd have at ~2.5 m
+let irLevel = 1; const irHead = new THREE.Vector3(), irDir = new THREE.Vector3();
+function lensDistance() {
+  camera.getWorldPosition(tmpV); camera.getWorldDirection(irDir); let d = 9;
+  // the bodies in front of us
+  const bodies = horrors.list.map((h) => h.body).concat(scares.actors || [], scares.corpseActor ? [scares.corpseActor] : []);
+  for (const b of bodies) {
+    if (!b || !b.root.visible) continue;
+    for (const n of ['head', 'neck', 'chest', 'Lhand', 'Rhand']) { if (!b.bones[n]) continue; b.bones[n].getWorldPosition(irHead).sub(tmpV); const l = irHead.length(); if (irHead.dot(irDir) > l * 0.35) d = Math.min(d, l); }
+  }
+  // the room: march out of the lens until we hit floor, ceiling, wall, a shut door or a prop
+  const SURF = 1;
+  for (let t = 0.06; t < Math.min(d, 2.7); t += 0.06) {
+    const x = tmpV.x + irDir.x * t, y = tmpV.y + irDir.y * t, z = tmpV.z + irDir.z * t;
+    if (y < 0.02 || y > H - 0.02) { d = Math.min(d, t * SURF); break; }
+    const gx = Math.floor(x / C), gy = Math.floor(z / C);
+    if (space.solid(gx, gy)) { d = Math.min(d, t * SURF); break; }
+    const dr = doors.at(gx, gy); if (dr && Math.abs(dr.angle) < 0.3) { d = Math.min(d, t * SURF); break; }
+    let hit = false; for (const c of world.colliders) if (y < c.y1 && x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1) { hit = true; break; }
+    if (hit) { d = Math.min(d, t * SURF); break; }
+  }
+  return d;
+}
+function irGain(dt) {
+  const d = lensDistance();
+  const k = window.__noAGC ? 1 : Math.min(1, Math.pow(Math.max(0.2, d) / 2.6, 1.7));
+  irLevel += (k - irLevel) * Math.min(1, dt * (k < irLevel ? 14 : 3));   // drops fast, recovers slowly, like the real thing
+  return irLevel;
+}
 function draw(dt, vr, I) {
   fade += (fadeGoal - fade) * (1 - Math.exp(-dt * 3));
   const t = G.t; const hurt = Math.max(0, 1 - walker.health / 100); const glitch = horrors.glitch || 0;
@@ -494,7 +577,7 @@ function draw(dt, vr, I) {
     // night vision: the infrared lamp rides on your head and every surface takes the green grade
     NVU.on.value = cam.nv ? 1 : 0; NVU.t.value = t;
     if (cam.nv) camera.layers.enable(EYE_LAYER); else camera.layers.disable(EYE_LAYER);
-    camera.getWorldPosition(tmpV); camera.getWorldQuaternion(tmpQ); cam.aim(tmpV, tmpQ, 90); cam.setIR(cam.nv);
+    camera.getWorldPosition(tmpV); camera.getWorldQuaternion(tmpQ); cam.aim(tmpV, tmpQ, 90); cam.setIR(cam.nv); if (cam.nv) cam.ir.intensity *= irGain(dt);
     for (const h of world.hazeCones) h.mesh.visible = !cam.nv;
     osdHud.visible = G.playing && !G.reading && !G.paused; cam.paintOSD(false, objT > 0 ? objectiveText() : '');
     veil.uniforms.t.value = t; veil.uniforms.hurt.value = hurt; veil.uniforms.fear.value = horrors.fear * S.grain; veil.uniforms.fade.value = fade; veil.uniforms.stat.value = horrors.static || 0;
@@ -508,7 +591,7 @@ function draw(dt, vr, I) {
   $('osd').hidden = !G.playing;
   if (raised) {
     if (cam.nv) camera.layers.enable(EYE_LAYER); else camera.layers.disable(EYE_LAYER); camera.updateMatrixWorld();
-    cam.aim(camera.getWorldPosition(tmpV), camera.getWorldQuaternion(tmpQ), 70); cam.setIR(cam.nv);
+    cam.aim(camera.getWorldPosition(tmpV), camera.getWorldQuaternion(tmpQ), 70); cam.setIR(cam.nv); if (cam.nv) cam.ir.intensity *= irGain(dt);
     $('tc').textContent = timecode(cam.clock); $('mode').textContent = cam.nv ? 'NIGHT SHOT' : cam.dead ? 'BATTERY EMPTY' : '';
     $('zoom').textContent = cam.zoom > 1.05 ? `ZOOM ${cam.zoom.toFixed(1)}x` : ''; $('spares').textContent = '';
     const bars = Math.ceil(cam.battery * 4); document.querySelectorAll('#osd .bat i').forEach((el, i) => el.classList.toggle('off', i >= bars)); document.querySelector('#osd .bat').classList.toggle('low', cam.battery < 0.2);
@@ -523,6 +606,14 @@ function draw(dt, vr, I) {
 // the title: a slow drift through the dark lobby on tape
 function renderTitle(dt) {
   const t = performance.now() / 1000;
+  if (renderer.xr.isPresenting) {
+    // standing still in the lobby (no drifting camera in a headset), the menu in front of you
+    const tc = plan.titleCam || { x: 25.5, y: 31, yaw: Math.PI }; dolly.position.set(cx(tc.x), 0, cz(tc.y)); dolly.rotation.set(0, tc.yaw, 0);
+    LIGHT.A.value = Math.sin(t * 9) > 0.3 ? 1 : 0.1; NVU.on.value = 0;
+    veil.uniforms.t.value = t; veil.uniforms.hurt.value = 0; veil.uniforms.fear.value = 0.2 * S.grain; veil.uniforms.fade.value = 0; veil.uniforms.stat.value = 0;
+    vrMenu.update(); updateHands(dt, true);
+    renderer.render(scene, camera); return;
+  }
   const tc = plan.titleCam || { x: 25.5, y: 31, yaw: Math.PI }; dolly.position.set(cx(tc.x) + Math.sin(t * 0.05) * 2, 0, cz(tc.y) + Math.cos(t * 0.04) * 1.5); camera.position.set(0, 1.6, 0); camera.rotation.set(-0.05, tc.yaw + Math.sin(t * 0.07) * 0.6, 0, 'YXZ');
   LIGHT.A.value = Math.sin(t * 9) > 0.3 ? 1 : 0.1;
   renderer.setRenderTarget(rtMain); renderer.render(scene, camera); renderer.setRenderTarget(null);
@@ -557,7 +648,7 @@ function renderTape(o) {
   renderer.render(tape.scene, tape.cam);
 }
 function setCaptureSize(w, h) { renderer.setPixelRatio(1); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); rtMain.dispose(); rtMain = new THREE.WebGLRenderTarget(Math.round(w * 0.85), Math.round(h * 0.85), { type: THREE.HalfFloatType }); tape.uniforms.src.value = rtMain.texture; tape.uniforms.aspect.value = w / h; }
-window.__asy = { G, walker, renderTape, setCaptureSize, canvas, osdEl: $('osd'), cam, world, plan, doors, horrors, scene, camera, LIGHT, space, sound, renderer, use, interactables, scares, dressing, handL, handR, handLight, NVU,
+window.__asy = { vrMenu, ctlL: left, ctlR: right, dolly, G, walker, renderTape, setCaptureSize, canvas, osdEl: $('osd'), cam, world, plan, doors, horrors, scene, camera, LIGHT, space, sound, renderer, use, interactables, scares, dressing, handL, handR, handLight, NVU,
   // test hook: step the game a few frames by hand (the pane may not be animating) and grab the picture
   snap(steps = 3, w = 560) { const I0 = { mx: 0, mz: 0, turn: 0, lookDx: 0, lookDy: 0 }; for (let i = 0; i < steps; i++) { walker.update(1 / 30, I0); doors.update(1 / 30); lights(1 / 30); horrors.update(1 / 30); dressing.update(1 / 30, walker.pos, camera);  } draw(1, false, I0);
     const c = document.createElement('canvas'); c.width = w; c.height = Math.round(w * canvas.height / canvas.width); c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.72); } };
