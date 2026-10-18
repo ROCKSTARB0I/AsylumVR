@@ -28,8 +28,8 @@ export function makePlan3(base) {
 
   // what's lying about: Voss's tray on the kitchen counter, three documents
   p.items = [
-    { k: 'tray', x: 13.2, y: 2.4, id: 'tray' },
-    { k: 'note', x: 14.3, y: 2.4, id: 'n3_tray' },
+    { k: 'tray', x: 13.0, y: 1.78, id: 'tray' },   // on the serving counter (it sits back against the wall)
+    { k: 'note', x: 13.9, y: 1.78, id: 'n3_tray' },
     { k: 'note', x: 16.6, y: 29.3, id: 'n3_rota' },
     { k: 'note', x: 35.2, y: 30.8, id: 'n3_memo' },
   ];
