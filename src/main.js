@@ -2,23 +2,23 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=10';
-import { buildSurfaces, T } from './surfaces.js?v=10';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=10';
-import { Doors } from './doors.js?v=10';
-import { Space } from './space.js?v=10';
-import { Input } from './input.js?v=10';
-import { Walker } from './walker.js?v=10';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=10';
-import { makeTape, makeVeil } from './tape.js?v=10';
-import { Slate } from './slate.js?v=10';
-import * as STORY1 from './story.js?v=10';
-import * as TAPE2 from './tape2.js?v=10';
-import { Sound } from './dread.js?v=10';
-import { Horrors } from './horrors.js?v=10';
-import { Dressing } from './dressing.js?v=10';
-import { Scares } from './scares.js?v=10';
-import { makeHand } from './hands.js?v=10';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=11';
+import { buildSurfaces, T } from './surfaces.js?v=11';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=11';
+import { Doors } from './doors.js?v=11';
+import { Space } from './space.js?v=11';
+import { Input } from './input.js?v=11';
+import { Walker } from './walker.js?v=11';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=11';
+import { makeTape, makeVeil } from './tape.js?v=11';
+import { Slate } from './slate.js?v=11';
+import * as STORY1 from './story.js?v=11';
+import * as TAPE2 from './tape2.js?v=11';
+import { Sound } from './dread.js?v=11';
+import { Horrors } from './horrors.js?v=11';
+import { Dressing } from './dressing.js?v=11';
+import { Scares } from './scares.js?v=11';
+import { makeHand } from './hands.js?v=11';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -335,15 +335,34 @@ const hasSave = !!readSave();
 $('playDesktop').onclick = () => begin(false, hasSave);
 if (hasSave) {
   $('playDesktop').textContent = 'Continue on desktop'; $('enterVR').textContent = 'Continue in VR';
-  const nb = document.createElement('button'); nb.textContent = 'New game'; nb.onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); }; $('menu').insertBefore(nb, $('howBtn'));
+  const nb = document.createElement('button'); nb.textContent = 'New game'; nb.onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); }; $('menu').insertBefore(nb, $('selectBtn'));
 }
 {
-  const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4${TAPE === 2 ? ' &middot; The Male Ward' : ''}`;
-  {   // both tapes are always selectable
-    const menu = $('menu'); const other = TAPE === 1 ? 2 : 1;
-    const b = document.createElement('button'); b.textContent = other === 2 ? 'Tape 2: The Male Ward' : 'Tape 1: Recovered Footage'; b.onclick = () => { location.href = '?tape=' + other; };
-    menu.insertBefore(b, $('howBtn'));
+  const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4 &middot; ${TAPE === 2 ? 'The Male Ward' : 'Recovered Footage'}`;
+  // the tape shelf
+  const TAPES = [
+    { n: 1, name: 'Tape 1: Recovered Footage', sub: 'Ground floor. Administration, the cafeteria, the morgue.' },
+    { n: 2, name: 'Tape 2: The Male Ward', sub: 'The north building. Dormitory, chapel, surgical theater.' },
+    { n: 3, name: 'Tape 3: The Basement', sub: 'Not yet recovered.', locked: true },
+    { n: 4, name: 'Tape 4', sub: 'Not yet recovered.', locked: true },
+  ];
+  const status = (n) => {
+    let done = false, sv = null; try { done = localStorage.getItem('asylumvr_done_t' + n) === '1'; sv = JSON.parse(localStorage.getItem('asylumvr_save_t' + n) || 'null'); } catch (e) {}
+    if (sv) { const k = (sv.items || []).filter((i) => !i.startsWith('n')).length; const what = n === 1 ? `${sv.fuses || 0}/3 fuses` : `${k} key${k === 1 ? '' : 's'}`; const ago = Math.max(1, Math.round((Date.now() - sv.at) / 60000)); return ['prog', `IN PROGRESS · ${what} · saved ${ago < 60 ? ago + ' min' : Math.round(ago / 60) + ' h'} ago`]; }
+    if (done) return ['done', 'COMPLETED'];
+    return ['', 'NEW'];
+  };
+  const shelf = $('tapes');
+  for (const tp of TAPES) {
+    const b = document.createElement('button'); b.className = 'tape' + (tp.locked ? ' locked' : '') + (tp.n === TAPE ? ' loaded' : ''); b.disabled = !!tp.locked;
+    const [cls, txt] = tp.locked ? ['', 'LOCKED'] : status(tp.n);
+    b.innerHTML = `<span class="reels"><i></i><i></i></span><span class="label"><b>${tp.name}</b><small>${tp.sub}</small></span><span class="status ${tp.n === TAPE && !tp.locked ? 'now' : cls}">${tp.n === TAPE && !tp.locked ? 'LOADED · ' + txt : txt}</span>`;
+    b.onclick = () => { if (tp.locked) return; if (tp.n === TAPE) { $('shelf').hidden = true; $('menu').hidden = false; document.querySelector('.vhs').classList.remove('selecting'); return; } location.href = '?tape=' + tp.n; };
+    shelf.appendChild(b);
   }
+  const vhs = document.querySelector('.vhs');
+  $('selectBtn').onclick = () => { $('shelf').hidden = false; $('menu').hidden = true; $('how').hidden = true; vhs.classList.add('selecting'); };
+  $('shelfBack').onclick = () => { $('shelf').hidden = true; $('menu').hidden = false; vhs.classList.remove('selecting'); };
 }
 $('howBtn').onclick = () => { $('how').hidden = !$('how').hidden; };
 const vrBtn = $('enterVR');
@@ -500,7 +519,7 @@ function ending() {
   setTimeout(() => {
     G.playing = false; $('screen').hidden = false;
     document.querySelector('.osd-top .play').innerHTML = '&#9632;&#xFE0E; STOP';
-    try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+    try { localStorage.removeItem(SAVE_KEY); localStorage.setItem('asylumvr_done_t' + TAPE, '1'); } catch (e) {}
     try { localStorage.setItem('asylumvr_tapes', String(Math.min(2, Math.max(unlocked, TAPE + 1)))); } catch (e) {}
     if (TAPE === 2) document.querySelector('.vhs').innerHTML = TAPE2.ENDING(G, timecode);
     else document.querySelector('.vhs').innerHTML = `<div class="end"><p class="kicker">Mount Harrow State Asylum</p><h1 class="logo">END OF TAPE 1</h1><p class="lede">The gate rose. The courtyard was full of patients, standing in the rain, waiting.<br>None of them were looking at the gate. They were looking at the north building.<br>Somebody behind you said your name.</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${Object.keys(NOTES).length} · Time ${timecode(G.t).slice(3, 8)}</p><nav class="menu"><button onclick="location.href='?tape=2'">Play Tape 2: The Male Ward</button><button onclick="location.href='?tape=1'">Rewind</button></nav></div>`;
