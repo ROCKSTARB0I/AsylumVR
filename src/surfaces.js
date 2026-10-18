@@ -2,7 +2,7 @@
 // canvases at load time (tile, plaster, linoleum, concrete, rust, blood,
 // mattress stains, scrawl), with a matching normal map from its height.
 import * as THREE from '../vendor/three.module.js';
-import { picture, keepPicture, keptData, keepData } from './keep.js?v=16';
+import { picture, keepPicture, keptData, keepData } from './keep.js?v=17';
 
 // ---------------------------------------------------------------- noise
 function hash(x, y, s) { let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }

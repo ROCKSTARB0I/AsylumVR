@@ -2,25 +2,26 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=16';
-import { buildSurfaces, T } from './surfaces.js?v=16';
-import { loadPictures, savePictures } from './keep.js?v=16';
-import { VRMenu } from './vrmenu.js?v=16';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=16';
-import { Doors } from './doors.js?v=16';
-import { Space } from './space.js?v=16';
-import { Input } from './input.js?v=16';
-import { Walker } from './walker.js?v=16';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=16';
-import { makeTape, makeVeil } from './tape.js?v=16';
-import { Slate } from './slate.js?v=16';
-import * as STORY1 from './story.js?v=16';
-import * as TAPE2 from './tape2.js?v=16';
-import { Sound } from './dread.js?v=16';
-import { Horrors } from './horrors.js?v=16';
-import { Dressing } from './dressing.js?v=16';
-import { Scares } from './scares.js?v=16';
-import { makeHand } from './hands.js?v=16';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=17';
+import { buildSurfaces, T } from './surfaces.js?v=17';
+import { loadPictures, savePictures } from './keep.js?v=17';
+import { VRMenu } from './vrmenu.js?v=17';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=17';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=17';
+import { Doors } from './doors.js?v=17';
+import { Space } from './space.js?v=17';
+import { Input } from './input.js?v=17';
+import { Walker } from './walker.js?v=17';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=17';
+import { makeTape, makeVeil } from './tape.js?v=17';
+import { Slate } from './slate.js?v=17';
+import * as STORY1 from './story.js?v=17';
+import * as TAPE2 from './tape2.js?v=17';
+import { Sound } from './dread.js?v=17';
+import { Horrors } from './horrors.js?v=17';
+import { Dressing } from './dressing.js?v=17';
+import { Scares } from './scares.js?v=17';
+import { makeHand } from './hands.js?v=17';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -178,7 +179,7 @@ const itemMeshes = [];
     if (it.k === 'battery') continue;   // night vision is unlimited, so no batteries to find
     const m = mk(it.k); const x = cx(it.x), z = cz(it.y);
     // rest on whatever is under it
-    let y = 0.02; for (const c of world.colliders) if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1) y = Math.max(y, Math.min(1.2, c.y1) + 0.02);
+    let y = 0.02; for (const c of world.colliders) if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1) y = Math.max(y, (c.k === 'secdesk' ? 0.78 : Math.min(1.2, c.y1)) + 0.02);   // (the monitor desk's box is as tall as its monitors; the top is at 0.78)
     if (it.k === 'note') y = Math.max(y, 0.005);
     m.position.set(x, y, z); m.rotation.y = (it.x * 7 + it.y) % 6; scene.add(m);
     itemMeshes.push({ it, m });
@@ -323,6 +324,9 @@ $('grain').oninput = (e) => { S.grain = +e.target.value; save(); };
 $('smooth').onchange = (e) => { S.smooth = e.target.checked; save(); };
 document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && G.playing && !renderer.xr.isPresenting && !G.reading && !G.paused && input.hadLock) setPaused(true); if (document.pointerLockElement) input.hadLock = true; });
 
+// ---------------------------------------------------------------- the end of Tape 1: Pell
+const abduct = TAPE === 1 ? new Abduction({ scene, camera, dolly, walker, sound, horrors, scares, card, placeCard, setFade: (v, now) => { fadeGoal = v; if (now) fade = v; } }) : null;
+
 // ---------------------------------------------------------------- start
 async function begin(vr, cont = false) {
   if (!sound.rec) { $('loading').textContent = 'Recording sounds…'; await Promise.race([recording, new Promise((r) => { const iv = setInterval(() => { if (sound.rec) { clearInterval(iv); r(); } }, 100); })]); }
@@ -349,7 +353,7 @@ if (hasSave) {
   const TAPES = [
     { n: 1, name: 'Tape 1: Recovered Footage', sub: 'Ground floor. Administration, the cafeteria, the morgue.' },
     { n: 2, name: 'Tape 2: The Male Ward', sub: 'The north building. Dormitory, chapel, surgical theater.' },
-    { n: 3, name: 'Tape 3: The Basement', sub: 'Not yet recovered.', locked: true },
+    { n: 3, name: 'Tape 3: The Fall', sub: 'Not yet recovered.', locked: true },
     { n: 4, name: 'Tape 4', sub: 'Not yet recovered.', locked: true },
   ];
   const status = (n) => {
@@ -381,7 +385,8 @@ $('resetYes').onclick = () => {
 };
 // the title's sound: browsers only allow audio after you touch the page, so the theme starts on the first tap/click/key
 // it tries to start right away (allowed once you've played before); otherwise any tap/click/key starts it, and the menu says so
-function titleSound() { if (G.playing) return; sound.init(); sound.wake(); sound.playMenu(); soundHint(); }
+const QUIET = new URLSearchParams(location.search).has('mute');   // dev: test tabs stay silent
+function titleSound() { if (G.playing) return; sound.init(); if (QUIET) { sound.master.gain.value = 0; return; } sound.wake(); sound.playMenu(); soundHint(); }
 let hintOn = false;
 function soundHint(loop) { if (hintOn && !loop) return; hintOn = true; const st = sound.ctx ? sound.ctx.state : 'suspended'; $('soundHint').hidden = G.playing || st === 'running'; if (st !== 'running' && !G.playing) setTimeout(() => soundHint(true), 400); else hintOn = false; }
 for (const ev of ['pointerdown', 'pointerup', 'mousedown', 'click', 'touchstart', 'touchend', 'keydown']) addEventListener(ev, titleSound, { capture: true });
@@ -468,6 +473,13 @@ function frame() {
     draw(dt, vr, I); return;
   }
   if (G.reading) { if (I.interact || I.pause) closeRead(); draw(dt, vr, I); return; }
+  // the Tape 1 ending plays itself
+  if (abduct && abduct.on) {
+    const r = abduct.update(dt, vr, I); lights(dt); doors.update(dt); updateHands(dt, vr); if (gateMesh) { gateMesh.position.y = 2.9; space.gateBox = null; }
+    camera.getWorldPosition(tmpV); camera.getWorldQuaternion(tmpQ);
+    sound.listen(tmpV, tmpQ, dt, { fear: 0.5, chase: 0, chaseKind: null, exhaust: 0, hurt: 1 - walker.health / 100, hidden: false, pos: walker.pos, light: world.lightAt(walker.pos.x, walker.pos.z) });
+    draw(dt, vr, I); if (r === 'done') ending(); return;
+  }
   if (I.notes && !vr) { setPaused(true); }
   if (I.notes && vr) { caption(objectiveText(), 4); }
 
@@ -493,7 +505,7 @@ function frame() {
   if (TAPE === 1 && G.leftAdmin && !G.said.has('dark') && G.t > 20 && !cam.nv) say('dark');
   if (TAPE === 1 && !G.sawPanel && walker.pos.distanceTo(panelPos.clone().setY(0)) < 3.5) { G.sawPanel = true; say('security'); }
   if (TAPE === 1 && !G.said.has('gateChained') && walker.pos.distanceTo(new V(cx(25.5), 0, cz(36))) < 3) say('gateChained');
-  if (TAPE === 1 && G.gateOpen && walker.pos.z > cz(37.6) && !G.escaped) { G.escaped = true; ending(); }
+  if (TAPE === 1 && G.gateOpen && walker.pos.z > cz(37.6) && !G.escaped) { G.escaped = true; if (abduct) abduct.start(); else ending(); }
   if (gateMesh && G.gateOpen) gateMesh.position.y = Math.min(2.9, gateMesh.position.y + dt * 0.6), space.gateBox = gateMesh.position.y > 2.2 ? null : space.gateBox;
 
   // interaction ray
@@ -628,7 +640,7 @@ function ending() {
     try { localStorage.removeItem(SAVE_KEY); localStorage.setItem('asylumvr_done_t' + TAPE, '1'); } catch (e) {}
     try { localStorage.setItem('asylumvr_tapes', String(Math.min(2, Math.max(unlocked, TAPE + 1)))); } catch (e) {}
     if (TAPE === 2) document.querySelector('.vhs').innerHTML = TAPE2.ENDING(G, timecode);
-    else document.querySelector('.vhs').innerHTML = `<div class="end"><p class="kicker">Mount Harrow State Asylum</p><h1 class="logo">END OF TAPE 1</h1><p class="lede">The gate rose. The courtyard was full of patients, standing in the rain, waiting.<br>None of them were looking at the gate. They were looking at the north building.<br>Somebody behind you said your name.</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${Object.keys(NOTES).length} · Time ${timecode(G.t).slice(3, 8)}</p><nav class="menu"><button onclick="location.href='?tape=2'">Play Tape 2: The Male Ward</button><button onclick="location.href='?tape=1'">Rewind</button></nav></div>`;
+    else document.querySelector('.vhs').innerHTML = `<div class="end"><p class="kicker">Mount Harrow State Asylum</p><h1 class="logo">END OF TAPE 1</h1><p class="lede">${ABDUCT_TEXT.join('<br><br>')}</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${Object.keys(NOTES).length} · Time ${timecode(G.t).slice(3, 8)}</p><nav class="menu"><button onclick="location.href='?tape=2'">Play Tape 2: The Male Ward</button><button onclick="location.href='?tape=1'">Rewind</button></nav></div>`;
     if (renderer.xr.isPresenting) renderer.xr.getSession().end();
   }, 2200);
 }
@@ -648,7 +660,7 @@ function renderTape(o) {
   renderer.render(tape.scene, tape.cam);
 }
 function setCaptureSize(w, h) { renderer.setPixelRatio(1); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); rtMain.dispose(); rtMain = new THREE.WebGLRenderTarget(Math.round(w * 0.85), Math.round(h * 0.85), { type: THREE.HalfFloatType }); tape.uniforms.src.value = rtMain.texture; tape.uniforms.aspect.value = w / h; }
-window.__asy = { vrMenu, ctlL: left, ctlR: right, dolly, G, walker, renderTape, setCaptureSize, canvas, osdEl: $('osd'), cam, world, plan, doors, horrors, scene, camera, LIGHT, space, sound, renderer, use, interactables, scares, dressing, handL, handR, handLight, NVU,
+window.__asy = { abduct, vrMenu, ctlL: left, ctlR: right, dolly, G, walker, renderTape, setCaptureSize, canvas, osdEl: $('osd'), cam, world, plan, doors, horrors, scene, camera, LIGHT, space, sound, renderer, use, interactables, scares, dressing, handL, handR, handLight, NVU,
   // test hook: step the game a few frames by hand (the pane may not be animating) and grab the picture
   snap(steps = 3, w = 560) { const I0 = { mx: 0, mz: 0, turn: 0, lookDx: 0, lookDy: 0 }; for (let i = 0; i < steps; i++) { walker.update(1 / 30, I0); doors.update(1 / 30); lights(1 / 30); horrors.update(1 / 30); dressing.update(1 / 30, walker.pos, camera);  } draw(1, false, I0);
     const c = document.createElement('canvas'); c.width = w; c.height = Math.round(w * canvas.height / canvas.width); c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.72); } };

@@ -5,9 +5,9 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=16';
-import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=16';
-import { renderMenuTheme, THEME_LOOP } from './theme.js?v=16';
+import { Score } from './score.js?v=17';
+import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=17';
+import { renderMenuTheme, THEME_LOOP } from './theme.js?v=17';
 
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };

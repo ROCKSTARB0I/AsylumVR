@@ -3,7 +3,7 @@
 // station and hydrotherapy sit off one long corridor; the chapel and the
 // surgical theater are locked away to the north; the stairwell down to the
 // basement is chained shut at the east end.
-import { C, W, D, Z, cx, cz } from './plan.js?v=16';
+import { C, W, D, Z, cx, cz } from './plan.js?v=17';
 
 export function makePlan2() {
   const g = new Uint8Array(W * D); const win = new Uint8Array(W * D);
@@ -45,7 +45,7 @@ export function makePlan2() {
   for (const x of [5, 17, 21]) L(x, 28.8, 'S', { col: 0x7088c0, i: 0.8, r: 8, kind: 'none', dir: [0, -0.5, -1] });
   L(13, 24, 'S', { col: 0xff2a10, i: 0.45, r: 7, kind: 'cage' });
   L(9.7, 32.6, 'S', { col: 0xe6f0ff, i: 0.7, r: 5, kind: 'bulb' });                    // the bare bulb over your bed
-  L(28, 20, 'S', { col: 0xffb060, i: 0.55, r: 5, kind: 'lamp' });                   // desk lamp, nurses' station
+  L(29, 24, 'S', { col: 0xffb060, i: 0.55, r: 5, kind: 'lamp' });                   // desk lamp, nurses' station
   L(37, 23, 'A', { col: 0xcfe8ff, i: 0.7, r: 7, kind: 'tube' });
   for (const x of [5, 13, 21]) L(x, 12.5, 'S', { col: 0xe6f0ff, i: 0.3, r: 4, kind: 'bulb' });
   for (const x of [31, 36, 41, 45]) L(x, 2.2, 'S', { col: 0x7088c0, i: 0.7, r: 8, kind: 'none', dir: [0, -0.5, 1] });
@@ -59,7 +59,7 @@ export function makePlan2() {
   P('bed', 9.4, 32.6, 0);                                                        // your restraint bed, against the west wall
   P('trolley', 12.6, 33.6, 0); P('ivstand', 10.3, 31.3, 0);
   for (const x of [4, 8, 12, 16, 20]) { P('bucket', x + 2.2, 11.4, 0); }
-  P('secdesk', 28.5, 19.4, 0); P('filing', 26.4, 24.4, 2); P('filing', 27.4, 24.4, 2); P('shelf', 31.6, 22, 3); P('chair', 28.5, 20.6, 2);
+  P('secdesk', 29.7, 24.35, 2); P('filing', 26.4, 24.4, 2); P('filing', 27.4, 24.4, 2); P('shelf', 31.6, 21, 3); P('chair', 29.7, 23.3, 0);   // the monitor desk against the back wall, clear of the door
   for (const x of [34.5, 37.5, 40.5]) { P('tub', x, 20.8, 0); P('tub', x, 25.6, 0); }
   P('stall', 42.6, 23, 3);
   for (let y = 6.5; y <= 12; y += 1.5) { P('bench', 33, y, 1); P('bench', 41, y, 1); }
@@ -79,10 +79,10 @@ export function makePlan2() {
 
   const items = [
     { k: 'note', x: 12.4, y: 33.6, id: 'n2_wake' },
-    { k: 'card', x: 29.4, y: 19.5, id: 'card' },
+    { k: 'card', x: 30.4, y: 24.15, id: 'card' },
     { k: 'chapelKey', x: 38.5, y: 4.2, id: 'chapelKey' },
     { k: 'stairKey', x: 14.5, y: 3.5, id: 'stairKey' },
-    { k: 'note', x: 28.8, y: 19.5, id: 'n2_pell' }, { k: 'note', x: 15, y: 25, id: 'n2_dorm' }, { k: 'note', x: 13, y: 12.4, id: 'n2_padded' },
+    { k: 'note', x: 29.0, y: 24.15, id: 'n2_pell' }, { k: 'note', x: 15, y: 25, id: 'n2_dorm' }, { k: 'note', x: 13, y: 12.4, id: 'n2_padded' },
     { k: 'note', x: 40.5, y: 25.6, id: 'n2_hydro' }, { k: 'note', x: 34, y: 6.5, id: 'n2_chapel' }, { k: 'note', x: 10, y: 3.2, id: 'n2_surgery' },
     { k: 'note', x: 45.5, y: 25.4, id: 'n2_stairs' }, { k: 'note', x: 8, y: 37.6, id: 'n2_kroft' },
   ];
