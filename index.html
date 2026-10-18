@@ -10,7 +10,19 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=VT323&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=10">
+<script>
+// Self-update: GitHub Pages caches this page for a few minutes, so a stale copy can load old scripts.
+// Ask for the current version (never cached) and, if it's newer than this page, reload past the cache.
+(function () {
+  var BUILD = 11;
+  try {
+    fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.v > BUILD) { var q = new URLSearchParams(location.search); if (q.get('build') === String(j.v)) return; q.set('build', j.v); location.replace(location.pathname + '?' + q.toString()); }
+    }).catch(function () {});
+  } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="style.css?v=11">
 </head>
 <body>
 <canvas id="view" tabindex="0"></canvas>
@@ -51,8 +63,14 @@
     <nav class="menu" id="menu">
       <button id="enterVR">Enter VR</button>
       <button id="playDesktop">Play on desktop</button>
+      <button id="selectBtn">Select tape</button>
       <button id="howBtn">How to play</button>
     </nav>
+    <div class="shelf" id="shelf" hidden>
+      <p class="shelfTitle">&#9654;&#xFE0E; SELECT TAPE</p>
+      <div class="tapes" id="tapes"></div>
+      <nav class="menu"><button id="shelfBack">Back</button></nav>
+    </div>
     <p id="vrNote"></p>
     <p id="loading">Rewinding tape&hellip;</p>
     <div class="how" id="how" hidden>
@@ -64,6 +82,6 @@
   <div class="osd-bot"><span class="date">OCT.17 1993</span><span class="clock">2:13 AM</span></div>
 </div>
 
-<script type="module" src="src/main.js?v=10"></script>
+<script type="module" src="src/main.js?v=11"></script>
 </body>
 </html>
