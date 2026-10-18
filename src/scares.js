@@ -3,8 +3,8 @@
 // hunting you). The worst of them end the same way: a face lunging into
 // the lens, a scream, a burst of dead-channel static.
 import * as THREE from '../vendor/three.module.js';
-import { C, H, cx, cz } from './plan.js?v=11';
-import { makeBody, pose } from './carcass.js?v=11';
+import { C, H, cx, cz } from './plan.js?v=13';
+import { makeBody, pose } from './carcass.js?v=13';
 
 const V = THREE.Vector3;
 const near = (p, x, y, r) => Math.hypot(p.x - cx(x), p.z - cz(y)) < r;

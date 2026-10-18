@@ -2,23 +2,23 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=11';
-import { buildSurfaces, T } from './surfaces.js?v=11';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=11';
-import { Doors } from './doors.js?v=11';
-import { Space } from './space.js?v=11';
-import { Input } from './input.js?v=11';
-import { Walker } from './walker.js?v=11';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=11';
-import { makeTape, makeVeil } from './tape.js?v=11';
-import { Slate } from './slate.js?v=11';
-import * as STORY1 from './story.js?v=11';
-import * as TAPE2 from './tape2.js?v=11';
-import { Sound } from './dread.js?v=11';
-import { Horrors } from './horrors.js?v=11';
-import { Dressing } from './dressing.js?v=11';
-import { Scares } from './scares.js?v=11';
-import { makeHand } from './hands.js?v=11';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=13';
+import { buildSurfaces, T } from './surfaces.js?v=13';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=13';
+import { Doors } from './doors.js?v=13';
+import { Space } from './space.js?v=13';
+import { Input } from './input.js?v=13';
+import { Walker } from './walker.js?v=13';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=13';
+import { makeTape, makeVeil } from './tape.js?v=13';
+import { Slate } from './slate.js?v=13';
+import * as STORY1 from './story.js?v=13';
+import * as TAPE2 from './tape2.js?v=13';
+import { Sound } from './dread.js?v=13';
+import { Horrors } from './horrors.js?v=13';
+import { Dressing } from './dressing.js?v=13';
+import { Scares } from './scares.js?v=13';
+import { makeHand } from './hands.js?v=13';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -321,7 +321,7 @@ document.addEventListener('pointerlockchange', () => { if (!document.pointerLock
 // ---------------------------------------------------------------- start
 async function begin(vr, cont = false) {
   if (!sound.rec) { $('loading').textContent = 'Recording sounds…'; await Promise.race([recording, new Promise((r) => { const iv = setInterval(() => { if (sound.rec) { clearInterval(iv); r(); } }, 100); })]); }
-  sound.init(); await sound.ready;
+  sound.init(); await sound.ready; sound.stopMenu();
   $('screen').hidden = true; G.playing = true; fade = 1; fadeTo(0);
   walker.place(cx(plan.start.x), cz(plan.start.y), plan.start.yaw); checkpoint();
   const sv = cont ? readSave() : null;
@@ -357,7 +357,7 @@ if (hasSave) {
     const b = document.createElement('button'); b.className = 'tape' + (tp.locked ? ' locked' : '') + (tp.n === TAPE ? ' loaded' : ''); b.disabled = !!tp.locked;
     const [cls, txt] = tp.locked ? ['', 'LOCKED'] : status(tp.n);
     b.innerHTML = `<span class="reels"><i></i><i></i></span><span class="label"><b>${tp.name}</b><small>${tp.sub}</small></span><span class="status ${tp.n === TAPE && !tp.locked ? 'now' : cls}">${tp.n === TAPE && !tp.locked ? 'LOADED · ' + txt : txt}</span>`;
-    b.onclick = () => { if (tp.locked) return; if (tp.n === TAPE) { $('shelf').hidden = true; $('menu').hidden = false; document.querySelector('.vhs').classList.remove('selecting'); return; } location.href = '?tape=' + tp.n; };
+    b.onclick = () => { if (tp.locked) return; if (tp.n === TAPE) { $('shelf').hidden = true; $('menu').hidden = false; document.querySelector('.vhs').classList.remove('selecting'); return; } setTimeout(() => { location.href = '?tape=' + tp.n; }, 650); };
     shelf.appendChild(b);
   }
   const vhs = document.querySelector('.vhs');
@@ -365,6 +365,17 @@ if (hasSave) {
   $('shelfBack').onclick = () => { $('shelf').hidden = true; $('menu').hidden = false; vhs.classList.remove('selecting'); };
 }
 $('howBtn').onclick = () => { $('how').hidden = !$('how').hidden; };
+// reset progress: asks first, then wipes every save, completion flag and unlocked tape
+$('resetBtn').onclick = () => { $('confirm').hidden = false; $('menu').hidden = true; $('how').hidden = true; };
+$('resetNo').onclick = () => { $('confirm').hidden = true; $('menu').hidden = false; };
+$('resetYes').onclick = () => {
+  try { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (k && k.startsWith('asylumvr_')) localStorage.removeItem(k); } } catch (e) {}
+  setTimeout(() => { location.href = location.pathname; }, 650);
+};
+// the title's sound: browsers only allow audio after you touch the page, so the theme starts on the first tap/click/key
+function titleSound() { if (G.playing) return; sound.init(); sound.ready.then(() => sound.playMenu()); }
+addEventListener('pointerdown', titleSound, { capture: true }); addEventListener('keydown', titleSound, { capture: true });
+$('screen').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || b.disabled) return; if (b.classList.contains('tape')) sound.tapeLoad(); else sound.tapeClick(); }, true);
 const vrBtn = $('enterVR');
 if (!navigator.xr) { vrBtn.disabled = true; $('vrNote').textContent = 'WebXR not available here — open this page in the Meta Quest browser to play in VR.'; }
 else navigator.xr.isSessionSupported('immersive-vr').then((ok) => { if (!ok) { vrBtn.disabled = true; $('vrNote').textContent = 'No VR headset found — play on desktop, or open this page on your Quest.'; } }).catch(() => {});
@@ -517,7 +528,7 @@ function renderTitle(dt) {
 function ending() {
   fadeTo(1); sound.duck(true);
   setTimeout(() => {
-    G.playing = false; $('screen').hidden = false;
+    G.playing = false; $('screen').hidden = false; sound.duck(false); sound.playMenu();
     document.querySelector('.osd-top .play').innerHTML = '&#9632;&#xFE0E; STOP';
     try { localStorage.removeItem(SAVE_KEY); localStorage.setItem('asylumvr_done_t' + TAPE, '1'); } catch (e) {}
     try { localStorage.setItem('asylumvr_tapes', String(Math.min(2, Math.max(unlocked, TAPE + 1)))); } catch (e) {}
