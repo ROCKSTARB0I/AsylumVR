@@ -5,8 +5,8 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=14';
-import { renderMenuTheme, THEME_LOOP } from './theme.js?v=14';
+import { Score } from './score.js?v=15';
+import { renderMenuTheme, THEME_LOOP } from './theme.js?v=15';
 
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
@@ -21,7 +21,7 @@ export class Sound {
     let ctx; try { ctx = new AC({ latencyHint: QUEST ? 'playback' : 'interactive' }); } catch (e) { ctx = new AC(); } this.ctx = ctx;
     // the Quest browser suspends audio when the session or focus changes; bring it back on any input
     const wake = () => { if (ctx.state !== 'running') ctx.resume().catch(() => {}); };
-    for (const ev of ['pointerdown', 'keydown', 'touchstart', 'visibilitychange', 'focus']) addEventListener(ev, wake, true);
+    for (const ev of ['pointerdown', 'pointerup', 'mousedown', 'click', 'keydown', 'touchstart', 'touchend', 'visibilitychange', 'focus']) addEventListener(ev, wake, true);
     ctx.onstatechange = () => { if (ctx.state !== 'running' && ctx.state !== 'closed') setTimeout(wake, 200); };
     this.wake = wake;
     this.ready = ctx.resume ? ctx.resume() : Promise.resolve();

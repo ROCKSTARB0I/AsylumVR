@@ -2,23 +2,23 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=14';
-import { buildSurfaces, T } from './surfaces.js?v=14';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=14';
-import { Doors } from './doors.js?v=14';
-import { Space } from './space.js?v=14';
-import { Input } from './input.js?v=14';
-import { Walker } from './walker.js?v=14';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=14';
-import { makeTape, makeVeil } from './tape.js?v=14';
-import { Slate } from './slate.js?v=14';
-import * as STORY1 from './story.js?v=14';
-import * as TAPE2 from './tape2.js?v=14';
-import { Sound } from './dread.js?v=14';
-import { Horrors } from './horrors.js?v=14';
-import { Dressing } from './dressing.js?v=14';
-import { Scares } from './scares.js?v=14';
-import { makeHand } from './hands.js?v=14';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=15';
+import { buildSurfaces, T } from './surfaces.js?v=15';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=15';
+import { Doors } from './doors.js?v=15';
+import { Space } from './space.js?v=15';
+import { Input } from './input.js?v=15';
+import { Walker } from './walker.js?v=15';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=15';
+import { makeTape, makeVeil } from './tape.js?v=15';
+import { Slate } from './slate.js?v=15';
+import * as STORY1 from './story.js?v=15';
+import * as TAPE2 from './tape2.js?v=15';
+import { Sound } from './dread.js?v=15';
+import { Horrors } from './horrors.js?v=15';
+import { Dressing } from './dressing.js?v=15';
+import { Scares } from './scares.js?v=15';
+import { makeHand } from './hands.js?v=15';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -373,8 +373,12 @@ $('resetYes').onclick = () => {
   setTimeout(() => { location.href = location.pathname; }, 650);
 };
 // the title's sound: browsers only allow audio after you touch the page, so the theme starts on the first tap/click/key
-function titleSound() { if (G.playing) return; sound.init(); sound.ready.then(() => sound.playMenu()); }
-addEventListener('pointerdown', titleSound, { capture: true }); addEventListener('keydown', titleSound, { capture: true });
+// it tries to start right away (allowed once you've played before); otherwise any tap/click/key starts it, and the menu says so
+function titleSound() { if (G.playing) return; sound.init(); sound.wake(); sound.playMenu(); soundHint(); }
+let hintOn = false;
+function soundHint(loop) { if (hintOn && !loop) return; hintOn = true; const st = sound.ctx ? sound.ctx.state : 'suspended'; $('soundHint').hidden = G.playing || st === 'running'; if (st !== 'running' && !G.playing) setTimeout(() => soundHint(true), 400); else hintOn = false; }
+for (const ev of ['pointerdown', 'pointerup', 'mousedown', 'click', 'touchstart', 'touchend', 'keydown']) addEventListener(ev, titleSound, { capture: true });
+try { titleSound(); } catch (e) {}
 $('screen').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b || b.disabled) return; if (b.classList.contains('tape')) sound.tapeLoad(); else sound.tapeClick(); }, true);
 const vrBtn = $('enterVR');
 if (!navigator.xr) { vrBtn.disabled = true; $('vrNote').textContent = 'WebXR not available here — open this page in the Meta Quest browser to play in VR.'; }
