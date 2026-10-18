@@ -5,9 +5,9 @@
 // trousers) and a face damaged in one of several ways. Procedural poses
 // drive the bones: walking, running, stalking, rocking, eating, reaching.
 import * as THREE from '../vendor/three.module.js';
-import { rng, fbm } from './surfaces.js?v=24';
-import { EYE_LAYER } from './camcorder.js?v=24';
-import { buildVisage, headMaterial } from './visage.js?v=24';
+import { rng, fbm } from './surfaces.js?v=25';
+import { EYE_LAYER } from './camcorder.js?v=25';
+import { buildVisage, headMaterial } from './visage.js?v=25';
 
 const V = THREE.Vector3;
 export const BODY_LIGHT = { up: { value: new V(0, 1, 0) } };
