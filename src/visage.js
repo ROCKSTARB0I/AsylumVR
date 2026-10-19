@@ -6,8 +6,8 @@
 // bandages, a missing nose, a surgical mask). Both maps share a front
 // projection; the rest of the head keeps procedural vertex colour.
 import * as THREE from '../vendor/three.module.js';
-import { picture, keepPicture } from './keep.js?v=29';
-import { rng, fbm } from './surfaces.js?v=29';
+import { picture, keepPicture } from './keep.js?v=30';
+import { rng, fbm } from './surfaces.js?v=30';
 
 const V = THREE.Vector3;
 const D = 256, T = 512;     // depth map and face texture sizes
