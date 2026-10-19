@@ -119,3 +119,5 @@ button:hover:not(:disabled), button:focus-visible { border-color: var(--red); co
 #talk .replies li { padding: 1px 8px; }
 #talk .replies li.sel { background: #e8e2d4; color: #000; }
 #talk .hint { margin: 8px 0 0; font-family: 'VT323', monospace; font-size: 17px; color: #6f695f; letter-spacing: 0.08em; text-transform: uppercase; }
+
+#minimap { display: block; margin: 14px auto 6px; width: min(560px, 90vw); height: auto; border: 1px solid #3a352c; image-rendering: pixelated; }
