@@ -4,7 +4,7 @@
 //   B1 (3.2 m), Intake & Genetics: the tank hall, the genetics lab, offices, specimen storage, the nursery
 //   B2 (0 m), Containment: holding cells behind glass, dissection, cryo, the observation gallery over the Pit
 // and the way out: the emergency stairs up two storeys to the vehicle bay, and the desert road at dawn.
-import { H, Z, setGrid, setLevels } from './plan.js?v=34';
+import { H, Z, setGrid, setLevels } from './plan.js?v=35';
 
 export function makePlan5() {
   const W = 110, D = 82; setGrid(W, D);

@@ -2,8 +2,8 @@
 // engineer, is sent out to Site 7 in the Nye County desert because the annex stopped reporting. The camcorder
 // is for the insurance report. What the asylum grew down here is out of its tanks.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, C, H, floorAt, ceilOf } from './plan.js?v=34';
-import { makeBody, pose } from './carcass.js?v=34';
+import { cx, cz, C, H, floorAt, ceilOf } from './plan.js?v=35';
+import { makeBody, pose } from './carcass.js?v=35';
 const V = THREE.Vector3;
 
 // ------------------------------------------------------------------ the documents

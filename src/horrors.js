@@ -3,9 +3,9 @@
 // dark), hears (your steps, doors, things you knock), patrols or keeps to
 // its corner, investigates, chases, searches, checks lockers, and kills.
 import * as THREE from '../vendor/three.module.js';
-import { C, W, D, cx, cz, floorAt } from './plan.js?v=34';
-import { VAULT_H } from './space.js?v=34';
-import { makeBody, pose, cleaver, bonesaw, flashlight, syringe, BODY_LIGHT } from './carcass.js?v=34';
+import { C, W, D, cx, cz, floorAt } from './plan.js?v=35';
+import { VAULT_H } from './space.js?v=35';
+import { makeBody, pose, cleaver, bonesaw, flashlight, syringe, BODY_LIGHT } from './carcass.js?v=35';
 
 const V = THREE.Vector3;
 const tmp = new V(), tmp2 = new V();

@@ -1,7 +1,7 @@
 // The minimap: the floor you're on, drawn from the plan. Rooms you've been through are bright, the rest
 // is a faint outline; room names, stairwells, doors, and you (a red arrow). Shown on the pause screen:
 // on desktop (Esc / Tab) in the pause panel, in VR on a panel beside the pause card.
-import { W, D, C, Z, ZNAME, LEVELS, floorAt, baseOf } from './plan.js?v=34';
+import { W, D, C, Z, ZNAME, LEVELS, floorAt, baseOf } from './plan.js?v=35';
 
 export class MiniMap {
   constructor(plan) {

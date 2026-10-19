@@ -3,8 +3,8 @@
 // disturbed ward, down through the staff offices to the examining rooms, and down again to the boiler
 // house, the power plant, and the coal yard. Everything Mount Harrow was hiding is on this tape.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, C, floorAt } from './plan.js?v=34';
-import { makeBody, pose, bonesaw } from './carcass.js?v=34';
+import { cx, cz, C, floorAt } from './plan.js?v=35';
+import { makeBody, pose, bonesaw } from './carcass.js?v=35';
 const V = THREE.Vector3;
 
 // ------------------------------------------------------------------ the documents
@@ -356,7 +356,9 @@ export function setupTape4(ctx) {
     // build the next area's people a little at a time (every other frame)
     S.pf = (S.pf || 0) + 1; if (bq.length && S.pf % 2 === 0) bq.shift()();
     if (S.t > 3) for (let i = 1; i < ORDER.length; i++) { const k = ORDER[i - 1]; if (k === 'basement' || st[k]) want(ORDER[i]); }
-    const enter = (k, flag, line) => { if (!st[flag] && inReg(k)) { st[flag] = true; say1(line, 0.6); ctx.checkpoint(); ctx.save(); want(k); while (built[k] !== true && bq.length) bq.shift()(); } };
+    const enter = (k, flag, line) => { if (!st[flag] && inReg(k)) { st[flag] = true; shake(); say1(line, 0.6); ctx.checkpoint(); ctx.save(); want(k); while (built[k] !== true && bq.length) bq.shift()(); } };
+    // through the door at the top (or bottom) of a stairwell: whoever was hunting the floor you left is gone, chase or no chase
+    const shake = () => { horrors.setSegment(horrors.segment); for (const h of horrors.hunters) if (h !== horrors.hunter && h.active) { h.active = false; h.leaving = false; h.body.root.visible = false; h.state = 'patrol'; h.path = null; h.aware = 0; } };
     enter('female', 'female', 'female'); enter('disturbed', 'disturbed', 'disturbed'); enter('offices', 'offices', 'offices'); enter('exam', 'exam', 'exam'); enter('boiler', 'boiler', 'boiler');
     if (st.offices) loopGain('bell', 0, 1.5);
     // a mash in progress (Dolly, a valve)
