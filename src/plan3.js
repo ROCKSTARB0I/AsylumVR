@@ -2,7 +2,7 @@
 // it all came apart. Clean, lit, staffed. The mains are channel 'P' (white, on until the alarm); the
 // alarm beacons are channel 'S' (red, dark until the alarm, then pulsing). Cells start locked.
 
-import { W, Z } from './plan.js?v=30';
+import { W, Z } from './plan.js?v=31';
 
 export function makePlan3(base) {
   const p = base;

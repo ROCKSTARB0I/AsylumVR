@@ -5,9 +5,9 @@
 // trousers) and a face damaged in one of several ways. Procedural poses
 // drive the bones: walking, running, stalking, rocking, eating, reaching.
 import * as THREE from '../vendor/three.module.js';
-import { rng, fbm } from './surfaces.js?v=30';
-import { EYE_LAYER } from './camcorder.js?v=30';
-import { buildVisage, headMaterial } from './visage.js?v=30';
+import { rng, fbm } from './surfaces.js?v=31';
+import { EYE_LAYER } from './camcorder.js?v=31';
+import { buildVisage, headMaterial } from './visage.js?v=31';
 
 const V = THREE.Vector3;
 export const BODY_LIGHT = { up: { value: new V(0, 1, 0) } };
@@ -105,8 +105,8 @@ export function makeBody(kind, seed = 1, opts = {}) {
     return withBlood(c, p, n, 0.05 * stains);
   };
   const O = r.outfit;
-  const torsoCloth = O === 'orderly' || O === 'nurse' ? cloth.orderly : O === 'gown' ? cloth.gown : O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : O === 'rags' ? null : null;
-  const legCloth = O === 'nurse' ? new THREE.Color(0.86, 0.85, 0.82) : O === 'orderly' ? cloth.orderly : O === 'trousers' ? cloth.trousers : O === 'surgeon' ? cloth.scrub : O === 'straitjacket' ? cloth.gown : null;
+  const torsoCloth = O === 'ward' ? new THREE.Color(0.3, 0.29, 0.22) : O === 'orderly' || O === 'nurse' ? cloth.orderly : O === 'gown' ? cloth.gown : O === 'straitjacket' ? cloth.jacket : O === 'surgeon' ? cloth.scrub : O === 'rags' ? null : null;
+  const legCloth = O === 'ward' ? new THREE.Color(0.17, 0.2, 0.3) : O === 'nurse' ? new THREE.Color(0.86, 0.85, 0.82) : O === 'orderly' ? cloth.orderly : O === 'trousers' ? cloth.trousers : O === 'surgeon' ? cloth.scrub : O === 'straitjacket' ? cloth.gown : null;
 
   // ---- torso: crotch to neck base, elliptical, ribs when starved, pecs and traps when huge
   const torsoR = (t, ang) => {
@@ -462,6 +462,16 @@ function glintTex() {
   x.fillStyle = g; x.fillRect(0, 0, 64, 64); _glint = new THREE.CanvasTexture(c); return _glint;
 }
 
+// a big glass syringe, a hand's length of needle
+export function syringe(s = 1) {
+  const g = new THREE.Group(); const glass = new THREE.MeshStandardMaterial({ color: 0x9aa8a0, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.6 }); const steel = new THREE.MeshStandardMaterial({ color: 0x8a8a84, metalness: 0.9, roughness: 0.25 });
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.16, 10), glass); barrel.rotation.x = Math.PI / 2; barrel.position.z = 0.08; g.add(barrel);
+  const fill = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.1, 8), new THREE.MeshStandardMaterial({ color: 0x3a0a06, roughness: 0.3 })); fill.rotation.x = Math.PI / 2; fill.position.z = 0.11; g.add(fill);
+  const plunger = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.08, 6), steel); plunger.rotation.x = Math.PI / 2; plunger.position.z = -0.03; g.add(plunger);
+  const thumb = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.006, 10), steel); thumb.rotation.x = Math.PI / 2; thumb.position.z = -0.07; g.add(thumb);
+  const needle = new THREE.Mesh(new THREE.CylinderGeometry(0.0015, 0.0015, 0.12, 4), steel); needle.rotation.x = Math.PI / 2; needle.position.z = 0.22; g.add(needle);
+  g.scale.setScalar(s); return g;
+}
 export function flashlight(s = 1) {
   const g = new THREE.Group(); const m = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.5, metalness: 0.6 });
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.2, 10), m); body.rotation.x = Math.PI / 2; body.position.z = 0.06; g.add(body);

@@ -2,9 +2,9 @@
 // swung about its hinge. Collision treats the leaf as a segment, so a half
 // open door still blocks you (and them).
 import * as THREE from '../vendor/three.module.js';
-import { C } from './plan.js?v=30';
-import { T } from './surfaces.js?v=30';
-import { bakedMaterial, Batch } from './mason.js?v=30';
+import { C, baseOf } from './plan.js?v=31';
+import { T } from './surfaces.js?v=31';
+import { bakedMaterial, Batch } from './mason.js?v=31';
 
 export class Doors {
   constructor(world, scene) {
@@ -34,6 +34,7 @@ export class Doors {
       for (const s of [1, -1]) b.box(0.03, 0.16, 0.05, m(L / 2 - 0.1, -0.1, s * (th / 2 + 0.03)), 1);   // handles
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.u, 2));
+      g.translate(0, baseOf(d.x, d.y), 0);   // up on its own storey
       world.baker.bakeGeometry(g);
       g.translate(-hinge.x, 0, -hinge.z);
       const mesh = new THREE.Mesh(g, b.mat); mesh.position.copy(hinge); scene.add(mesh);

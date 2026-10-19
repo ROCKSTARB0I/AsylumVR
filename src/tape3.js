@@ -2,9 +2,9 @@
 // (Voss has the staff film the patients). Clock in, do the count, take Voss his tray. Then the alarm:
 // the mains die, the beacons turn the building red, every cell door opens, and the staff die.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, H } from './plan.js?v=30';
-import { makeBody, pose } from './carcass.js?v=30';
-import { Talk } from './talk.js?v=30';
+import { cx, cz, H } from './plan.js?v=31';
+import { makeBody, pose } from './carcass.js?v=31';
+import { Talk } from './talk.js?v=31';
 const V = THREE.Vector3;
 
 export const NOTES = {
@@ -63,7 +63,7 @@ export const ENDING_TEXT = [
   'Three weeks later, Mount Harrow was declared decommissioned. The meal rosters kept coming.',
   'Four years later, you wrote to a journalist. You told them to come after dark, to bring a camera, and that the east window in Administration doesn\u2019t latch. You broke it yourself.',
 ];
-export const ENDING = (G, timecode, notesN) => `<div class="end"><p class="kicker">Mount Harrow State Asylum &middot; 14 October 1989</p><h1 class="logo">END OF TAPE 3</h1><p class="lede">${ENDING_TEXT.join('<br><br>')}</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${notesN} · Time ${timecode(G.t).slice(3, 8)}</p><nav class="menu"><button onclick="location.href='?tape=1'">Play Tape 1: Recovered Footage</button><button onclick="location.href='?tape=3'">Rewind</button></nav></div>`;
+export const ENDING = (G, timecode, notesN) => `<div class="end"><p class="kicker">Mount Harrow State Asylum &middot; 14 October 1989</p><h1 class="logo">END OF TAPE 3</h1><p class="lede">${ENDING_TEXT.join('<br><br>')}</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${notesN} · Time ${timecode(G.t).slice(3, 8)}</p><nav class="menu"><button onclick="location.href='?tape=4'">Play Tape 4: The End</button><button onclick="location.href='?tape=3'">Rewind</button></nav></div>`;
 
 // ------------------------------------------------------------------ what people say
 // every turn of yours has two replies; flags (G.flags) carry what you chose into later scenes

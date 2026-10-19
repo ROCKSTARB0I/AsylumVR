@@ -1,8 +1,8 @@
 // Space: what is solid. Circle movers (you and them) are pushed out of
 // wall cells, props, door leaves and the gate; sight lines are traced
 // through the grid and closed doors.
-import { C, W, D } from './plan.js?v=30';
-import { circleSeg } from './doors.js?v=30';
+import { C, W, D, LEVELS, floorAt, cellFloorAt } from './plan.js?v=31';
+import { circleSeg } from './doors.js?v=31';
 
 // props up to this height (m) can be vaulted by the things chasing you
 export const VAULT_H = 1.15;
@@ -28,6 +28,10 @@ export class Space {
     this.gateBox = null; this.boxes = [];   // extra solid boxes [x0, z0, x1, z1] (a fence gate, a parked car)
   }
   solid(gx, gy) { return !this.plan.at(gx, gy); }
+  // a neighbouring floor too far above or below where you stand (the other flight of a stairwell): a wall to you
+  ledge(gx, gy, p, here) { const qx = Math.max(gx * C, Math.min(p.x, (gx + 1) * C)), qz = Math.max(gy * C, Math.min(p.z, (gy + 1) * C)); return Math.abs(cellFloorAt(gx, gy, qx, qz) - here) > 0.45; }
+  // can you walk from one cell to the next (no step up or down too big)
+  stepOk(ax, ay, bx, by) { if (!LEVELS) return true; return Math.abs(floorAt((ax + 0.5) * C, (ay + 0.5) * C) - floorAt((bx + 0.5) * C, (by + 0.5) * C)) < 0.75; }
   // a cell blocked only by tables, beds, crates: a chaser can go over it
   vaultable(gx, gy) { if (!this.plan.at(gx, gy) || !this.blockedCell[gy * W + gx] || this.tallCell[gy * W + gx]) return false; const d = this.doors.at(gx, gy); return !(d && d.locked); }
   walkable(gx, gy) { if (!this.plan.at(gx, gy) || this.blockedCell[gy * W + gx]) return false; const d = this.doors.at(gx, gy); return !(d && d.locked); }
@@ -35,7 +39,8 @@ export class Space {
     let hit = false;
     for (let pass = 0; pass < 2; pass++) {
       const gx0 = Math.floor((p.x - r) / C), gx1 = Math.floor((p.x + r) / C), gy0 = Math.floor((p.z - r) / C), gy1 = Math.floor((p.z + r) / C);
-      for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) if (this.solid(gx, gy)) hit = box(p, r, gx * C, gy * C, (gx + 1) * C, (gy + 1) * C) || hit;
+      const here = LEVELS ? floorAt(p.x, p.z) : 0;
+      for (let gy = gy0; gy <= gy1; gy++) for (let gx = gx0; gx <= gx1; gx++) if (this.solid(gx, gy) || (LEVELS && this.ledge(gx, gy, p, here))) hit = box(p, r, gx * C, gy * C, (gx + 1) * C, (gy + 1) * C) || hit;
       if (props) for (const c of this.world.colliders) { if (c.y1 <= low + 0.3) continue; if (p.x + r < c.x0 || p.x - r > c.x1 || p.z + r < c.z0 || p.z - r > c.z1) continue; hit = box(p, r, c.x0, c.z0, c.x1, c.z1) || hit; }
       if (doors) for (const d of this.doors.list) { if (Math.abs(d.wx - p.x) > 2.2 || Math.abs(d.wz - p.z) > 2.2) continue; hit = circleSeg(p, r, this.doors.seg(d)) || hit; }
       if (this.gateBox) hit = box(p, r, ...this.gateBox) || hit;

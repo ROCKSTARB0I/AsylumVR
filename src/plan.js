@@ -3,7 +3,30 @@
 // creatures' paths) is derived from this grid.
 export const C = 1.5;          // metres per cell
 export const H = 3.2;          // ceiling height
-export const W = 49, D = 64;   // grid size (x, y). y grows south (+z)
+export let W = 49, D = 64;     // grid size (x, y). y grows south (+z). Tape 4 is bigger (setGrid)
+export function setGrid(w, d) { W = w; D = d; }
+
+// Floors at different heights (Tape 4: real stairwells between storeys). LEVELS is null on the flat tapes.
+// Everything in the game's logic stays relative to the floor you're on; only drawing and sound add the
+// floor's height. A cell has a floor base, an optional ramp (a flight of stairs: rise over the cell along
+// dir 1 +x, 2 -x, 3 +y, 4 -y) and a ceiling height.
+export let LEVELS = null;
+export function setLevels(L) { LEVELS = L; }
+const _cell = (x, z) => [Math.floor(x / C), Math.floor(z / C)];
+// the floor's height under a world point (continuous: walking up a flight lifts you smoothly)
+export function floorAt(x, z) {
+  if (!LEVELS) return 0; const [gx, gy] = _cell(x, z); if (gx < 0 || gy < 0 || gx >= W || gy >= D) return 0; const i = gy * W + gx;
+  const r = LEVELS.rise[i]; if (!r) return LEVELS.base[i];
+  const fx = x / C - gx, fy = z / C - gy; const d = LEVELS.dir[i]; const t = d === 1 ? fx : d === 2 ? 1 - fx : d === 3 ? fy : 1 - fy;
+  return LEVELS.base[i] + r * Math.min(1, Math.max(0, t));
+}
+// a cell's own height at a point (clamped into that cell)
+export function cellFloorAt(gx, gy, x, z) { return floorAt(Math.min((gx + 1) * C - 1e-4, Math.max(gx * C + 1e-4, x)), Math.min((gy + 1) * C - 1e-4, Math.max(gy * C + 1e-4, z))); }
+export function ceilOf(gx, gy) { if (!LEVELS || gx < 0 || gy < 0 || gx >= W || gy >= D) return H; return LEVELS.ceil[gy * W + gx]; }
+// how far things fixed to a cell's ceiling (lamps) or floor (props, doors) are raised
+export function liftOf(gx, gy) { return ceilOf(gx, gy) - H; }
+export function baseOf(gx, gy) { if (!LEVELS || gx < 0 || gy < 0 || gx >= W || gy >= D) return 0; return LEVELS.base[gy * W + gx]; }
+export const liftAt = (x, z) => { if (!LEVELS) return 0; const [gx, gy] = _cell(x, z); return baseOf(gx, gy); };
 
 // zone codes. 0 is solid wall.
 export const Z = { SOLID: 0, HALL: 1, CELL: 2, CAFE: 3, SHOWER: 4, MORGUE: 5, ADMIN: 6, LOBBY: 7, GEN: 8, DAY: 9, STORE: 10, SEC: 11, DOOR: 12, OUT: 13, CHAPEL: 14, PADDED: 15, SURGERY: 16, DORM: 17, NURSE: 18, STAIR: 19 };
@@ -11,12 +34,14 @@ export const ZNAME = ['', 'Corridor', 'Patient Cell', 'Cafeteria', 'Showers', 'M
 
 export const cx = (x) => (x + 0.5) * C;
 export const cz = (y) => (y + 0.5) * C;
-import { makePlan2 } from './plan2.js?v=30';
-import { makePlan3 } from './plan3.js?v=30';
+import { makePlan2 } from './plan2.js?v=31';
+import { makePlan3 } from './plan3.js?v=31';
+import { makePlan4 } from './plan4.js?v=31';
 
 export function makePlan(tape = 1) {
   if (tape === 2) return makePlan2();
   if (tape === 3) return makePlan3(makePlan1());
+  if (tape === 4) return makePlan4();
   return makePlan1();
 }
 function makePlan1() {

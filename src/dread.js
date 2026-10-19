@@ -5,9 +5,10 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=30';
-import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=30';
-import { renderMenuTheme, THEME_LOOP } from './theme.js?v=30';
+import { Score } from './score.js?v=31';
+import { floorAt } from './plan.js?v=31';
+import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=31';
+import { renderMenuTheme, THEME_LOOP } from './theme.js?v=31';
 
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
@@ -129,6 +130,14 @@ export class Sound {
       }
       else if (what === 'attack') this.voiceSynth(p, { f0: 200, f1: 150, dur: 0.4, vowels: ['a', 'uh'], gain: 0.8, rough: 0.6 });
       else if (what === 'pant') this.breathAt(p, 0.3, 0.6, 520);
+    } else if (kind === 'matron') {
+      if (what === 'idle' || what === 'lost') {   // the Matron hums her girls to sleep: a lullaby that drops a semitone where it shouldn't
+        const tune = [7, 4, 4, 5, 2, 2, 0, 2, 4, 5, 7, 7, 6]; let d = 0; const base = 262;
+        for (let i = 0; i < 8; i++) { const n = tune[(i + (what === 'lost' ? 5 : 0)) % tune.length]; const dur = i % 4 === 3 ? 0.62 : 0.32; this.voiceSynth(p, { f0: base * Math.pow(2, n / 12), dur, vowels: ['m', 'u'], breath: 0.3, gain: 0.32, vib: 5.5, vibD: 0.018, delay: d, a: 0.06, verb: 0.6 }); d += dur + 0.04; }
+      } else if (what === 'alert') { this.burst(p, { f: 4200, q: 0.9, dur: 1.1, gain: 0.35, a: 0.15, verb: 0.5 }); }   // "shhhhh"
+      else if (what === 'chase') { this.burst(p, { f: 3800, q: 0.8, dur: 0.6, gain: 0.45, a: 0.05, verb: 0.4 }); this.voiceSynth(p, { f0: 620, f1: 900, dur: 1.2, vowels: ['i', 'e', 'a'], rough: 0.85, breath: 0.45, gain: 0.95, vib: 10, vibD: 0.06, delay: 0.5, verb: 0.4 }); }
+      else if (what === 'attack') this.voiceSynth(p, { f0: 520, f1: 380, dur: 0.45, vowels: ['a', 'i'], rough: 0.8, gain: 0.85 });
+      else if (what === 'pant') this.breathAt(p, 0.28, 0.6, 900);
     } else if (kind === 'rocker') {
       if (what === 'mutter') this.syllables(p, 4 + ((Math.random() * 5) | 0), rnd(100, 160), { gain: 0.3, breath: 0.5, verb: 0.5 });
       else if (what === 'scream') this.voiceSynth(p, { f0: rnd(500, 700), f1: rnd(800, 1000), dur: 1.3, vowels: ['a', 'i', 'e'], rough: 0.5, breath: 0.3, gain: 0.9, vib: 7, vibD: 0.04 });
@@ -283,7 +292,8 @@ export class Sound {
   flies(pos) { const ctx = this.ctx; const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 190; const l = ctx.createOscillator(); l.frequency.value = 7; const lg = ctx.createGain(); lg.gain.value = 25; l.connect(lg); lg.connect(o.frequency); const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 400; bp.Q.value = 3; const g = ctx.createGain(); g.gain.value = 0; o.connect(bp); bp.connect(g); const p = ctx.createPanner(); p.panningModel = QUEST ? 'equalpower' : 'HRTF'; p.refDistance = 0.6; p.rolloffFactor = 2.2; setPos(p, pos); g.connect(p); p.connect(this.dry); o.start(); l.start(); g.panner = p; return g; }
   buzz(pos) { const ctx = this.ctx; const o = ctx.createOscillator(); o.type = 'square'; o.frequency.value = 120; const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 4; const g = ctx.createGain(); g.gain.value = 0; o.connect(bp); bp.connect(g); const out = this.out(g, pos, { verb: 0.2, ref: 1, roll: 1.8 }); o.start(); return g; }
 }
-function setPos(p, v) { if (p.positionX) { p.positionX.value = v.x; p.positionY.value = v.y; p.positionZ.value = v.z; } else p.setPosition(v.x, v.y, v.z); }
+// sounds are placed relative to the floor they happen on (up a storey, they come from up there)
+function setPos(p, v) { const y = v.y + floorAt(v.x, v.z); if (p.positionX) { p.positionX.value = v.x; p.positionY.value = y; p.positionZ.value = v.z; } else p.setPosition(v.x, y, v.z); }
 
 // ---------------------------------------------------------- recording
 // Every sound is synthesized from live nodes, which is too much for the
@@ -336,7 +346,7 @@ Sound.prototype.record = async function (onProgress) {
   jobs.push(async () => { const b = await render(14, (s) => { Sound.prototype.ambience.call(s); s.fearG.gain.value = 0; }, noiseBuf, brownBuf, 1); rec.amb = foldLoop(b, 12); });
   jobs.push(async () => { const b = await render(7, (s) => { Sound.prototype.ambience.call(s); s.droneG.gain.value = 0; s.fearG.gain.value = 0.05; }, noiseBuf, brownBuf, 1); rec.fear = foldLoop(b, 5); });
   // voices
-  const VO = { orderly: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], brute: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], surgeon: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], rocker: ['mutter', 'scream'], eater: ['chew', 'chase', 'alert', 'attack', 'pant'], patient: ['idle', 'chase', 'alert', 'attack', 'pant', 'lost'] };
+  const VO = { matron: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], orderly: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], brute: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], surgeon: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], rocker: ['mutter', 'scream'], eater: ['chew', 'chase', 'alert', 'attack', 'pant'], patient: ['idle', 'chase', 'alert', 'attack', 'pant', 'lost'] };
   for (const [kind, whats] of Object.entries(VO)) for (const w of whats) one(`v:${kind}:${w}`, w === 'idle' || w === 'mutter' ? 4.6 : 2.2, w === 'idle' ? 1 : 2, (s) => ORIG.voice.call(s, kind, w, V0));
   for (const k of ['sting', 'scare']) one('j:' + k, 2.6, k === 'scare' ? 3 : 2, (s) => ORIG.jump.call(s, k));
   one('kill', 3, 2, (s) => ORIG.kill.call(s)); one('rip', 2.6, 2, (s) => ORIG.lockerRip.call(s));
@@ -368,7 +378,21 @@ Sound.prototype.playRec = function (key, pos, { gain = 1, verb = 0.12, delay = 0
 };
 const OV = {
   voice(kind, what, pos) { const k = `v:${kind}:${what}`; if (this.has(k)) return this.playRec(k, pos && pos.clone().setY(1.6), { ref: 2 }); return ORIG.voice.call(this, kind, what, pos); },
-  jump(kind = 'sting', delay = 0) { const k = 'j:' + (kind === 'kill' || kind === 'rip' ? 'scare' : kind === 'power' ? 'scare' : kind); if (this.has(k)) return this.playRec(k, null, { delay }); return ORIG.jump.call(this, kind, delay); },
+  // the jumpscare hit. The big ones go straight to the speakers past any hush, doubled a hair apart, with a scream on top
+  // and a sub drop under it: the loudest thing in the game, by a distance
+  jump(kind = 'sting', delay = 0) {
+    const big = kind === 'kill' || kind === 'rip' || kind === 'power' || kind === 'scare'; const k = 'j:' + (big ? 'scare' : kind);
+    if (!this.has(k)) return ORIG.jump.call(this, kind, delay);
+    const v = this.vip; this.vip = true;
+    try {
+      this.playRec(k, null, { delay, gain: big ? 1.8 : 1.2, verb: 0.05 });
+      if (big) {
+        this.playRec(k, null, { delay: delay + 0.035, gain: 1.3, verb: 0.05, rate: 0.92 });
+        if (this.has('scream')) { this.playRec('scream', null, { delay, gain: 1.5, rate: 0.82 }); this.playRec('scream', null, { delay: delay + 0.05, gain: 1.1, rate: 1.25 }); }
+        this.tone(null, { f: 46, f2: 18, dur: 1.6, gain: 1.4, delay, verb: 0.2 }); this.burst(null, { f: 3200, q: 0.5, dur: 0.35, gain: 0.8, delay, verb: 0.05 });
+      }
+    } finally { this.vip = v; }
+  },
   scream(pos, k = 1) { if (this.has('scream')) return this.playRec('scream', pos, { gain: Math.min(1.3, k), rate: 1 / Math.max(0.7, k) * 0.9 + 0.1 }); return ORIG.scream.call(this, pos, k); },
   kill(kind) { if (this.has('kill')) return this.playRec('kill', null); return ORIG.kill.call(this, kind); },
   lockerRip() { if (this.has('rip')) return this.playRec('rip', null); return ORIG.lockerRip.call(this); },

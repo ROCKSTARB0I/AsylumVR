@@ -2,27 +2,29 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=30';
-import { buildSurfaces, T } from './surfaces.js?v=30';
-import { loadPictures, savePictures } from './keep.js?v=30';
-import { VRMenu } from './vrmenu.js?v=30';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=30';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=30';
-import { Doors } from './doors.js?v=30';
-import { Space } from './space.js?v=30';
-import { Input } from './input.js?v=30';
-import { Walker, MAX_EYE } from './walker.js?v=30';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=30';
-import { makeTape, makeVeil } from './tape.js?v=30';
-import { Slate } from './slate.js?v=30';
-import * as STORY1 from './story.js?v=30';
-import * as TAPE3 from './tape3.js?v=30';
-import * as TAPE2 from './tape2.js?v=30';
-import { Sound } from './dread.js?v=30';
-import { Horrors } from './horrors.js?v=30';
-import { Dressing } from './dressing.js?v=30';
-import { Scares } from './scares.js?v=30';
-import { makeHand } from './hands.js?v=30';
+import { makePlan, C, H, Z, cx, cz, floorAt, ceilOf } from './plan.js?v=31';
+import { buildSurfaces, T } from './surfaces.js?v=31';
+import { loadPictures, savePictures } from './keep.js?v=31';
+import { VRMenu } from './vrmenu.js?v=31';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=31';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=31';
+import { Doors } from './doors.js?v=31';
+import { Space } from './space.js?v=31';
+import { Input } from './input.js?v=31';
+import { Walker, MAX_EYE } from './walker.js?v=31';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=31';
+import { makeTape, makeVeil } from './tape.js?v=31';
+import { Slate } from './slate.js?v=31';
+import { MiniMap } from './minimap.js?v=31';
+import * as STORY1 from './story.js?v=31';
+import * as TAPE3 from './tape3.js?v=31';
+import * as TAPE2 from './tape2.js?v=31';
+import * as TAPE4 from './tape4.js?v=31';
+import { Sound } from './dread.js?v=31';
+import { Horrors } from './horrors.js?v=31';
+import { Dressing } from './dressing.js?v=31';
+import { Scares } from './scares.js?v=31';
+import { makeHand } from './hands.js?v=31';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -32,8 +34,14 @@ try { Object.assign(S, JSON.parse(localStorage.getItem('asylumvr') || '{}')); } 
 const save = () => { try { localStorage.setItem('asylumvr', JSON.stringify(S)); } catch (e) {} };
 // which tape: ?tape=N, else the first one
 let unlocked = 1; try { unlocked = Math.max(1, +(localStorage.getItem('asylumvr_tapes') || 1)); } catch (e) {}
-const TAPE = Math.max(1, Math.min(3, +(new URLSearchParams(location.search).get('tape') || 1)));
-const STORY = TAPE === 2 ? TAPE2 : TAPE === 3 ? TAPE3 : STORY1; const { NOTES, MUTTER, OBJECTIVES } = STORY;
+// a tape plays only once every tape before it is finished (or you've already played into it: it has a save or is done)
+const tapeDone = (n) => { try { return localStorage.getItem('asylumvr_done_t' + n) === '1'; } catch (e) { return false; } };
+const tapeSaved = (n) => { try { return !!localStorage.getItem('asylumvr_save_t' + n); } catch (e) { return false; } };
+const tapeOpen = (n) => { if (n <= 1 || tapeDone(n) || tapeSaved(n)) return true; for (let k = 1; k < n; k++) if (!tapeDone(k)) return false; return true; };
+let TAPE = Math.max(1, Math.min(4, +(new URLSearchParams(location.search).get('tape') || 1)));
+const TAPE_ASKED = TAPE; while (TAPE > 1 && !tapeOpen(TAPE)) TAPE--;      // a locked tape in the address: the last one you can play
+if (TAPE !== TAPE_ASKED) history.replaceState(null, '', location.pathname + '?tape=' + TAPE + (location.search.includes('mute') ? '&mute' : ''));
+const STORY = TAPE === 4 ? TAPE4 : TAPE === 2 ? TAPE2 : TAPE === 3 ? TAPE3 : STORY1; const { NOTES, MUTTER, OBJECTIVES } = STORY;
 
 // ---------------------------------------------------------------- renderer
 const canvas = $('view');
@@ -89,6 +97,7 @@ $('loading').textContent = 'Rewinding tape… painting walls';
 await loadPictures();
 buildSurfaces(TAPE === 3);
 const plan = makePlan(TAPE);
+if (TAPE === 4) { camera.far = 36; camera.updateProjectionMatrix(); }   // the fog has swallowed everything past ~30 m: don't draw the rest of a building this size
 $('loading').textContent = 'Rewinding tape… baking light';
 await new Promise((r) => setTimeout(r, 30));
 mark('surfaces');
@@ -112,8 +121,8 @@ await new Promise((r) => setTimeout(r, 30));
 const dressing = new Dressing(world, plan, scene); mark('dressing');
 const horrors = new Horrors({ scene, plan, world, space, doors, walker, cam, sound, G, camera }); mark('horrors');
 const scares = new Scares({ scene, plan, world, space, doors, walker, cam, sound, G, horrors, camera, dressing });
-if (TAPE === 2) scares.list = TAPE2.setPieces(scares); if (TAPE === 3) { scares.list = []; scares.cool = 1e9; } mark('scares');
-const tapeLogic = TAPE === 3 ? TAPE3.setupTape3({ LIGHT, setFade: (v, now) => { fadeGoal = v; if (now) fade = v; }, get card() { return card; }, placeCard: () => placeCard(), G, walker, plan, world, sound, horrors, doors, scene, space, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), save: () => saveGame(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
+if (TAPE === 2) scares.list = TAPE2.setPieces(scares); if (TAPE === 3) { scares.list = []; scares.cool = 1e9; } if (TAPE === 4) { scares.list = []; scares.cool = 70; } mark('scares');
+const tapeLogic = TAPE === 4 ? TAPE4.setupTape4({ LIGHT, camera, dressing, scares, setFade: (v, now) => { fadeGoal = v; if (now) fade = v; }, get card() { return card; }, placeCard: () => placeCard(), G, walker, plan, world, sound, horrors, doors, scene, space, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), save: () => saveGame(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : TAPE === 3 ? TAPE3.setupTape3({ LIGHT, setFade: (v, now) => { fadeGoal = v; if (now) fade = v; }, get card() { return card; }, placeCard: () => placeCard(), G, walker, plan, world, sound, horrors, doors, scene, space, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), save: () => saveGame(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : TAPE === 2 ? TAPE2.setupTape2({ G, walker, plan, world, sound, horrors, cam, say: (...a) => say(...a), caption: (...a) => caption(...a), checkpoint: () => checkpoint(), ending: () => ending(), vr: () => renderer.xr.isPresenting }) : null;
 
 // ---------------------------------------------------------------- hands
 // your own hands, empty, on the controllers' grips in VR (the camcorder is the whole view, not something you hold)
@@ -170,6 +179,8 @@ function nvifyScene() { scene.traverse((o) => { if (o.material) (Array.isArray(o
 const card = new Slate(1024, 640, 0.9); scene.add(card.mesh);
 const capSlate = new Slate(1024, 160, 0.9, {}); camera.add(capSlate.mesh); capSlate.mesh.position.set(0, -0.28, -0.9);
 const promptSlate = new Slate(512, 96, 0.22); scene.add(promptSlate.mesh);
+const mapSlate = new Slate(768, 768, 0.62); scene.add(mapSlate.mesh); mapSlate.mesh.material.userData.noNV = true;   // the minimap beside the VR pause card
+const minimap = new MiniMap(plan);
 const osdHud = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.975), new THREE.MeshBasicMaterial({ map: cam.osdTex, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false }));
 osdHud.material.userData.noNV = true; osdHud.position.set(0, 0, -1.0); osdHud.renderOrder = 998; osdHud.visible = false; camera.add(osdHud);
 for (const sl of [card, capSlate, promptSlate]) sl.mesh.material.userData.noNV = true;
@@ -186,7 +197,17 @@ const itemMeshes = [];
     } else if (k === 'card') {
       g.add(new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.002, 0.054), lit(0xd8d4c8, 0.4)));
       const strip = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.0025, 0.01), lit(0x111111, 0.3)); strip.position.z = 0.015; g.add(strip);
-    } else if (k === 'chapelKey' || k === 'stairKey') {
+    } else if (k === 'cutters') {
+      const red = lit(0x8a1a12, 0.6), st = lit(0x6a6a64, 0.35, 0.8);
+      for (const s2 of [-1, 1]) { const h = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.42), red); h.position.set(s2 * 0.03, 0, -0.05); h.rotation.y = s2 * 0.08; g.add(h); }
+      const jaw = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.025, 0.12), st); jaw.position.z = 0.2; g.add(jaw);
+    } else if (k === 'wardKeys') {
+      const brass = lit(0x9a7a30, 0.35, 0.8); const ring = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.006, 6, 18), brass); ring.rotation.x = Math.PI / 2; g.add(ring);
+      for (let i = 0; i < 6; i++) { const k2 = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.005, 0.08), brass); k2.position.set(Math.cos(i * 1.05) * 0.06, 0, Math.sin(i * 1.05) * 0.06); k2.rotation.y = -i * 1.05; g.add(k2); }
+    } else if (k === 'examCard') {
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.002, 0.054), lit(0xa8c0d8, 0.4)));
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(0.085, 0.0025, 0.01), lit(0x111111, 0.3)); strip.position.z = 0.015; g.add(strip);
+    } else if (k === 'chapelKey' || k === 'stairKey' || k === 'boothKey' || k === 'directorKey') {
       const brass = lit(k === 'stairKey' ? 0x6a6a64 : 0x9a7a30, 0.35, 0.8);
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.005, 6, 14), brass); ring.rotation.x = Math.PI / 2; g.add(ring);
       const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.006, 0.07), brass); shaft.position.z = 0.05; g.add(shaft);
@@ -216,7 +237,7 @@ const itemMeshes = [];
     // rest on whatever is under it
     let y = 0.02; for (const c of world.colliders) if (x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1) y = Math.max(y, (c.k === 'secdesk' ? 0.78 : Math.min(1.2, c.y1)) + 0.02);   // (the monitor desk's box is as tall as its monitors; the top is at 0.78)
     if (it.k === 'note') y = Math.max(y, 0.005);
-    m.position.set(x, y, z); m.rotation.y = (it.x * 7 + it.y) % 6; scene.add(m);
+    m.position.set(x, y + floorAt(x, z), z); m.rotation.y = (it.x * 7 + it.y) % 6; scene.add(m);
     itemMeshes.push({ it, m });
   }
 }
@@ -233,11 +254,12 @@ const gateMesh = !plan.gate ? null : (() => {
 })();
 
 // ---------------------------------------------------------------- interaction
+const LOCK_NAME = TAPE === 4 ? TAPE4.LOCK_NAME : TAPE2.LOCK_NAME;
 const interactables = [];
-for (const d of doors.list) interactables.push({ kind: 'door', d, pos: () => new V(d.wx, 1.1, d.wz), r: 1.0, label: () => d.locked ? (d.lock && G.items.has(d.lock) ? 'Unlock' : d.lock && TAPE2.LOCK_NAME[d.lock] ? `Locked (needs ${TAPE2.LOCK_NAME[d.lock]})` : 'Locked') : Math.abs(d.target) > 0.2 ? 'Close door' : 'Open door' });
+for (const d of doors.list) interactables.push({ kind: 'door', d, pos: () => new V(d.wx, 1.1, d.wz), r: 1.0, label: () => d.locked ? (d.lock && G.items.has(d.lock) ? 'Unlock' : d.lock && LOCK_NAME[d.lock] ? `Locked (${d.lock === 'never' || d.lock === 'power' || d.lock === 'release' || d.lock === 'chain' ? LOCK_NAME[d.lock] : 'needs ' + LOCK_NAME[d.lock]})` : 'Locked') : Math.abs(d.target) > 0.2 ? 'Close door' : 'Open door' });
 for (const h of world.hides) interactables.push({ kind: 'hide', h, pos: () => h.k === 'locker' ? new V(h.x + h.fx * 0.3, 1.2, h.z + h.fz * 0.3) : new V(h.x, 0.45, h.z), r: h.k === 'locker' ? 0.6 : 0.9, label: () => h.k === 'locker' ? 'Hide in locker' : 'Hide under bed' });
-for (const im of itemMeshes) interactables.push({ kind: 'item', im, pos: () => im.m.position, r: 0.45, label: () => ({ fuse: 'Take fuse', battery: 'Take battery', note: 'Read', ...TAPE2.ITEM_LABEL, ...TAPE3.ITEM_LABEL })[im.it.k], gone: () => G.items.has(im.it.id) });
-if (TAPE === 3) interactables.push(...tapeLogic.interactables);
+for (const im of itemMeshes) interactables.push({ kind: 'item', im, pos: () => im.m.position, r: 0.45, label: () => ({ fuse: 'Take fuse', battery: 'Take battery', note: 'Read', ...TAPE2.ITEM_LABEL, ...TAPE3.ITEM_LABEL, ...TAPE4.ITEM_LABEL })[im.it.k], gone: () => G.items.has(im.it.id) });
+if (TAPE === 3 || TAPE === 4) interactables.push(...tapeLogic.interactables);
 if (TAPE === 1) interactables.push({ kind: 'gen', pos: () => genPos, r: 1.2, label: () => G.power ? 'Generator running' : G.fuses >= 3 ? 'Insert fuses and start' : `Generator: needs 3 fuses (${G.fuses}/3)` });
 if (TAPE === 1) interactables.push({ kind: 'panel', pos: () => panelPos, r: 1.0, label: () => G.gateOpen ? 'Gate open' : G.power ? 'Open the front gate' : 'Gate panel (no power)' });
 
@@ -247,7 +269,7 @@ function pick(origin, dir) {
   for (const o of interactables) {
     if (o.gone && o.gone()) continue;
     if (o.kind === 't3' && !o.label()) continue;
-    const p = o.pos(); const to = new V().subVectors(p, origin); const d = to.length(); if (d > 2.3 + o.r * 0.3) continue;
+    const p = o.pos().clone(); if (o.kind === 'door' || o.kind === 'hide' || o.kind === 'gen' || o.kind === 'panel') p.y += floorAt(p.x, p.z); const to = new V().subVectors(p, origin); const d = to.length(); if (d > 2.3 + o.r * 0.3) continue;
     const along = to.dot(dir); if (along < 0) continue;
     const off = Math.sqrt(Math.max(0, d * d - along * along));
     if (off > o.r * 0.7 + 0.1) continue;
@@ -268,7 +290,7 @@ function use(o) {
     if (it.k === 'fuse') { G.fuses++; sound.pickup('fuse'); say(['', 'fuse1', 'fuse2', 'fuse3'][G.fuses], 0, true); checkpoint(); saveGame(); }
     else if (it.k === 'battery') { cam.spares = Math.min(6, cam.spares + 1); sound.pickup('battery'); say('battery', 0.4); }
     else if (it.k === 'tray' || it.k === 'file' || it.k === 'fencekey') { sound.pickup('fuse'); say(it.k, 0, true); checkpoint(); saveGame(); }
-    else if (it.k === 'card' || it.k === 'chapelKey' || it.k === 'stairKey') { sound.pickup('fuse'); say(it.k, 0, true); checkpoint(); saveGame(); }
+    else if (it.k === 'card' || it.k === 'chapelKey' || it.k === 'stairKey' || it.k === 'wardKeys' || it.k === 'boothKey' || it.k === 'directorKey' || it.k === 'examCard' || it.k === 'cutters') { sound.pickup('fuse'); say(it.k, 0, true); checkpoint(); saveGame(); }
     else { G.notes.push(it.id); read(it.id); sound.pickup('paper'); }
   } else if (o.kind === 'gen') {
     if (!G.power && G.fuses >= 3) { G.power = true; sound.generator(genPos); horrors.powerOn(genPos); scares.powerOn(); setTimeout(() => say('power', 0, true), 2600); checkpoint(); }
@@ -319,20 +341,20 @@ function saveGame() {
   const ck = G.checkpoint || { pos: walker.pos, yaw: walker.yaw };
   const data = { v: 1, tape: TAPE, at: Date.now(), pos: [ck.pos.x, ck.pos.z], yaw: ck.yaw, items: [...G.items], notes: G.notes, fuses: G.fuses, power: G.power, gateOpen: G.gateOpen, clocked: G.clocked, sheet: G.sheet, flags: G.flags, counted: G.counted, mopped: G.mopped, fileGiven: G.fileGiven, breaker: G.breaker, inYard: G.inYard, fenceOpen: G.fenceOpen, delivered: G.delivered, alarm: G.alarm, sawLockdown: G.sawLockdown,
     leftAdmin: G.leftAdmin, sawPanel: G.sawPanel, sawStairs: !!G.sawStairs, strapped: !!G.strapped, obj: G.obj, deaths: G.deaths, t: G.t, said: [...G.said], scares: [...scares.done],
-    unlocked: doors.list.filter((d) => d.lock && !d.locked).map((d) => [d.x, d.y]) };
+    unlocked: doors.list.filter((d) => d.lock && !d.locked).map((d) => [d.x, d.y]), t4: TAPE === 4 && tapeLogic ? tapeLogic.serialize() : undefined, seen: (() => { const sn = minimap.seen; let s2 = ''; for (let i = 0; i < sn.length; i += 8) { let v = 0; for (let k = 0; k < 8; k++) if (sn[i + k]) v |= 1 << k; s2 += String.fromCharCode(v); } return btoa(s2); })() };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { return; }
   $('saved').classList.remove('on'); void $('saved').offsetWidth; $('saved').classList.add('on'); cam.saveFlash = cam.clock + 2.5; cam.paintOSD(true, '');
 }
 function applySave(d) {
   for (const k of ['fuses', 'power', 'gateOpen', 'leftAdmin', 'sawPanel', 'sawStairs', 'strapped', 'obj', 'deaths', 't', 'clocked', 'counted', 'delivered', 'sawLockdown', 'mopped', 'fileGiven', 'breaker', 'fenceOpen']) if (d[k] !== undefined) G[k] = d[k];
-  if (TAPE === 3 && tapeLogic) tapeLogic.restore(d);
+  if ((TAPE === 3 || TAPE === 4) && tapeLogic) tapeLogic.restore(d);
   G.items = new Set(d.items || []); G.notes = d.notes || []; G.said = new Set(d.said || []);
   for (const id of d.scares || []) scares.done.add(id);
   for (const im of itemMeshes) if (G.items.has(im.it.id)) im.m.visible = false;
   for (const [x, y] of d.unlocked || []) { const dd = doors.at(x, y); if (dd) dd.locked = false; }
   if (G.power) { sound.generator(genPos); }
   if (G.gateOpen && gateMesh) { gateMesh.position.y = 2.9; space.gateBox = null; }
-  walker.place(d.pos[0], d.pos[1], d.yaw); checkpoint(); horrors.reset();
+  walker.place(d.pos[0], d.pos[1], d.yaw); checkpoint(); horrors.reset(); if (d.seen) { try { const b = atob(d.seen); for (let i = 0; i < b.length && i < minimap.seen.length * 8; i++) { const v = b.charCodeAt(i); for (let k = 0; k < 8; k++) if (v & (1 << k)) minimap.seen[i * 8 + k] = 1; } } catch (e) {} }
 }
 let lastObj = 0;
 
@@ -350,11 +372,22 @@ let deadT = 0;
 // ---------------------------------------------------------------- fades / pause
 let fade = 1, fadeGoal = 0;
 function fadeTo(v) { fadeGoal = v; }
-function pauseCard() { card.card([['PAUSED', 70], [objectiveText(), 34, '#c8c0b0'], ['', 20], [TAPE === 1 ? `Fuses ${G.fuses}/3   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}` : `Tape ${TAPE}   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}`, 32, '#9a948a'], ['', 20], ['Height ' + heightLabel() + '  \u00b7  left stick \u2191\u2193', 28, '#c8c0b0'], ['', 12], ['B resume   ·   hold trigger 2 s: last checkpoint', 30, '#9a948a']]); placeCard(); }
+function pauseCard() { showMap(true); card.card([['PAUSED', 70], [objectiveText(), 34, '#c8c0b0'], ['', 20], [TAPE === 1 ? `Fuses ${G.fuses}/3   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}` : `Tape ${TAPE}   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}`, 32, '#9a948a'], ['', 20], ['Height ' + heightLabel() + '  \u00b7  left stick \u2191\u2193', 28, '#c8c0b0'], ['', 12], ['B resume   ·   hold trigger 2 s: last checkpoint', 30, '#9a948a']]); placeCard(); }
+function mapTitle() { return TAPE === 4 ? ({ basement: 'WARD C', female: 'THE WOMEN\u2019S WARD', disturbed: 'THE DISTURBED WARD', offices: 'STAFF OFFICES', exam: 'EXAMINING ROOMS', boiler: 'THE BOILER HOUSE' })[regionAt()] || 'MOUNT HARROW' : TAPE === 2 ? 'THE MALE WARD' : 'GROUND FLOOR'; }
+function regionAt() { if (!plan.regions) return ''; const gx = walker.pos.x / C, gy = walker.pos.z / C; for (const [k, [x0, y0, x1, y1]] of Object.entries(plan.regions)) if (gx >= x0 && gx <= x1 + 1 && gy >= y0 && gy <= y1 + 1) return k; return ''; }
+// the map: on the desktop pause panel, and beside the pause card in the headset
+function showMap(on) {
+  if (!on) { mapSlate.mesh.visible = false; return; }
+  if (renderer.xr.isPresenting) {
+    minimap.draw(mapSlate.cv, walker, mapTitle()); mapSlate.tex.needsUpdate = true;
+    const head = camera.getWorldPosition(new V()); const f = new V(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); f.y = 0; f.normalize(); const r = new V(-f.z, 0, f.x);
+    mapSlate.mesh.position.copy(head).addScaledVector(f, 0.68).addScaledVector(r, 0.66); mapSlate.mesh.position.y -= 0.08; mapSlate.mesh.lookAt(head); mapSlate.mesh.visible = true;
+  } else { minimap.draw($('minimap'), walker, mapTitle()); }
+}
 function setPaused(p) {
   G.paused = p; $('pause').hidden = !p || renderer.xr.isPresenting;
-  if (p) { sound.duck(true); $('notesList').textContent = G.notes.length ? 'Notes: ' + G.notes.map((n) => NOTES[n].t).join(' · ') : ''; if (renderer.xr.isPresenting) pauseCard(); }
-  else { sound.duck(false); card.mesh.visible = false; if (!renderer.xr.isPresenting) input.wantLock = true; }
+  if (p) { sound.duck(true); if (!renderer.xr.isPresenting) showMap(true); $('notesList').textContent = G.notes.length ? 'Notes: ' + G.notes.map((n) => NOTES[n].t).join(' · ') : ''; if (renderer.xr.isPresenting) pauseCard(); }
+  else { sound.duck(false); card.mesh.visible = false; showMap(false); if (!renderer.xr.isPresenting) input.wantLock = true; }
 }
 $('resume').onclick = () => setPaused(false);
 $('restartCk').onclick = () => { setPaused(false); respawn(); };
@@ -377,7 +410,7 @@ async function begin(vr, cont = false) {
   if (!sound.rec) { $('loading').textContent = 'Recording sounds…'; await Promise.race([recording, new Promise((r) => { const iv = setInterval(() => { if (sound.rec) { clearInterval(iv); r(); } }, 100); })]); }
   sound.init(); await sound.ready; sound.stopMenu(); vrMenu.close(); handLight.lock = false;
   $('screen').hidden = true; G.playing = true; fade = 1; fadeTo(0);
-  walker.place(cx(plan.start.x), cz(plan.start.y), plan.start.yaw); checkpoint();
+  walker.place(cx(plan.start.x), cz(plan.start.y), plan.start.yaw); checkpoint(); minimap.mark(walker.pos.x, walker.pos.z);
   const sv = cont ? readSave() : null;
   if (sv) { applySave(sv); lastObj = G.obj; caption('Tape resumed.', 2.5); }
   else if (tapeLogic) tapeLogic.start();
@@ -393,7 +426,7 @@ if (hasSave) {
   const nb = document.createElement('button'); nb.textContent = 'New game'; nb.onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); }; $('menu').insertBefore(nb, $('selectBtn'));
 }
 {
-  const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4 &middot; ${TAPE === 3 ? 'The Fall' : TAPE === 2 ? 'The Male Ward' : 'Recovered Footage'}`;
+  const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4 &middot; ${TAPE === 4 ? 'The End' : TAPE === 3 ? 'The Fall' : TAPE === 2 ? 'The Male Ward' : 'Recovered Footage'}`;
   // the prequel is a different night
   if (TAPE === 3) { const d = document.querySelector('.osd-bot .date'), c = document.querySelector('.osd-bot .clock'); if (d) d.textContent = 'OCT.14 1989'; if (c) c.textContent = '11:40 PM'; }
   // the tape shelf
@@ -401,8 +434,9 @@ if (hasSave) {
     { n: 1, name: 'Tape 1: Recovered Footage', sub: 'Ground floor. Administration, the cafeteria, the morgue.' },
     { n: 2, name: 'Tape 2: The Male Ward', sub: 'The north building. Dormitory, chapel, surgical theater.' },
     { n: 3, name: 'Tape 3: The Fall', sub: '14 October 1989. The night it all came apart.' },
-    { n: 4, name: 'Tape 4', sub: 'Not yet recovered.', locked: true },
+    { n: 4, name: 'Tape 4: The End', sub: 'The last tape. Ward C, the women\u2019s ward, the disturbed wards, and the way out.' },
   ];
+  for (const tp of TAPES) if (!tapeOpen(tp.n)) { tp.locked = true; tp.sub = `Finish Tape ${tp.n - 1} to unlock.`; }
   const status = (n) => {
     let done = false, sv = null; try { done = localStorage.getItem('asylumvr_done_t' + n) === '1'; sv = JSON.parse(localStorage.getItem('asylumvr_save_t' + n) || 'null'); } catch (e) {}
     if (sv) { const k = (sv.items || []).filter((i) => !i.startsWith('n')).length; const what = n === 1 ? `${sv.fuses || 0}/3 fuses` : `${k} key${k === 1 ? '' : 's'}`; const ago = Math.max(1, Math.round((Date.now() - sv.at) / 60000)); return ['prog', `IN PROGRESS · ${what} · saved ${ago < 60 ? ago + ' min' : Math.round(ago / 60) + ' h'} ago`]; }
@@ -586,7 +620,7 @@ function frame() {
   sound.listen(tmpV, tmpQ, dt, { fear: horrors.fear, chase: horrors.chase, chaseKind: horrors.chaseKind, exhaust: walker.exhaust, hurt: 1 - walker.health / 100, hidden: !!walker.hidden, pos: walker.pos, light: world.lightAt(walker.pos.x, walker.pos.z) });
   draw(dt, vr, I);
 }
-walker.onStep = (k, p) => { sound.step(k, plan.at(Math.floor(p.x / C), Math.floor(p.z / C))); horrors.heard(p.x, p.z, walker.noise); };
+walker.onStep = (k, p) => { sound.step(k, plan.at(Math.floor(p.x / C), Math.floor(p.z / C))); horrors.heard(p.x, p.z, walker.noise); minimap.mark(p.x, p.z); };
 
 // the four light channels: S steady, A and B stutter, P comes up with the generator
 let powerT = -1;
@@ -624,11 +658,11 @@ function lensDistance() {
   const SURF = 1;
   for (let t = 0.06; t < Math.min(d, 2.7); t += 0.06) {
     const x = tmpV.x + irDir.x * t, y = tmpV.y + irDir.y * t, z = tmpV.z + irDir.z * t;
-    if (y < 0.02 || y > H - 0.02) { d = Math.min(d, t * SURF); break; }
-    const gx = Math.floor(x / C), gy = Math.floor(z / C);
+    const gx = Math.floor(x / C), gy = Math.floor(z / C); const fl = floorAt(x, z);
+    if (y < fl + 0.02 || y > ceilOf(gx, gy) - 0.02) { d = Math.min(d, t * SURF); break; }
     if (space.solid(gx, gy)) { d = Math.min(d, t * SURF); break; }
     const dr = doors.at(gx, gy); if (dr && Math.abs(dr.angle) < 0.3) { d = Math.min(d, t * SURF); break; }
-    let hit = false; for (const c of world.colliders) if (y < c.y1 && x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1) { hit = true; break; }
+    let hit = false; for (const c of world.colliders) if (y - fl < c.y1 && x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1) { hit = true; break; }
     if (hit) { d = Math.min(d, t * SURF); break; }
   }
   return d;
@@ -677,13 +711,13 @@ function renderTitle(dt) {
   const t = performance.now() / 1000;
   if (renderer.xr.isPresenting) {
     // standing still in the lobby (no drifting camera in a headset), the menu in front of you
-    const tc = plan.titleCam || { x: 25.5, y: 31, yaw: Math.PI }; dolly.position.set(cx(tc.x), 0, cz(tc.y)); dolly.rotation.set(0, tc.yaw, 0);
+    const tc = plan.titleCam || { x: 25.5, y: 31, yaw: Math.PI }; dolly.position.set(cx(tc.x), floorAt(cx(tc.x), cz(tc.y)), cz(tc.y)); dolly.rotation.set(0, tc.yaw, 0);
     LIGHT.A.value = Math.sin(t * 9) > 0.3 ? 1 : 0.1; NVU.on.value = 0;
     veil.uniforms.t.value = t; veil.uniforms.hurt.value = 0; veil.uniforms.fear.value = 0.2 * S.grain; veil.uniforms.fade.value = 0; veil.uniforms.stat.value = 0;
     vrMenu.update(); updateHands(dt, true);
     renderer.render(scene, camera); return;
   }
-  const tc = plan.titleCam || { x: 25.5, y: 31, yaw: Math.PI }; dolly.position.set(cx(tc.x) + Math.sin(t * 0.05) * 2, 0, cz(tc.y) + Math.cos(t * 0.04) * 1.5); camera.position.set(0, 1.6, 0); camera.rotation.set(-0.05, tc.yaw + Math.sin(t * 0.07) * 0.6, 0, 'YXZ');
+  const tc = plan.titleCam || { x: 25.5, y: 31, yaw: Math.PI }; dolly.position.set(cx(tc.x) + Math.sin(t * 0.05) * (tc.drift ?? 2), floorAt(cx(tc.x), cz(tc.y)), cz(tc.y) + Math.cos(t * 0.04) * (tc.drift ?? 1.5)); camera.position.set(0, 1.6, 0); camera.rotation.set(-0.05, tc.yaw + Math.sin(t * 0.07) * 0.6, 0, 'YXZ');
   LIGHT.A.value = Math.sin(t * 9) > 0.3 ? 1 : 0.1;
   renderer.setRenderTarget(rtMain); renderer.render(scene, camera); renderer.setRenderTarget(null);
   const u = tape.uniforms; u.t.value = t; u.mode.value = 1; u.fade.value = 0.1; u.glitch.value = Math.max(0, Math.sin(t * 0.7) - 0.9) * 6; u.exposure.value = 2.6 * S.bright; renderer.render(tape.scene, tape.cam);
@@ -697,7 +731,8 @@ function ending() {
     try { localStorage.removeItem(SAVE_KEY); localStorage.setItem('asylumvr_done_t' + TAPE, '1'); } catch (e) {}
     try { localStorage.setItem('asylumvr_tapes', String(Math.min(2, Math.max(unlocked, TAPE + 1)))); } catch (e) {}
     if (TAPE === 3 && tapeLogic) tapeLogic.stopKlaxon();
-    if (TAPE === 3) document.querySelector('.vhs').innerHTML = TAPE3.ENDING(G, timecode, Object.keys(NOTES).length);
+    if (TAPE === 4) document.querySelector('.vhs').innerHTML = TAPE4.ENDING(G, timecode, Object.keys(NOTES).length);
+    else if (TAPE === 3) document.querySelector('.vhs').innerHTML = TAPE3.ENDING(G, timecode, Object.keys(NOTES).length);
     else if (TAPE === 2) document.querySelector('.vhs').innerHTML = TAPE2.ENDING(G, timecode);
     else document.querySelector('.vhs').innerHTML = `<div class="end"><p class="kicker">Mount Harrow State Asylum</p><h1 class="logo">END OF TAPE 1</h1><p class="lede">${ABDUCT_TEXT.join('<br><br>')}</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${Object.keys(NOTES).length} · Time ${timecode(G.t).slice(3, 8)}</p><nav class="menu"><button onclick="location.href='?tape=2'">Play Tape 2: The Male Ward</button><button onclick="location.href='?tape=1'">Rewind</button></nav></div>`;
     if (renderer.xr.isPresenting) renderer.xr.getSession().end();

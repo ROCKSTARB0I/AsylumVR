@@ -1,8 +1,8 @@
 // Tape 2, The Male Ward: the documents, what you mutter, the objectives,
 // the wake-up, the keys, and this tape's own set-piece scares.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, H } from './plan.js?v=30';
-import { makeBody, pose } from './carcass.js?v=30';
+import { cx, cz, H } from './plan.js?v=31';
+import { makeBody, pose } from './carcass.js?v=31';
 
 const V = THREE.Vector3;
 
@@ -44,7 +44,7 @@ export const OBJECTIVES = [
 export const ITEM_LABEL = { card: 'Take keycard', chapelKey: 'Take key', stairKey: 'Take key' };
 export const LOCK_NAME = { card: 'the chapel keycard', chapelKey: "the chaplain's key", stairKey: 'the stairwell key' };
 
-export const ENDING = (G, timecode) => `<div class="end"><p class="kicker">Mount Harrow State Asylum</p><h1 class="logo">END OF TAPE 2</h1><p class="lede">The stairs went down past the ground floor. Past where the foundations should have been. The walls turned from tile to brick to stone.<br>At the bottom there was a light on, and a radio playing, and somebody humming along.</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${Object.keys(NOTES).length} · Time ${timecode(G.t).slice(3, 8)}</p><p class="lede">Tape 3 — <i>The Fall</i> — is next.</p><nav class="menu"><button onclick="location.href='?tape=1'">Tape 1</button><button onclick="location.href='?tape=2'">Replay Tape 2</button></nav></div>`;
+export const ENDING = (G, timecode) => `<div class="end"><p class="kicker">Mount Harrow State Asylum</p><h1 class="logo">END OF TAPE 2</h1><p class="lede">The stairs went down past the ground floor. Past where the foundations should have been. The walls turned from tile to brick to stone.<br>At the bottom there was a light on, and a radio playing, and somebody humming along.</p><p class="kicker">Deaths ${G.deaths} · Notes ${G.notes.length}/${Object.keys(NOTES).length} · Time ${timecode(G.t).slice(3, 8)}</p><p class="lede">Tape 3 — <i>The Fall</i> — is next.</p><nav class="menu"><button onclick="location.href='?tape=3'">Play Tape 3: The Fall</button><button onclick="location.href='?tape=2'">Replay Tape 2</button></nav></div>`;
 
 // ------------------------------------------------------------------ set pieces
 // These run as Scares methods (this = the Scares instance), like Tape 1's.

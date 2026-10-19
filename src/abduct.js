@@ -3,8 +3,8 @@
 // comes down. The tape keeps rolling while you lie there, and while he drags you back inside by the
 // ankles. Then a card says where he took you (Tape 2 picks up from there).
 import * as THREE from '../vendor/three.module.js';
-import { makeBody, pose, flashlight } from './carcass.js?v=30';
-import { C } from './plan.js?v=30';
+import { makeBody, pose, flashlight } from './carcass.js?v=31';
+import { C } from './plan.js?v=31';
 const V = THREE.Vector3;
 const sm = (a, b, t) => { const x = Math.min(1, Math.max(0, (t - a) / (b - a))); return x * x * (3 - 2 * x); };
 
@@ -23,6 +23,20 @@ export class Abduction {
     const b = this.pell = makeBody('orderly', 61, {}); const s = b.s;
     const w = flashlight(s); w.position.set(0, -0.08 * s, 0.03); w.rotation.x = -Math.PI / 2 + 0.9; b.bones.Rhand.add(w); this.torch = w;
     b.root.visible = false; this.scene.add(b.root);
+    // you: Ward, in a field jacket and jeans, so when you're down you can see your own legs (the head is hidden: the camera is in it)
+    const me = this.me = makeBody('orderly', 5, { outfit: 'ward', face: 'plain', healthy: true, stare: false, bald: false, blood: 0.15, dirt: 0.4, scars: 0, lean: 0.2, h: 1.78, girth: 0.86, skin: [0.68, 0.53, 0.45] });
+    me.root.visible = false; this.scene.add(me.root);
+  }
+  // lay Ward's body out from the eyes along the ground, toward the feet (-z); Pell has the ankles
+  lie(headAt, t, pulling) {
+    const me = this.me, B = me.bones; me.root.visible = true; pose(me, 'lie', t);
+    B.head.scale.setScalar(0.001); B.neck.scale.setScalar(0.3);
+    me.root.rotation.order = 'YXZ'; me.root.rotation.set(-Math.PI / 2, Math.PI, 0);
+    me.root.position.set(headAt.x, 0.12, headAt.z - 1.55 * me.s);
+    // the legs up off the ground, held at the ankles, jerking with each pull
+    const lift = pulling !== 0 || t >= 6.8 ? 0.42 + pulling * 0.1 : 0.06; B.Lthigh.rotation.x = -lift; B.Rthigh.rotation.x = -lift * 0.9; B.Lshin.rotation.x = 0.05; B.Rshin.rotation.x = 0.1;
+    B.Lupper.rotation.set(0, 0, 0.14 + Math.sin(t * 7) * 0.05 * (pulling ? 1 : 0)); B.Rupper.rotation.set(0, 0, -0.18); B.Lfore.rotation.set(-0.15, 0, 0); B.Rfore.rotation.set(-0.3, 0, 0); B.Lhand.rotation.set(0, 0, 0); B.Rhand.rotation.set(0, 0, 0);
+    me.mat.userData.uAmb.value.setRGB(0.06, 0.06, 0.075);
   }
   start() {
     this.on = true; this.t = 0; this.ev = new Set(); this.cardUp = false; this.base = null; this.lay = null;
@@ -93,12 +107,13 @@ export class Abduction {
     // the eyes: on the ground, looking along your body to him
     if (vr) {
       const off = this.camera.position.clone().applyAxisAngle(new V(0, 1, 0), this.dolly.rotation.y);
-      this.dolly.position.set(headAt.x - off.x, 0.22 - this.camera.position.y, headAt.z - off.z);
+      this.dolly.position.set(headAt.x - off.x, 0.46 - this.camera.position.y, headAt.z - off.z);   // (your head lifted off the ground, enough to see down yourself)
     } else {
       this.dolly.position.set(headAt.x, 0, headAt.z); this.dolly.rotation.set(0, 0, 0);
-      this.camera.position.set(0, 0.2, 0); this.camera.rotation.set(0.62 + Math.sin(t * 0.7) * 0.05, Math.sin(t * 0.4) * 0.08, 0.22 + Math.sin(t * 0.9) * 0.03, 'YXZ');
+      this.camera.position.set(0, 0.46, 0); this.camera.rotation.set(0.12 + Math.sin(t * 0.7) * 0.05, Math.sin(t * 0.4) * 0.08, 0.18 + Math.sin(t * 0.9) * 0.03, 'YXZ');   // (down your body to your legs, and him)
     }
-    const feet = headAt.clone().add(new V(0, 0, -1.45));
+    const feet = headAt.clone().add(new V(0, 0, -1.62));
+    this.lie(headAt, t, t >= 6.8 ? Math.max(0, Math.sin((t - 6.8) * 7)) : 0);
     if (t < 6.8) {
       // standing at your feet, looking down, the light in your face
       P.root.position.copy(feet).add(new V(0, 0, -0.35)); P.root.rotation.set(0, 0, 0);
@@ -121,7 +136,7 @@ export class Abduction {
     if (t < 11.2) return;
 
     // ---- 5. black. In the headset, the card first; on desktop, straight to the end screen
-    P.root.visible = false; H.beam.intensity = 0;
+    P.root.visible = false; this.me.root.visible = false; H.beam.intensity = 0;
     if (!vr) { this.on = false; return 'done'; }
     if (!this.cardUp) { this.cardUp = t; this.card.card([['END OF TAPE 1', 64], ...ABDUCT_TEXT.map((l) => [l, 27, '#d8d0c0']), ['', 10], ['Pull the trigger', 28, '#9a948a']], { top: 70 }); this.placeCard(); }
     if ((t - this.cardUp > 1.5 && I.interact) || t - this.cardUp > 60) { this.card.mesh.visible = false; this.on = false; return 'done'; }

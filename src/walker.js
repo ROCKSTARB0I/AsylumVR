@@ -2,6 +2,7 @@
 // and under beds, getting hurt, dying. Desktop moves the dolly from keys
 // and mouse; in VR your real head is the body and the stick moves it.
 import * as THREE from '../vendor/three.module.js';
+import { floorAt } from './plan.js?v=31';
 
 const V = THREE.Vector3;
 // Kroft is 2.16 m; his eyes are at about 2.02. However tall you make yourself, you're still a head under him.
@@ -41,7 +42,7 @@ export class Walker {
     if (this.freecam) {
       const fly = new V(0, 0, -1).applyEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ')).multiplyScalar(I.mz * sp).addScaledVector(r, I.mx * sp);
       this.pos.addScaledVector(fly, dt); this.flyY = (this.flyY ?? this.eye) + (I.up * sp + fly.y * 0) * dt;
-      this.dolly.position.set(this.pos.x, 0, this.pos.z); this.camera.position.set(0, this.flyY + this.pos.y, 0); this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+      this.dolly.position.set(this.pos.x, floorAt(this.pos.x, this.pos.z), this.pos.z); this.camera.position.set(0, this.flyY + this.pos.y, 0); this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
       return;
     }
     this.flyY = undefined; this.pos.y = 0;
@@ -54,7 +55,7 @@ export class Walker {
     const bobA = Math.min(1, this.speed / 4.3);
     const by = Math.abs(Math.sin(this.stepPhase * Math.PI)) * 0.045 * bobA, bx = Math.cos(this.stepPhase * Math.PI) * 0.025 * bobA;
     const sh = this.shake; const sway = Math.sin(this.t * 1.3) * 0.004 * (1 + this.exhaust * 3);
-    this.dolly.position.set(this.pos.x, 0, this.pos.z);
+    this.dolly.position.set(this.pos.x, floorAt(this.pos.x, this.pos.z), this.pos.z);
     this.camera.position.set(bx, this.eye + by + sway, 0);
     this.camera.rotation.set(this.pitch + (Math.random() - 0.5) * sh * 0.08 + sway * 0.5, this.yaw + (Math.random() - 0.5) * sh * 0.08, Math.cos(this.stepPhase * Math.PI) * 0.006 * bobA, 'YXZ');
   }
@@ -65,7 +66,7 @@ export class Walker {
       const hl = this.camera.position; const ang = this.yaw - camYaw(this.camera);
       this.dolly.rotation.y = ang;
       const off = new V(hl.x, 0, hl.z).applyAxisAngle(new V(0, 1, 0), ang);
-      this.dolly.position.set(this.pos.x - off.x, 0, this.pos.z - off.z);
+      this.dolly.position.set(this.pos.x - off.x, floorAt(this.pos.x, this.pos.z), this.pos.z - off.z); this.lift = 0;
       return;
     }
     if (I.snap) {   // snap turn about the head
@@ -83,7 +84,7 @@ export class Walker {
     this.space.collide(p, 0.25);
     this.dolly.position.x += p.x - head.x; this.dolly.position.z += p.z - head.z;
     const lift = Math.min((this.vrCrouch ? -0.6 : 0) + this.heightOff, MAX_EYE - this.camera.position.y);   // never taller than Kroft
-    this.dolly.position.y += (lift - this.dolly.position.y) * (1 - Math.exp(-dt * 8));
+    this.lift = (this.lift || 0) + (lift - (this.lift || 0)) * (1 - Math.exp(-dt * 8)); this.dolly.position.y = this.lift + floorAt(p.x, p.z);   // (the floor under you: up the stairs)
     this.pos.set(p.x, 0, p.z); this.speed = Math.hypot(this.vel.x, this.vel.z);
     this.steps(dt, run);
   }
@@ -118,15 +119,15 @@ export class Walker {
     if (I.vr) {
       // keep the head inside the locker / under the bed
       const head = this.camera.getWorldPosition(new V());
-      if (this.syncVR) { this.syncVR = false; const hl = this.camera.position; const ang = this.yaw - camYaw(this.camera); this.dolly.rotation.y = ang; const off = new V(hl.x, 0, hl.z).applyAxisAngle(new V(0, 1, 0), ang); this.dolly.position.set(this.pos.x - off.x, 0, this.pos.z - off.z); }
+      if (this.syncVR) { this.syncVR = false; const hl = this.camera.position; const ang = this.yaw - camYaw(this.camera); this.dolly.rotation.y = ang; const off = new V(hl.x, 0, hl.z).applyAxisAngle(new V(0, 1, 0), ang); this.dolly.position.set(this.pos.x - off.x, floorAt(this.pos.x, this.pos.z), this.pos.z - off.z); this.hideY = 0; }
       else { this.dolly.position.x += this.pos.x - head.x; this.dolly.position.z += this.pos.z - head.z; }
-      const want = h.k === 'locker' ? 0 : h.k === 'strap' ? Math.min(0, eye - (head.y - this.dolly.position.y)) : eye - (head.y - this.dolly.position.y); this.dolly.position.y += (want - this.dolly.position.y) * (1 - Math.exp(-dt * 6));
+      const fl = floorAt(this.pos.x, this.pos.z); const dy0 = this.dolly.position.y - fl; const want = h.k === 'locker' ? 0 : h.k === 'strap' ? Math.min(0, eye - (head.y - this.dolly.position.y)) : eye - (head.y - this.dolly.position.y); this.dolly.position.y = fl + dy0 + (want - dy0) * (1 - Math.exp(-dt * 6));
     } else {
       this.yaw -= I.lookDx * 0.0018; this.pitch -= I.lookDy * 0.0018;
       const lim = h.k === 'locker' ? 0.45 : h.k === 'strap' ? 1.1 : 0.9; this.yaw = this.hideYaw + Math.max(-lim, Math.min(lim, this.yaw - this.hideYaw)); this.pitch = h.k === 'strap' ? Math.max(0.2, Math.min(1.45, this.pitch)) : Math.max(-0.5, Math.min(0.4, this.pitch));
       this.eye += (eye - this.eye) * (1 - Math.exp(-dt * 6));
       const br = Math.sin(this.t * 2.2) * 0.006;
-      this.dolly.position.set(this.pos.x, 0, this.pos.z); this.camera.position.set(0, this.eye + br, 0); this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
+      this.dolly.position.set(this.pos.x, floorAt(this.pos.x, this.pos.z), this.pos.z); this.camera.position.set(0, this.eye + br, 0); this.camera.rotation.set(this.pitch, this.yaw, 0, 'YXZ');
     }
   }
   dying(dt) {
@@ -134,7 +135,7 @@ export class Walker {
     if (!this.vr) {
       const k = Math.min(1, this.deadT / 1.1);
       this.camera.position.y = this.eye * (1 - k * 0.85) + 0.05; this.camera.rotation.z = k * 1.2; this.camera.rotation.x = this.pitch * (1 - k) + k * 0.3;
-    } else this.dolly.position.y += (-1.2 - this.dolly.position.y) * dt * 2;
+    } else { const fl = floorAt(this.pos.x, this.pos.z); this.dolly.position.y += (fl - 1.2 - this.dolly.position.y) * dt * 2; }
   }
 }
 const _h = new V();

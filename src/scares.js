@@ -3,8 +3,8 @@
 // hunting you). The worst of them end the same way: a face lunging into
 // the lens, a scream, a burst of dead-channel static.
 import * as THREE from '../vendor/three.module.js';
-import { C, H, cx, cz } from './plan.js?v=30';
-import { makeBody, pose } from './carcass.js?v=30';
+import { C, H, cx, cz, floorAt } from './plan.js?v=31';
+import { makeBody, pose } from './carcass.js?v=31';
 
 const V = THREE.Vector3;
 const near = (p, x, y, r) => Math.hypot(p.x - cx(x), p.z - cz(y)) < r;
@@ -44,16 +44,21 @@ export class Scares {
     const hw = a.bones.head.getWorldPosition(new V()); a.root.position.add(target.clone().sub(hw)); a.root.updateMatrixWorld(true);
   }
   // the hit: the face fills the lens, it screams, the picture tears into static
-  hit(a, A, { dmg = 0, hold = 0.45 } = {}) {
+  hit(a, A, { dmg = 0, hold = 0.65 } = {}) {
     if (A.hitAt === undefined) {
-      A.hitAt = A.t; a.root.visible = true; this.sound.jump('scare'); this.sound.scream(this.head(), 1.2);
-      this.horrors.glitchKick(2.2); this.horrors.staticBurst(0.12); this.walker.shake = 1.2; if (dmg) this.walker.hurt(dmg);
+      A.hitAt = A.t; a.root.visible = true; this.sound.jump('scare');
+      this.horrors.glitchKick(2.6); this.horrors.staticBurst(0.07); this.walker.shake = 1.6; if (dmg) this.walker.hurt(dmg);
     }
-    const k = A.t - A.hitAt; const h = this.head(); const f = this.fwd();
-    const target = h.clone().addScaledVector(f, 0.24 + Math.sin(k * 40) * 0.02).add(new V((Math.random() - 0.5) * 0.02, -0.03 + (Math.random() - 0.5) * 0.02, 0));
-    pose(a, 'grab', this.t, { k: 1 }); a.bones.jaw.rotation.x = 0.7 + Math.sin(k * 30) * 0.15; a.bones.head.rotation.z = Math.sin(k * 23) * 0.2;
-    this.faceAt(a, target); a.mat.userData.uAmb.value.setRGB(0.05, 0.045, 0.04);
-    if (k > hold) { a.root.visible = false; this.horrors.staticBurst(0.25); return true; }
+    // it comes from arm's length to right against the lens in under a tenth of a second, then stays there, shaking, screaming
+    const k = A.t - A.hitAt; const h = this.head(); const f = this.fwd(); const lunge = Math.max(0, 1 - k / 0.08);
+    const jit = () => (Math.random() - 0.5) * 0.035;
+    const target = h.clone().addScaledVector(f, 0.3 + lunge * 0.45 + Math.sin(k * 47) * 0.025).add(new V(jit(), -0.035 + jit(), jit()));
+    pose(a, 'grab', this.t, { k: 1 }); a.bones.jaw.rotation.x = 0.85 + Math.sin(k * 34) * 0.18; a.bones.head.rotation.z = Math.sin(k * 23) * 0.28; a.bones.head.rotation.x = Math.sin(k * 17) * 0.12;
+    this.faceAt(a, target);
+    // lit like a flashbulb in a dark room, strobing: you see every detail of it
+    const st = Math.sin(k * 70) > -0.3 ? 1 : 0.25; a.mat.userData.uAmb.value.setRGB(0.55 * st, 0.5 * st, 0.45 * st);
+    this.walker.shake = Math.max(this.walker.shake, 1.0 - k);
+    if (k > hold) { a.root.visible = false; this.horrors.staticBurst(0.35); this.horrors.glitchKick(1.4); return true; }
     return false;
   }
   powerOn() {
@@ -69,7 +74,7 @@ export class Scares {
   // ---------------------------------------------------------------- running
   update(dt) {
     this.t += dt;
-    if (this.active) { const A = this.active; A.t += dt; const r = A.fn.call(this, dt, A); if (r === true) { for (const a of this.actors) a.root.visible = false; this.horrors.blackout = false; this.active = null; this.cool = rnd(80, 160); } return; }
+    if (this.active) { const A = this.active; A.t += dt; const r = A.fn.call(this, dt, A); if (r === true) { for (const a of this.actors) a.root.visible = false; this.horrors.blackout = false; this.active = null; this.cool = rnd(55, 115); } return; }
     if (!this.walker.alive || this.G.reading || this.G.paused) return;
     for (const s of this.list) if (!this.done.has(s.id) && s.when()) { this.done.add(s.id); this.start(s.run); return; }
     // the director: when nothing is hunting you and it's quiet, something happens
@@ -96,12 +101,12 @@ export class Scares {
       A.s.go = true; A.s.pos = p; a.root.visible = true; this.sound.hush(1.8); A.s.wait = rnd(1.0, 1.8);
     }
     if (A.t < A.s.wait) {
-      a.root.position.copy(A.s.pos); a.root.rotation.y = Math.atan2(w.pos.x - A.s.pos.x, w.pos.z - A.s.pos.z); pose(a, 'idle', this.t, {}); a.bones.head.rotation.z = 0.6; this.light(a, 1);
+      a.root.position.set(A.s.pos.x, floorAt(A.s.pos.x, A.s.pos.z), A.s.pos.z); a.root.rotation.y = Math.atan2(w.pos.x - A.s.pos.x, w.pos.z - A.s.pos.z); pose(a, 'idle', this.t, {}); a.bones.head.rotation.z = 0.6; this.light(a, 1);
       return false;
     }
     if (!A.s.ran) { A.s.ran = true; this.sound.voice('eater', 'chase', A.s.pos); }
     const h = this.head(); const to = new V(h.x - A.s.pos.x, 0, h.z - A.s.pos.z); const d = to.length(); to.normalize();
-    A.s.pos.addScaledVector(to, Math.min(d, dt * 8.5)); a.root.position.copy(A.s.pos); a.root.rotation.y = Math.atan2(to.x, to.z);
+    A.s.pos.addScaledVector(to, Math.min(d, dt * 8.5)); a.root.position.set(A.s.pos.x, floorAt(A.s.pos.x, A.s.pos.z), A.s.pos.z); a.root.rotation.y = Math.atan2(to.x, to.z);
     pose(a, 'run', this.t, { speed: 8, phase: this.t * 13, reach: true }); this.light(a, 1);
     if (d < 0.9) this.hit(a, A, { dmg: 8 });
     return false;
@@ -129,7 +134,8 @@ export class Scares {
     const k = Math.min(1, A.t / 2.5); pose(a, 'idle', this.t, {}); a.bones.neck.rotation.x = 0.35; a.bones.head.rotation.z = 0.3 + Math.sin(this.t * 2) * 0.1;
     this.faceAt(a, slat.clone().add(new V(hd.fx * (0.6 * (1 - k)), -0.25 * (1 - k), hd.fz * (0.6 * (1 - k))))); a.mat.userData.uAmb.value.setRGB(0.02, 0.018, 0.016);
     A.s.breath -= dt; if (A.s.breath < 0) { A.s.breath = 0.9; this.sound.breathAt(slat, 0.5, 0.6, 450); }
-    if (A.t > 5 && !A.s.bang) { A.s.bang = true; this.sound.lockerRip(); this.sound.scream(slat, 1.1); this.horrors.glitchKick(2); this.horrors.staticBurst(0.2); w.shake = 1; }
+    if (A.t > 5 && !A.s.bang) { A.s.bang = true; this.sound.lockerRip(); this.sound.jump('scare'); this.horrors.glitchKick(2.6); this.horrors.staticBurst(0.08); w.shake = 1.6; }
+    if (A.s.bang) { const st = Math.sin(A.t * 70) > -0.2 ? 0.5 : 0.15; a.mat.userData.uAmb.value.setRGB(st, st * 0.92, st * 0.85); this.faceAt(a, slat.clone().add(new V(-hd.fx * 0.1, 0.02, -hd.fz * 0.1))); }
     if (A.t > 5.5) { a.root.visible = false; return true; }
     return false;
   }
@@ -139,7 +145,7 @@ export class Scares {
     const a = this.actors[1];
     if (!A.s.go) { A.s.go = true; a.root.visible = true; this.sound.thud(new V(cx(10), 1.6, cz(1)), 1.4); this.sound.clang(new V(cx(10), 1.6, cz(1)), 220, 0.6, 1.2); this.sound.jump('scare'); this.sound.scream(new V(cx(10), 1.6, cz(1)), 1.2); this.horrors.glitchKick(2); this.horrors.staticBurst(0.1); this.walker.shake = 0.8; }
     pose(a, 'grab', this.t, { k: 1 }); a.bones.Lupper.rotation.set(-2.7, 0, 0.45); a.bones.Rupper.rotation.set(-2.7, 0, -0.45); a.bones.jaw.rotation.x = 0.6 + Math.sin(A.t * 25) * 0.15;
-    this.faceAt(a, new V(cx(10) + Math.sin(A.t * 31) * 0.03, 1.72, cz(1) + 0.55)); a.mat.userData.uAmb.value.setRGB(0.06, 0.06, 0.08);
+    this.faceAt(a, new V(cx(10) + Math.sin(A.t * 31) * 0.03, 1.72, cz(1) + 0.55)); { const st = Math.sin(A.t * 60) > -0.2 ? 0.42 : 0.12; a.mat.userData.uAmb.value.setRGB(st, st, st * 1.15); }
     if (A.t > 1.6) { a.root.visible = false; return true; }
     return false;
   }
@@ -150,7 +156,7 @@ export class Scares {
     if (!A.s.go) { A.s.go = true; this.sound.lockerRip(); this.horrors.glitchKick(1.5); a.root.visible = true; A.s.p = new V(hd.x + hd.fx * 0.3, 0, hd.z + hd.fz * 0.3); }
     const h = this.head(); const to = new V(h.x - A.s.p.x, 0, h.z - A.s.p.z); const d = to.length(); to.normalize();
     if (A.t > 0.25) A.s.p.addScaledVector(to, Math.min(d, dt * 7));
-    a.root.position.copy(A.s.p); a.root.rotation.y = Math.atan2(to.x, to.z); pose(a, A.t < 0.25 ? 'grab' : 'run', this.t, { k: 1, speed: 7, phase: this.t * 12, reach: true }); this.light(a);
+    a.root.position.set(A.s.p.x, floorAt(A.s.p.x, A.s.p.z), A.s.p.z); a.root.rotation.y = Math.atan2(to.x, to.z); pose(a, A.t < 0.25 ? 'grab' : 'run', this.t, { k: 1, speed: 7, phase: this.t * 12, reach: true }); this.light(a);
     if (d < 0.9 || A.t > 2) this.hit(a, A, { dmg: 10 });
     return false;
   }
@@ -171,7 +177,7 @@ export class Scares {
       const f = this.fwd(); f.y = 0; f.normalize(); const p = w.pos.clone().addScaledVector(f, 2.6); this.space.collide(p, 0.3); A.s.p = p; a.root.visible = true; A.s.whisper = 0;
     }
     // it stands in the dark; you only see it if your night vision is on
-    a.root.position.copy(A.s.p); a.root.rotation.y = Math.atan2(w.pos.x - A.s.p.x, w.pos.z - A.s.p.z); pose(a, 'idle', this.t, {}); a.bones.head.rotation.z = 0.5; a.mat.userData.uAmb.value.setRGB(0, 0, 0);
+    a.root.position.set(A.s.p.x, floorAt(A.s.p.x, A.s.p.z), A.s.p.z); a.root.rotation.y = Math.atan2(w.pos.x - A.s.p.x, w.pos.z - A.s.p.z); pose(a, 'idle', this.t, {}); a.bones.head.rotation.z = 0.5; a.mat.userData.uAmb.value.setRGB(0, 0, 0);
     A.s.whisper -= dt; if (A.s.whisper < 0) { A.s.whisper = 1.5; this.sound.syllables(A.s.p.clone().setY(1.6), 3, 95, { breath: 0.9, gain: 0.35 }); }
     if (A.t > 6 || A.s.p.distanceTo(w.pos) < 1.6 || w.speed > 2) this.hit(a, A, { dmg: 12 });
     return false;
@@ -199,7 +205,7 @@ export class Scares {
       A.s.go = true; this.sound.hush(30); const f = this.fwd(); f.y = 0; f.normalize();
       const p = w.pos.clone().addScaledVector(f, -1.0); this.space.collide(p, 0.3); A.s.p = p; a.root.visible = true; A.s.breath = 0;
     }
-    a.root.position.copy(A.s.p); a.root.rotation.y = Math.atan2(w.pos.x - A.s.p.x, w.pos.z - A.s.p.z); pose(a, 'idle', this.t, {}); a.bones.neck.rotation.x = 0.3; a.bones.head.rotation.z = -0.4; this.light(a);
+    a.root.position.set(A.s.p.x, floorAt(A.s.p.x, A.s.p.z), A.s.p.z); a.root.rotation.y = Math.atan2(w.pos.x - A.s.p.x, w.pos.z - A.s.p.z); pose(a, 'idle', this.t, {}); a.bones.neck.rotation.x = 0.3; a.bones.head.rotation.z = -0.4; this.light(a);
     A.s.breath -= dt; if (A.s.breath < 0) { A.s.breath = 1.0; this.sound.breathAt(A.s.p.clone().setY(1.6), 0.55, 0.7, 500); }   // breathing right behind your ear
     if (this.looking(A.s.p.x, 1.55, A.s.p.z, 0.6) || A.t > 25) this.hit(a, A, { dmg: 8, hold: 0.6 });
     return false;

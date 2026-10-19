@@ -5,8 +5,8 @@
 // cones and stains are added on top. Light comes in four channels: S always
 // on, A and B the stuttering broken tubes, P the main circuit (generator).
 import * as THREE from '../vendor/three.module.js';
-import { C, H, W, D, Z, cx, cz } from './plan.js?v=30';
-import { T, scrawlTexture, rng } from './surfaces.js?v=30';
+import { C, H, W, D, Z, cx, cz, LEVELS, floorAt, cellFloorAt, ceilOf, liftOf, baseOf } from './plan.js?v=31';
+import { T, scrawlTexture, rng } from './surfaces.js?v=31';
 
 const V3 = THREE.Vector3;
 export const LIGHT = { A: { value: 1 }, B: { value: 1 }, P: { value: 0 }, S: { value: 1 }, cool: { value: new THREE.Color(0.78, 0.88, 1.0) } };
@@ -63,18 +63,34 @@ class Batch {
   }
 }
 
+// split a batch into 24x24-cell pieces by triangle, so the headset only draws what's near (big maps)
+function chunks(b) {
+  const K = 24 * C; const out = new Map();
+  for (let t = 0; t < b.p.length / 9; t++) {
+    const mx = (b.p[t * 9] + b.p[t * 9 + 3] + b.p[t * 9 + 6]) / 3, mz = (b.p[t * 9 + 2] + b.p[t * 9 + 5] + b.p[t * 9 + 8]) / 3;
+    const k = Math.floor(mx / K) * 1000 + Math.floor(mz / K); let c = out.get(k); if (!c) { c = new Batch(b.mat); out.set(k, c); }
+    for (let v = 0; v < 3; v++) { const i = t * 3 + v; c.p.push(b.p[i * 3], b.p[i * 3 + 1], b.p[i * 3 + 2]); c.n.push(b.n[i * 3], b.n[i * 3 + 1], b.n[i * 3 + 2]); c.u.push(b.u[i * 2], b.u[i * 2 + 1]); }
+  }
+  return [...out.values()];
+}
+
 // ------------------------------------------------------------ the bake
 class Baker {
   constructor(plan) {
     this.plan = plan;
     this.lamps = plan.lamps.map((l) => ({ ...l, wx: cx(l.x), wz: cz(l.y), wy: l.y !== undefined && l.kind !== 'tube' && l.kind !== 'cage' && l.kind !== 'bulb' && l.kind !== 'monitor' && l.kind !== 'lamp' ? (l.yH ?? (l.kind === 'none' ? l.y2 ?? 2.1 : l.kind === 'candle' ? (l.yy ?? 0.3) : H - 0.3)) : H - 0.3,
       c: new THREE.Color(l.col), dir: l.dir ? new V3(...l.dir).normalize() : null }));
-    for (const l of this.lamps) { if (l.kind === 'candle') l.wy = l.h ?? 0.35; if (l.kind === 'none') l.wy = 2.1; if (l.kind === 'lamp') l.wy = 1.15; if (l.kind === 'monitor') l.wy = 1.1; }
+    for (const l of this.lamps) { if (l.kind === 'candle') l.wy = l.h ?? 0.35; if (l.kind === 'none') l.wy = l.y2 ?? 2.1; if (l.kind === 'lamp') l.wy = 1.15; if (l.kind === 'monitor') l.wy = 1.1; }
+    // on a building with storeys, a lamp hangs from its own cell's ceiling (or stands on its floor)
+    if (LEVELS) for (const l of this.lamps) { const gx = Math.floor(l.x), gy = Math.floor(l.y); l.wy += (l.kind === 'tube' || l.kind === 'cage' || l.kind === 'bulb') ? liftOf(gx, gy) - (l.drop || 0) : baseOf(gx, gy); l.lift = liftOf(gx, gy); }
+    // lamps sorted into 8x8-cell buckets, so each point only looks at the lamps that can reach it
+    this.BK = 8; this.bw = Math.ceil(W / this.BK); this.bh = Math.ceil(D / this.BK); this.buckets = Array.from({ length: this.bw * this.bh }, () => []);
+    for (const l of this.lamps) { const r = l.r / C; for (let by = Math.max(0, Math.floor((l.y - r) / this.BK)); by <= Math.min(this.bh - 1, Math.floor((l.y + r) / this.BK)); by++) for (let bx = Math.max(0, Math.floor((l.x - r) / this.BK)); bx <= Math.min(this.bw - 1, Math.floor((l.x + r) / this.BK)); bx++) this.buckets[by * this.bw + bx].push(l); }
     // per cell irradiance for bounce, AI vision and character light
     this.cell = new Float32Array(W * D * 6);
     for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) {
       if (!plan.at(x, y)) continue;
-      const r = this.direct(cx(x), 1.2, cz(y), 0, 0, 0, true);
+      const r = this.direct(cx(x), 1.2 + baseOf(x, y), cz(y), 0, 0, 0, true);
       this.cell.set(r, (y * W + x) * 6);
     }
     // blur for the bounce term
@@ -101,7 +117,8 @@ class Baker {
   }
   direct(px, py, pz, nx, ny, nz, omni = false) {
     const out = [0, 0, 0, 0, 0, 0];
-    for (const l of this.lamps) {
+    const bx = Math.min(this.bw - 1, Math.max(0, Math.floor(px / C / this.BK))), by = Math.min(this.bh - 1, Math.max(0, Math.floor(pz / C / this.BK)));
+    for (const l of this.buckets[by * this.bw + bx]) {
       const dx = l.wx - px, dy = l.wy - py, dz = l.wz - pz; const d2 = dx * dx + dy * dy + dz * dz; const r = l.r;
       if (d2 > r * r) continue;
       const d = Math.sqrt(d2) || 1e-3;
@@ -123,7 +140,8 @@ class Baker {
     const gx = Math.min(W - 1, Math.max(0, Math.floor((px + nx * 0.2) / C))), gy = Math.min(D - 1, Math.max(0, Math.floor((pz + nz * 0.2) / C)));
     const bo = (gy * W + gx) * 6;
     // contact AO: near floor/ceiling lines and wall corners
-    let ao = 0.55 + 0.45 * Math.min(1, py / 0.7) * Math.min(1, (H - py) / 0.45);
+    const fy = LEVELS ? cellFloorAt(gx, gy, px, pz) : 0, cy = LEVELS ? ceilOf(gx, gy) : H;
+    let ao = 0.55 + 0.45 * Math.min(1, Math.max(0, py - fy) / 0.7) * Math.min(1, Math.max(0, cy - py) / 0.45);
     if (ny > 0.5 || ny < -0.5) {
       let walls = 0; for (const [ox, oz] of [[0.35, 0], [-0.35, 0], [0, 0.35], [0, -0.35]]) if (this.solid(px + ox, pz + oz)) walls++;
       ao *= 1 - walls * 0.17;
@@ -169,6 +187,8 @@ export function buildAsylum(plan, scene) {
   const winGlass = [];
   const outside = (x, y) => at(x, y) === Z.OUT;
 
+  if (LEVELS) buildStoreys();
+  else {
   // ---- floors and ceilings
   for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) {
     const z = at(x, y); if (!z) continue;
@@ -224,12 +244,94 @@ export function buildAsylum(plan, scene) {
     }
   }
 
+  }
+
+  // ---- a building with storeys: floors at their own heights, flights of stairs, tall stairwells,
+  // and a face wherever two floors (or two ceilings) meet at different heights
+  function buildStoreys() {
+    const edgeOf = (x, y, dx, dy) => {   // the shared edge between (x,y) and its neighbour, ordered to face back into (x,y)
+      if (dx === 1) return [(x + 1) * C, y * C, (x + 1) * C, (y + 1) * C];
+      if (dx === -1) return [x * C, (y + 1) * C, x * C, y * C];
+      if (dy === 1) return [(x + 1) * C, (y + 1) * C, x * C, (y + 1) * C];
+      return [x * C, y * C, (x + 1) * C, y * C];
+    };
+    // a quad on an edge, its bottom and top allowed to slope (stairs)
+    const face = (mb, e, n, ya0, yb0, ya1, yb1, vScale = H) => {
+      const [ax, az, bx, bz] = e; const ua = (n[0] ? az : ax) / 3, ub = (n[0] ? bz : bx) / 3;
+      mb.quad([ax, ya0, az], [bx, yb0, bz], [bx, yb1, bz], [ax, ya1, az], n, [ua, ya0 / vScale], [ub, yb0 / vScale], [ub, yb1 / vScale], [ua, ya1 / vScale]);
+    };
+    const inset = (e, x, y) => { const mx = (x + 0.5) * C, mz = (y + 0.5) * C; return [[e[0] + (mx - e[0]) * 0.02, e[1] + (mz - e[1]) * 0.02], [e[2] + (mx - e[2]) * 0.02, e[3] + (mz - e[3]) * 0.02]]; };
+    for (let y = 0; y < D; y++) for (let x = 0; x < W; x++) {
+      const z = at(x, y); if (!z) continue; const i = y * W + x;
+      const base = LEVELS.base[i], rise = LEVELS.rise[i], dir = LEVELS.dir[i], ceil = LEVELS.ceil[i];
+      const fkey = (plan.floorOf && plan.floorOf(x, y, z)) || FLOOR_OF[z]; const fb = M(fkey); const x0 = x * C, z0 = y * C; const h = C / 2;
+      if (!rise) {
+        for (let j = 0; j < 2; j++) for (let k = 0; k < 2; k++) { const a = x0 + k * h, b = z0 + j * h; fb.quad([a, base, b + h], [a + h, base, b + h], [a + h, base, b], [a, base, b], [0, 1, 0], [a / 3, -(b + h) / 3], [(a + h) / 3, -(b + h) / 3], [(a + h) / 3, -b / 3], [a / 3, -b / 3]); }
+      } else {
+        // a flight: real steps (about 16 cm risers, 30 cm treads), each a solid block with a steel nosing
+        const N = Math.max(2, Math.round(rise / 0.16)); const along = dir <= 2 ? 'x' : 'z'; const sgn = dir === 1 || dir === 3 ? 1 : -1;
+        for (let k = 0; k < N; k++) {
+          const top = base + rise * (k + 1) / N, t0 = k / N, t1 = (k + 1) / N; const hgt = top - base + 0.02;
+          const c0 = sgn > 0 ? t0 : 1 - t1, c1 = sgn > 0 ? t1 : 1 - t0; const mid = (c0 + c1) / 2 * C;
+          const m = along === 'x' ? new THREE.Matrix4().makeTranslation(x0 + mid, base + hgt / 2 - 0.02, z0 + C / 2) : new THREE.Matrix4().makeTranslation(x0 + C / 2, base + hgt / 2 - 0.02, z0 + mid);
+          if (along === 'x') fb.box(C / N, hgt, C, m, 1.5); else fb.box(C, hgt, C / N, m, 1.5);
+          const ne = (sgn > 0 ? c0 : c1) * C + (sgn > 0 ? 0.015 : -0.015);   // the nosing sits on the front edge of the tread
+          const nm = along === 'x' ? new THREE.Matrix4().makeTranslation(x0 + ne, top + 0.004, z0 + C / 2) : new THREE.Matrix4().makeTranslation(x0 + C / 2, top + 0.004, z0 + ne);
+          if (along === 'x') M('metal').box(0.04, 0.012, C - 0.04, nm, 0.5); else M('metal').box(C - 0.04, 0.012, 0.04, nm, 0.5);
+        }
+      }
+      if (z !== Z.OUT) for (let j = 0; j < 2; j++) for (let k = 0; k < 2; k++) { const a = x0 + k * h, b = z0 + j * h; M('ceiling').quad([a, ceil, b], [a + h, ceil, b], [a + h, ceil, b + h], [a, ceil, b + h], [0, -1, 0], [a / 3, b / 3], [(a + h) / 3, b / 3], [(a + h) / 3, (b + h) / 3], [a / 3, (b + h) / 3]); }
+      for (const [dx, dy] of DIRS) {
+        const nx = x + dx, ny = y + dy; const e = edgeOf(x, y, dx, dy); const n = [-dx, 0, -dy]; const wb = M(WALL_OF[z]);
+        const [pa, pb] = inset(e, x, y); const fa = cellFloorAt(x, y, pa[0], pa[1]), fbb = cellFloorAt(x, y, pb[0], pb[1]);
+        if (solid(nx, ny)) {
+          if (z === Z.OUT && plan.perimeter && plan.perimeter(nx, ny)) continue;
+          const lo = Math.min(fa, fbb) - 0.02, top = z === Z.OUT ? base + 9 : ceil;
+          const isWin = plan.win[ny * W + nx] && z !== Z.OUT;
+          if (!isWin) { let y0 = lo; for (const step of [0.45, 0.9, 0.85, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]) { const y1 = Math.min(top, y0 + step); face(wb, e, n, y0, y0, y1, y1); y0 = y1; if (y0 >= top - 1e-3) break; } if (y0 < top) face(wb, e, n, y0, y0, top, top); }
+          else {
+            const h0 = base + 1.05, h1 = base + 2.45, [ax, az, bx, bz] = e; const along = (t) => [ax + (bx - ax) * t, az + (bz - az) * t];
+            const part = (t0, t1, y0, y1) => { const [p0x, p0z] = along(t0), [p1x, p1z] = along(t1); face(wb, [p0x, p0z, p1x, p1z], n, y0, y0, y1, y1); };
+            part(0, 1, lo, base + 0.45); part(0, 1, base + 0.45, h0); part(0, 1, h1, ceil); part(0, 0.2, h0, h1); part(0.8, 1, h0, h1);
+            const dep = 0.45; const [q0x, q0z] = along(0.2), [q1x, q1z] = along(0.8); const ox = dx * dep, oz = dy * dep; const rv = M('wallBlock');
+            rv.quad([q0x, h0, q0z], [q1x, h0, q1z], [q1x + ox, h0, q1z + oz], [q0x + ox, h0, q0z + oz], [0, 1, 0], [0, 0], [1, 0], [1, 0.2], [0, 0.2]);
+            rv.quad([q1x, h1, q1z], [q0x, h1, q0z], [q0x + ox, h1, q0z + oz], [q1x + ox, h1, q1z + oz], [0, -1, 0], [0, 0], [1, 0], [1, 0.2], [0, 0.2]);
+            winGlass.push({ a: [q0x + ox, q0z + oz], b: [q1x + ox, q1z + oz], h0, h1, n });
+            for (let k = 1; k <= 4; k++) { const [bx2, bz2] = along(0.2 + 0.6 * k / 5); M('metal').box(0.025, h1 - h0, 0.025, new THREE.Matrix4().makeTranslation(bx2 + dx * 0.12, (h0 + h1) / 2, bz2 + dy * 0.12), 0.5); }
+          }
+          // a steel handrail on the wall beside a flight, 90 cm above the pitch line, on brackets
+          if (rise && ((dir <= 2) === (dx === 0))) {
+            const off = 0.07; const ha = fa + 0.9, hb = fbb + 0.9; const [ax, az, bx, bz] = e;
+            const A = new THREE.Vector3(ax - dx * off, ha, az - dy * off), B = new THREE.Vector3(bx - dx * off, hb, bz - dy * off);
+            const len = A.distanceTo(B); const mid = A.clone().add(B).multiplyScalar(0.5); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize());
+            M('metal').geo(new THREE.CylinderGeometry(0.022, 0.022, len, 8), new THREE.Matrix4().compose(mid, q, new THREE.Vector3(1, 1, 1)));
+            for (const t of [0.25, 0.75]) { const P = A.clone().lerp(B, t); M('metal').box(dx ? 0.07 : 0.025, 0.025, dx ? 0.025 : 0.07, new THREE.Matrix4().makeTranslation(P.x + dx * 0.035, P.y - 0.03, P.z + dy * 0.035), 0.5); }
+          }
+          continue;
+        }
+        // two floors meeting at different heights: the step face seen from the lower side, and a railing on the upper
+        const [qa, qb] = inset(e, nx, ny); const ga = cellFloorAt(nx, ny, qa[0], qa[1]), gb = cellFloorAt(nx, ny, qb[0], qb[1]);
+        if (ga - fa > 0.03 || gb - fbb > 0.03) face(M(WALL_OF[at(nx, ny)] || 'wallBlock'), e, n, fa, fbb, Math.max(fa, ga), Math.max(fbb, gb));
+        if (fa - ga > 0.5 && fbb - gb > 0.5) {   // we're the high side of a drop: a railing along it
+          const [ax, az, bx, bz] = e; const A = new THREE.Vector3(ax + dx * -0.06, fa, az + dy * -0.06), B = new THREE.Vector3(bx + dx * -0.06, fbb, bz + dy * -0.06);
+          const mk = (P, Q, r) => { const len = P.distanceTo(Q); const mid = P.clone().add(Q).multiplyScalar(0.5); const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), Q.clone().sub(P).normalize()); M('metal').geo(new THREE.CylinderGeometry(r, r, len, 8), new THREE.Matrix4().compose(mid, q, new THREE.Vector3(1, 1, 1))); };
+          mk(A.clone().setY(A.y + 1.0), B.clone().setY(B.y + 1.0), 0.024); mk(A.clone().setY(A.y + 0.5), B.clone().setY(B.y + 0.5), 0.012);
+          for (let k = 0; k <= 3; k++) { const P = A.clone().lerp(B, k / 3); mk(P, P.clone().setY(P.y + 1.0), 0.014); }
+          (plan.rails ||= []).push([x, y, nx, ny]);
+        }
+        // a ceiling stepping up into a taller space (the head of a stairwell door): the face seen from the tall side
+        const nc = ceilOf(nx, ny);
+        if (nc - ceil > 0.03 && z !== Z.OUT && at(nx, ny) !== Z.OUT) face(M(WALL_OF[at(nx, ny)] || 'wallBlock'), e.length ? [e[2], e[3], e[0], e[1]] : e, [dx, 0, dy], ceil, ceil, nc, nc);
+      }
+    }
+  }
+
   // ---- door frames: jambs + lintel inside every door cell
   const doors = [];
   for (const d of plan.doors) {
     const pass = at(d.x - 1, d.y) && at(d.x + 1, d.y) ? 'x' : 'z';
-    const x0 = d.x * C, z0 = d.y * C; const jw = 0.15; const wb = M('wallWard');
-    const mm = (px, py, pz) => new THREE.Matrix4().makeTranslation(px, py, pz);
+    const x0 = d.x * C, z0 = d.y * C; const jw = 0.15; const wb = M('wallWard'); const dl = baseOf(d.x, d.y);
+    const mm = (px, py, pz) => new THREE.Matrix4().makeTranslation(px, py + dl, pz);
     if (pass === 'x') {
       wb.box(C, H - 2.3, C, mm(x0 + C / 2, 2.3 + (H - 2.3) / 2, z0 + C / 2), 3);
       wb.box(C, 2.3, jw, mm(x0 + C / 2, 1.15, z0 + jw / 2), 3); wb.box(C, 2.3, jw, mm(x0 + C / 2, 1.15, z0 + C - jw / 2), 3);
@@ -244,6 +346,8 @@ export function buildAsylum(plan, scene) {
   const colliders = [];   // {x0,z0,x1,z1,y1, prop}
   const hides = [];       // lockers and beds
   const R = rng(777);
+  // the way through every door: the door cell and a cell either side of it, as wide as the opening
+  const lanes = doors.map((d) => d.pass === 'x' ? [(d.x - 1) * C, d.y * C + 0.12, (d.x + 2) * C, (d.y + 1) * C - 0.12] : [d.x * C + 0.12, (d.y - 1) * C, (d.x + 1) * C - 0.12, (d.y + 2) * C]);
   for (const p of plan.props) buildProp(p);
   function buildProp(p) {
     const def = PROPS[p.k]; if (!def) return;
@@ -256,7 +360,18 @@ export function buildAsylum(plan, scene) {
       // and from the other side, if we started inside the wall
       for (let s = 0; s < 30 && baker.solid(px + bx * (d / 2), pz + bz * (d / 2)); s++) { px -= bx * 0.05; pz -= bz * 0.05; }
     }
-    const base = new THREE.Matrix4().makeRotationY(ang).setPosition(px, 0, pz);
+    // never in a doorway: furniture that would block the way through a door slides aside, or goes
+    if (def.solid !== false && !p.inDoor) {
+      const cw = Math.abs(Math.cos(ang)) * w + Math.abs(Math.sin(ang)) * d, cd = Math.abs(Math.sin(ang)) * w + Math.abs(Math.cos(ang)) * d;
+      const hits = (qx, qz) => lanes.some((L) => qx + cw / 2 > L[0] && qx - cw / 2 < L[2] && qz + cd / 2 > L[1] && qz - cd / 2 < L[3]);
+      const inside = (qx, qz) => [[-1, -1], [1, -1], [-1, 1], [1, 1]].every(([sx, sz]) => at(Math.floor((qx + sx * (cw / 2 - 0.02)) / C), Math.floor((qz + sz * (cd / 2 - 0.02)) / C)));
+      if (hits(px, pz)) {
+        let moved = false;
+        for (const k of [0.3, 0.6, 0.9, 1.2, 1.5, 1.8, 2.2]) { for (const [ox, oz] of [[k, 0], [-k, 0], [0, k], [0, -k]]) if (!hits(px + ox, pz + oz) && inside(px + ox, pz + oz)) { px += ox; pz += oz; moved = true; break; } if (moved) break; }
+        if (!moved) return;
+      }
+    }
+    const base = new THREE.Matrix4().makeRotationY(ang).setPosition(px, LEVELS ? baseOf(Math.floor(px / C), Math.floor(pz / C)) : 0, pz);
     if (p.tipped && def.tip) base.multiply(def.tip);
     const ctx = { base, p, R, M, at: (lx, ly, lz) => base.clone().multiply(new THREE.Matrix4().makeTranslation(lx, ly, lz)), box: (key, sx, sy, sz, lx, ly, lz, ts = 1, rot) => { const m = ctx.at(lx, ly, lz); if (rot) m.multiply(rot); M(key).box(sx, sy, sz, m, ts); }, cyl: (key, r0, r1, len, lx, ly, lz, rot, seg = 12, ts = 1) => { const g = new THREE.CylinderGeometry(r0, r1, len, seg, 1, false); const m = ctx.at(lx, ly, lz); if (rot) m.multiply(rot); M(key).geo(g, m, ts); g.dispose(); } };
     def.build(ctx);
@@ -272,12 +387,14 @@ export function buildAsylum(plan, scene) {
 
   // ---- bake + meshes
   const group = new THREE.Group(); scene.add(group);
-  for (const [key, b] of Object.entries(batches)) {
-    if (!b.p.length) continue;
+  for (const [key, b0] of Object.entries(batches)) {
+    if (!b0.p.length) continue;
+    for (const b of LEVELS ? chunks(b0) : [b0]) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(b.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(b.n, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(b.u, 2));
     baker.bakeGeometry(g); g.computeBoundingSphere();
     const mesh = new THREE.Mesh(g, b.mat); mesh.matrixAutoUpdate = false; group.add(mesh);
+    }
   }
 
   // ---- night beyond the windows
@@ -297,16 +414,18 @@ export function buildAsylum(plan, scene) {
   const T4 = (x, y, z, rot) => { const m = new THREE.Matrix4().makeTranslation(x, y, z); if (rot) m.multiply(rot); return m; };
   const hazeB = { S: [], A: [], B: [], P: [] };
   for (const l of baker.lamps) {
-    const x = l.wx, zz = l.wz;
+    const x = l.wx, zz = l.wz; const H = (l.lift || 0) + 3.2;
     if (l.kind === 'tube') {
       houseB.box(1.25, 0.09, 0.32, T4(x, H - 0.05, zz), 1);
       for (const o of [-0.07, 0.07]) fixBatch(l.ch, l.col).geo(new THREE.CylinderGeometry(0.018, 0.018, 1.18, 6), T4(x, H - 0.11, zz + o, new THREE.Matrix4().makeRotationZ(Math.PI / 2)));
       hazeB[l.ch].push([l, x, zz, 1.6, 2.9]);
     } else if (l.kind === 'cage' || l.kind === 'bulb') {
+      if (l.drop) { cageB.box(0.012, l.drop, 0.012, T4(x, H - l.drop / 2, zz), 1); }   // a pendant on a long flex
+      const H0 = H; { const H = H0 - (l.drop || 0);
       fixBatch(l.ch, l.col).geo(new THREE.SphereGeometry(0.07, 10, 8), T4(x, H - 0.16, zz));
       for (let i = 0; i < 4; i++) cageB.box(0.008, 0.2, 0.008, T4(x + Math.cos(i * 1.57) * 0.1, H - 0.16, zz + Math.sin(i * 1.57) * 0.1), 1);
       houseB.box(0.24, 0.04, 0.24, T4(x, H - 0.03, zz), 1);
-      hazeB[l.ch].push([l, x, zz, 1.2, 2.6]);
+      hazeB[l.ch].push([l, x, zz, 1.2, 2.6]); }
     } else if (l.kind === 'candle') {
       houseB.geo(new THREE.CylinderGeometry(0.02, 0.022, 0.12, 8), T4(x, l.wy - 0.1, zz));
       fixBatch('S', 0xffb050).geo(new THREE.SphereGeometry(0.012, 6, 6).scale(1, 2, 1), T4(x, l.wy - 0.02, zz));
@@ -322,7 +441,7 @@ export function buildAsylum(plan, scene) {
   for (const [ch, cones] of Object.entries(hazeB)) {
     if (!cones.length) continue;
     const P = [], N = [], Y = [], Col = [];
-    for (const [l, x, zz, r, h] of cones) {
+    for (const [l, x, zz, r, h] of cones) { const H = (l.lift || 0) + 3.2 - (l.drop || 0);
       const g = new THREE.ConeGeometry(r, h, 20, 1, true).translate(0, -h / 2, 0).toNonIndexed(); const pa = g.attributes.position.array, na = g.attributes.normal.array;
       const c = new THREE.Color(l.col).multiplyScalar(l.i);
       for (let i = 0; i < pa.length / 3; i++) { P.push(pa[i * 3] + x, pa[i * 3 + 1] + H - 0.12, pa[i * 3 + 2] + zz); N.push(na[i * 3], na[i * 3 + 1], na[i * 3 + 2]); Y.push(-pa[i * 3 + 1]); Col.push(c.r, c.g, c.b); }
@@ -372,6 +491,7 @@ const PROPS = {
     c.box('mattress', 0.86, 0.15, 1.92, 0, 0.5, 0.02, 1); c.box('sheet', 0.7, 0.05, 0.4, 0.05, 0.6, -0.72, 1);
     c.box('metal', 0.88, 0.02, 1.95, 0, 0.42, 0); for (const sz of [-0.6, 0, 0.6]) c.box('metal', 0.03, 0.02, 0.03, 0, 0.12, sz);   // springs/cross
     for (const sx of [-1, 1]) c.box('metal', 0.18, 0.02, 0.02, sx * 0.45, 0.32, 0.6);   // restraint straps hanging
+    if (c.p.straps) for (const sz of [-0.55, 0.05, 0.7]) c.box('rubber', 0.9, 0.015, 0.09, 0, 0.6, sz, 1);   // leather straps across chest, hips and ankles
   } },
   bucket: { size: [0.3, 0.32, 0.3], solid: false, build(c) { c.cyl('metal', 0.15, 0.12, 0.32, 0, 0.16, 0, null, 12); c.cyl('black', 0.135, 0.135, 0.01, 0, 0.28, 0, null, 12); } },
   locker: { size: [0.62, 1.95, 0.55], snap: true, build(c) {
@@ -403,11 +523,59 @@ const PROPS = {
   reception: { size: [3.2, 1.15, 1.0], build(c) { c.box('wood', 3.2, 1.1, 0.12, 0, 0.55, 0.44); for (const s of [-1, 1]) c.box('wood', 0.12, 1.1, 1.0, s * 1.54, 0.55, 0); c.box('wood', 3.3, 0.05, 0.4, 0, 1.13, 0.45); c.box('wood', 3.0, 0.05, 0.7, 0, 0.75, 0); c.box('black', 0.4, 0.3, 0.35, -0.8, 0.93, 0); } },
   bench: { size: [0.5, 0.5, 1.8], build(c) { c.box('wood', 0.45, 0.05, 1.8, 0, 0.45, 0); for (const s of [-1, 1]) c.box('metal', 0.4, 0.43, 0.05, 0, 0.21, s * 0.8); } },
   plant: { size: [0.5, 1.2, 0.5], build(c) { c.cyl('porcelain', 0.22, 0.16, 0.4, 0, 0.2, 0, null, 12); for (let i = 0; i < 6; i++) c.box('black', 0.02, 0.6 + c.R() * 0.3, 0.02, 0, 0.6, 0, 1, RZ((c.R() - 0.5) * 0.9).multiply(RX((c.R() - 0.5) * 0.9))); } },
-  desk: { size: [1.6, 0.8, 0.8], build(c) { c.box('wood', 1.6, 0.05, 0.8, 0, 0.75, 0); c.box('wood', 0.45, 0.72, 0.75, 0.55, 0.36, 0); c.box('wood', 0.05, 0.72, 0.75, -0.77, 0.36, 0); c.box('paper', 0.3, 0.01, 0.22, -0.2, 0.78, 0.1, 1, RY(0.3)); c.cyl('metal', 0.08, 0.1, 0.03, 0.5, 0.79, -0.2, null, 10); c.cyl('metal', 0.012, 0.012, 0.35, 0.5, 0.95, -0.2, RZ(0.4), 6); c.cyl('lampshade', 0.05, 0.12, 0.12, 0.42, 1.12, -0.2, null, 10); } },
+  desk: { size: [1.6, 0.8, 0.8], build(c) { c.box('wood', 1.6, 0.05, 0.8, 0, 0.75, 0); if (c.p.typewriter) { c.box('black', 0.42, 0.12, 0.34, -0.25, 0.84, -0.05, 1, RX(-0.12)); c.cyl('black', 0.03, 0.03, 0.46, -0.25, 0.94, -0.17, RZ(Math.PI / 2), 8); c.box('paper', 0.22, 0.01, 0.2, -0.25, 1.0, -0.2, 1, RX(-1.2)); } c.box('wood', 0.45, 0.72, 0.75, 0.55, 0.36, 0); c.box('wood', 0.05, 0.72, 0.75, -0.77, 0.36, 0); c.box('paper', 0.3, 0.01, 0.22, -0.2, 0.78, 0.1, 1, RY(0.3)); c.cyl('metal', 0.08, 0.1, 0.03, 0.5, 0.79, -0.2, null, 10); c.cyl('metal', 0.012, 0.012, 0.35, 0.5, 0.95, -0.2, RZ(0.4), 6); c.cyl('lampshade', 0.05, 0.12, 0.12, 0.42, 1.12, -0.2, null, 10); } },
   cross: { size: [1.0, 1.6, 0.12], snap: true, solid: false, build(c) { c.box('wood', 0.12, 1.6, 0.08, 0, 1.6, 0); c.box('wood', 0.9, 0.12, 0.08, 0, 2.0, 0); } },
   ivstand: { size: [0.4, 1.9, 0.4], solid: false, build(c) { c.cyl('metal', 0.012, 0.012, 1.85, 0, 0.93, 0, null, 6); for (let i = 0; i < 4; i++) c.box('metal', 0.32, 0.02, 0.02, 0, 0.04, 0, 1, RY(i * Math.PI / 4)); c.box('metal', 0.3, 0.015, 0.015, 0, 1.84, 0); c.box('sheet', 0.1, 0.16, 0.04, 0.12, 1.7, 0, 1); c.cyl('rubber', 0.004, 0.004, 0.9, 0.12, 1.15, 0.05, RX(0.1), 4); } },
   trolley: { size: [0.6, 0.9, 1.0], tip: new THREE.Matrix4().makeTranslation(0, 0.3, 0).multiply(RZ(Math.PI / 2)).multiply(new THREE.Matrix4().makeTranslation(0, -0.3, 0)), build(c) { for (const y of [0.25, 0.85]) c.box('metal', 0.56, 0.02, 0.95, 0, y, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) c.box('metal', 0.02, 0.85, 0.02, sx * 0.27, 0.43, sz * 0.46); for (let i = 0; i < 4; i++) c.box(i % 2 ? 'porcelain' : 'metal', 0.08, 0.04, 0.2, -0.15 + i * 0.1, 0.88, -0.2 + (i % 3) * 0.2); } },
 };
+// Tape 4's furniture
+Object.assign(PROPS, {
+  // a restraint chair: oak, bolted down, leather straps at the wrists, ankles and forehead
+  chairR: { size: [0.7, 1.4, 0.7], build(c) {
+    c.box('wood', 0.62, 0.08, 0.6, 0, 0.5, 0); c.box('wood', 0.62, 0.95, 0.08, 0, 0.98, -0.27); c.box('wood', 0.3, 0.3, 0.06, 0, 1.55, -0.27);
+    for (const sx of [-1, 1]) { c.box('wood', 0.08, 0.5, 0.08, sx * 0.27, 0.25, 0.25); c.box('wood', 0.08, 0.5, 0.08, sx * 0.27, 0.25, -0.25); c.box('wood', 0.08, 0.06, 0.56, sx * 0.31, 0.78, 0); c.box('rubber', 0.1, 0.03, 0.08, sx * 0.31, 0.82, 0.12); c.box('rubber', 0.1, 0.05, 0.06, sx * 0.17, 0.12, 0.28); }
+    c.box('rubber', 0.3, 0.05, 0.03, 0, 1.55, -0.23); c.box('metal', 0.7, 0.03, 0.7, 0, 0.015, 0, 1);
+  } },
+  // a cot with high bars
+  crib: { size: [0.8, 1.0, 1.3], build(c) {
+    c.box('wood', 0.78, 0.04, 1.28, 0, 0.45, 0); c.box('mattress', 0.7, 0.08, 1.2, 0, 0.51, 0, 1);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) c.box('wood', 0.05, 1.0, 0.05, sx * 0.37, 0.5, sz * 0.62);
+    for (const sx of [-1, 1]) { c.box('wood', 0.03, 0.04, 1.24, sx * 0.37, 0.98, 0); for (let i = 0; i < 11; i++) c.box('wood', 0.015, 0.45, 0.015, sx * 0.37, 0.74, -0.56 + i * 0.112); }
+    for (const sz of [-1, 1]) { c.box('wood', 0.74, 0.04, 0.03, 0, 0.98, sz * 0.62); for (let i = 0; i < 6; i++) c.box('wood', 0.015, 0.45, 0.015, -0.3 + i * 0.12, 0.74, sz * 0.62); }
+  } },
+  // a Lancashire boiler: a riveted drum on a brick bed, the firebox doors at the front
+  boiler: { size: [2.6, 3.0, 6.0], build(c) {
+    c.box('wallBlock', 2.6, 0.9, 6.0, 0, 0.45, 0, 1.5); c.cyl('metal', 1.15, 1.15, 5.8, 0, 1.95, 0, RX(Math.PI / 2), 18, 2);
+    for (const z of [-2.4, -1.2, 0, 1.2, 2.4]) c.cyl('black', 1.17, 1.17, 0.05, 0, 1.95, z, RX(Math.PI / 2), 18);
+    c.box('black', 1.5, 0.75, 0.08, 0, 0.75, 3.02); for (const sx of [-1, 1]) c.box('rubber', 0.6, 0.55, 0.06, sx * 0.35, 0.78, 3.07);
+    c.cyl('metal', 0.08, 0.08, 1.1, 0.5, 3.4, -1.8, null, 8); c.cyl('metal', 0.2, 0.2, 0.08, 0.6, 2.4, 2.9, RX(Math.PI / 2), 12); c.cyl('black', 0.16, 0.16, 0.09, 0.6, 2.4, 2.92, RX(Math.PI / 2), 12);
+  } },
+  // the furnace: a brick oven the width of the wall, a steel mouth, a chain and a shovel
+  furnace: { size: [4.2, 3.0, 1.6], snap: true, build(c) {
+    c.box('wallBlock', 4.2, 3.0, 1.5, 0, 1.5, 0, 1.5); c.box('black', 1.6, 1.0, 0.2, 0, 0.95, 0.7); c.box('metal', 1.8, 0.12, 0.25, 0, 1.52, 0.72); c.box('metal', 1.8, 0.1, 0.25, 0, 0.42, 0.72);
+    c.box('metal', 0.8, 0.9, 0.05, -1.25, 0.95, 0.8, 1, RY(-0.6)); c.cyl('metal', 0.03, 0.03, 1.4, 1.6, 0.7, 0.9, RZ(0.4), 6); c.box('metal', 0.3, 0.02, 0.35, 1.86, 0.08, 0.95);
+  } },
+  // a steam turbine and its generator, cased in green paint
+  turbine: { size: [2.0, 2.2, 6.5], build(c) {
+    c.box('black', 2.0, 0.4, 6.5, 0, 0.2, 0, 1); c.cyl('metal', 0.85, 0.85, 3.0, 0, 1.25, -1.5, RX(Math.PI / 2), 16, 2); c.cyl('metal', 0.7, 0.7, 2.6, 0, 1.15, 1.8, RX(Math.PI / 2), 16, 2);
+    c.box('metal', 1.9, 0.12, 0.6, 0, 2.05, -1.5); c.cyl('metal', 0.18, 0.18, 1.6, 0.7, 2.6, -2.6, null, 10); c.box('screen', 0.3, 0.3, 0.05, 0.9, 1.2, 3.1);
+  } },
+  // the electroconvulsive machine: a wooden cabinet of dials on a trolley, two paddles on their leads
+  ect: { size: [0.6, 1.2, 0.45], build(c) {
+    c.box('metal', 0.56, 0.02, 0.42, 0, 0.7, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) c.box('metal', 0.02, 0.7, 0.02, sx * 0.26, 0.35, sz * 0.19);
+    c.box('wood', 0.5, 0.3, 0.36, 0, 0.86, 0); c.box('black', 0.42, 0.18, 0.01, 0, 0.9, 0.181); for (let i = 0; i < 3; i++) c.cyl('porcelain', 0.03, 0.03, 0.02, -0.14 + i * 0.14, 0.92, 0.19, RX(Math.PI / 2), 10); c.box('redbtn', 0.04, 0.04, 0.02, 0.18, 0.8, 0.19);
+    for (const sx of [-1, 1]) c.cyl('rubber', 0.035, 0.035, 0.12, sx * 0.12, 1.04, 0, RZ(Math.PI / 2), 8);
+  } },
+  // an x-ray stand: a column, an arm, the tube head
+  xray: { size: [0.8, 2.3, 0.8], build(c) {
+    c.box('metal', 0.7, 0.06, 0.7, 0, 0.03, 0); c.box('metal', 0.12, 2.2, 0.12, -0.25, 1.1, 0); c.box('metal', 0.1, 0.1, 0.9, -0.25, 1.9, 0.4); c.cyl('black', 0.16, 0.12, 0.35, -0.25, 1.75, 0.82, null, 12); c.box('porcelain', 0.3, 0.06, 0.3, -0.25, 1.55, 0.82);
+  } },
+  // a dentist's chair: reclined, a headrest, the drill on its arm and a spittoon
+  dentalchair: { size: [0.8, 1.4, 1.6], build(c) {
+    c.cyl('metal', 0.1, 0.25, 0.5, 0, 0.25, 0, null, 12); c.box('rubber', 0.6, 0.12, 0.7, 0, 0.6, 0.15); c.box('rubber', 0.6, 0.12, 0.7, 0, 0.85, -0.45, 1, RX(-0.9)); c.box('rubber', 0.3, 0.12, 0.2, 0, 1.2, -0.75, 1, RX(-0.5)); c.box('rubber', 0.5, 0.1, 0.5, 0, 0.4, 0.65, 1, RX(0.6));
+    c.cyl('metal', 0.02, 0.02, 1.0, 0.55, 1.1, -0.4, null, 6); c.box('metal', 0.04, 0.04, 0.6, 0.55, 1.6, -0.1); c.cyl('porcelain', 0.12, 0.1, 0.12, -0.55, 0.85, -0.2, null, 12); c.cyl('metal', 0.02, 0.02, 0.8, -0.55, 0.4, -0.2, null, 6);
+  } },
+});
 // a few colour-only materials props refer to
 export const EXTRA_MATS = {
   filthwater: () => bakedMaterial({ color: 0x2a200c, roughness: 0.05 }),
@@ -435,12 +603,13 @@ export function laydecals(world, plan, scene) {
   const b = new Batch(mat); const R = rng(99);
   const uvq = (name) => { const [u0, v0, u1, v1] = cells[name]; return [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]; };
   const floorDecal = (name, x, z, s, a) => {
-    const ca = Math.cos(a) * s / 2, sa = Math.sin(a) * s / 2; const y = 0.006 + R() * 0.002; const u = uvq(name);
+    if (LEVELS && LEVELS.rise[Math.floor(z / C) * W + Math.floor(x / C)]) return;   // not on the stairs
+    const ca = Math.cos(a) * s / 2, sa = Math.sin(a) * s / 2; const y = 0.006 + R() * 0.002 + (LEVELS ? floorAt(x, z) : 0); const u = uvq(name);
     b.quad([x - ca - sa, y, z + sa - ca], [x + ca - sa, y, z - sa - ca], [x + ca + sa, y, z - sa + ca], [x - ca + sa, y, z + sa + ca], [0, 1, 0], u[0], u[1], u[2], u[3]);
   };
   const wallDecal = (name, x, z, wall, s, y0) => {
     // find the wall surface by marching toward it
-    const sw = snapWall(world, x, z, wall); if (!sw) return null; const { px, pz, dir } = sw;
+    const sw = snapWall(world, x, z, wall); if (!sw) return null; const { px, pz, dir } = sw; y0 += LEVELS ? floorAt(x, z) : 0;
     const tx = -dir[1], tz = dir[0]; const h = s / 2; const u = uvq(name); const n = [-dir[0], 0, -dir[1]];
     b.quad([px - tx * h, y0, pz - tz * h], [px + tx * h, y0, pz + tz * h], [px + tx * h, y0 + s, pz + tz * h], [px - tx * h, y0 + s, pz - tz * h], n, u[0], u[1], u[2], u[3]);
     return { px, pz, tx, tz, n };
@@ -451,12 +620,13 @@ export function laydecals(world, plan, scene) {
     if (gd.k === 'smear') { wallDecal(R() > 0.5 ? 'wallsmear' : 'hands', x, z, gd.wall, 1.4, 0.5 + R() * 0.5); }
   }
   // drag trails between some pools, filth and damp everywhere
-  for (let i = 0; i < 70; i++) {
+  const AREA = Math.max(1, (W * D) / (49 * 64));
+  for (let i = 0; i < 70 * AREA; i++) {
     const x = R() * W, y = R() * D; if (!plan.at(x | 0, y | 0)) continue;
     const zone = plan.at(x | 0, y | 0); const name = zone === Z.SHOWER || zone === Z.MORGUE ? (R() > 0.5 ? 'puddle' : 'filth') : ['filth', 'puddle', 'smear', 'spray', 'filth'][(R() * 5) | 0];
     floorDecal(name, x * C, y * C, 0.8 + R() * 1.4, R() * 6.28);
   }
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 30 * AREA; i++) {
     const x = (R() * W) | 0, y = (R() * D) | 0; if (!plan.at(x, y)) continue;
     for (const [w, dx, dy] of [['n', 0, -1], ['s', 0, 1], ['e', 1, 0], ['w', -1, 0]]) if (!plan.at(x + dx, y + dy) && R() > 0.5) { wallDecal(R() > 0.7 ? 'hands' : R() > 0.5 ? 'spray' : 'wallsmear', cx(x), cz(y), w, 0.8 + R() * 0.8, 0.3 + R() * 1.2); break; }
   }
@@ -468,7 +638,7 @@ export function laydecals(world, plan, scene) {
   for (const gd of plan.gore) if (gd.k === 'scrawl') {
     const m = bakedMaterial({ map: scrawlTexture(gd.t, (gd.x * 13 + gd.y) | 0), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, roughness: 0.4 });
     const bb = new Batch(m); const s = 2.4;
-    const sw = snapWall(world, cx(gd.x), cz(gd.y), gd.wall); if (!sw) continue; const { px, pz, dir } = sw; const tx = -dir[1], tz = dir[0]; const n = [-dir[0], 0, -dir[1]]; const y0 = 1.3;
+    const sw = snapWall(world, cx(gd.x), cz(gd.y), gd.wall); if (!sw) continue; const { px, pz, dir } = sw; const tx = -dir[1], tz = dir[0]; const n = [-dir[0], 0, -dir[1]]; const y0 = 1.3 + (gd.y0 || 0) + (LEVELS ? floorAt(cx(gd.x), cz(gd.y)) : 0);
     bb.quad([px - tx * s / 2, y0, pz - tz * s / 2], [px + tx * s / 2, y0, pz + tz * s / 2], [px + tx * s / 2, y0 + s / 4, pz + tz * s / 2], [px - tx * s / 2, y0 + s / 4, pz - tz * s / 2], n, [0, 0], [1, 0], [1, 1], [0, 1]);
     const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(bb.p, 3)); gg.setAttribute('normal', new THREE.Float32BufferAttribute(bb.n, 3)); gg.setAttribute('uv', new THREE.Float32BufferAttribute(bb.u, 2));
     world.baker.bakeGeometry(gg); const sm = new THREE.Mesh(gg, m); sm.renderOrder = 1; scene.add(sm);
