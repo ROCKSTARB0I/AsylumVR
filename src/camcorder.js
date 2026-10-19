@@ -3,7 +3,7 @@
 // raise it to your eye (right mouse / Q); in VR it is in your left hand
 // with its flip-out screen showing what it sees.
 import * as THREE from '../vendor/three.module.js';
-import { makeScreenMaterial } from './tape.js?v=31';
+import { makeScreenMaterial } from './tape.js?v=32';
 
 export const EYE_LAYER = 5;   // things only the camcorder sees (eye-shine)
 

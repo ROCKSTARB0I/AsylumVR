@@ -2,29 +2,29 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz, floorAt, ceilOf } from './plan.js?v=31';
-import { buildSurfaces, T } from './surfaces.js?v=31';
-import { loadPictures, savePictures } from './keep.js?v=31';
-import { VRMenu } from './vrmenu.js?v=31';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=31';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=31';
-import { Doors } from './doors.js?v=31';
-import { Space } from './space.js?v=31';
-import { Input } from './input.js?v=31';
-import { Walker, MAX_EYE } from './walker.js?v=31';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=31';
-import { makeTape, makeVeil } from './tape.js?v=31';
-import { Slate } from './slate.js?v=31';
-import { MiniMap } from './minimap.js?v=31';
-import * as STORY1 from './story.js?v=31';
-import * as TAPE3 from './tape3.js?v=31';
-import * as TAPE2 from './tape2.js?v=31';
-import * as TAPE4 from './tape4.js?v=31';
-import { Sound } from './dread.js?v=31';
-import { Horrors } from './horrors.js?v=31';
-import { Dressing } from './dressing.js?v=31';
-import { Scares } from './scares.js?v=31';
-import { makeHand } from './hands.js?v=31';
+import { makePlan, C, H, Z, cx, cz, floorAt, ceilOf } from './plan.js?v=32';
+import { buildSurfaces, T } from './surfaces.js?v=32';
+import { loadPictures, savePictures } from './keep.js?v=32';
+import { VRMenu } from './vrmenu.js?v=32';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=32';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=32';
+import { Doors } from './doors.js?v=32';
+import { Space } from './space.js?v=32';
+import { Input } from './input.js?v=32';
+import { Walker, MAX_EYE } from './walker.js?v=32';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=32';
+import { makeTape, makeVeil } from './tape.js?v=32';
+import { Slate } from './slate.js?v=32';
+import { MiniMap } from './minimap.js?v=32';
+import * as STORY1 from './story.js?v=32';
+import * as TAPE3 from './tape3.js?v=32';
+import * as TAPE2 from './tape2.js?v=32';
+import * as TAPE4 from './tape4.js?v=32';
+import { Sound } from './dread.js?v=32';
+import { Horrors } from './horrors.js?v=32';
+import { Dressing } from './dressing.js?v=32';
+import { Scares } from './scares.js?v=32';
+import { makeHand } from './hands.js?v=32';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -130,6 +130,23 @@ const handLight = { value: new THREE.Color(0.02, 0.02, 0.02) };
 // Tape 3 is Marsh, the orderly: short sleeves, bare forearms, a cheap watch. Everywhere else, Ward's jacket.
 const armLook = (side) => (TAPE === 3 ? { bare: true, skin: [0.64, 0.49, 0.4], watch: side === 'left' } : {});
 const handL = makeHand('left', handLight, armLook('left')), handR = makeHand('right', handLight, armLook('right'));
+// the VR minimap: a little map strapped to your right forearm, on the watch side. Raise your arm and look at it.
+const armMap = new Slate(512, 400, 0.15, { depthTest: true }); armMap.mesh.material.userData.noNV = true; armMap.mesh.material.transparent = true; armMap.mesh.material.opacity = 0; armMap.mesh.visible = false; armMap.mesh.renderOrder = 10;
+{
+  const m = armMap.mesh; m.position.set(-0.062, 0.2, 0.004);
+  m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new V(0, 0, -1), new V(0, -1, 0), new V(-1, 0, 0)));   // facing out of the forearm, the top of the map toward your hand
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.162, 0.13, 0.006), new THREE.MeshStandardMaterial({ color: 0x15130f, roughness: 0.8 })); back.position.z = -0.004; m.add(back);
+  for (const y of [-0.045, 0.045]) { const strap = new THREE.Mesh(new THREE.TorusGeometry(0.058, 0.004, 4, 24), new THREE.MeshStandardMaterial({ color: 0x2a2018, roughness: 0.9 })); strap.rotation.x = Math.PI / 2; strap.position.set(0, y, -0.062); m.add(strap); }
+  handR.root.add(m);
+}
+let armMapT = 0;
+function updateArmMap(dt, vr) {
+  const m = armMap.mesh; if (!vr || !hands.gripRight || !G.playing) { m.visible = false; return; }
+  const n = new V(0, 0, 1).applyQuaternion(m.getWorldQuaternion(new THREE.Quaternion())); const p = m.getWorldPosition(new V()); const toEye = camera.getWorldPosition(new V()).sub(p).normalize();
+  const want = G.paused ? 1 : Math.min(1, Math.max(0, (n.dot(toEye) - 0.45) / 0.3)); const o = m.material.opacity + (want - m.material.opacity) * Math.min(1, dt * 10);
+  m.material.opacity = o; m.visible = o > 0.02; for (const c of m.children) c.visible = m.visible;
+  armMapT -= dt; if (m.visible && armMapT <= 0) { armMapT = 0.15; minimap.draw(armMap.cv, walker, mapTitle()); armMap.tex.needsUpdate = true; }
+}
 const left = renderer.xr.getController(0), right = renderer.xr.getController(1);
 const gripL = renderer.xr.getControllerGrip(0), gripR = renderer.xr.getControllerGrip(1);
 dolly.add(left, right, gripL, gripR);
@@ -146,6 +163,7 @@ function attachHand(c, g, side) {
 function updateHands(dt, vr) {
   if (!vr) return;
   if (!handLight.lock) handLight.value.copy(world.lightAt(walker.pos.x, walker.pos.z));
+  updateArmMap(dt, vr);
   for (const [side, h] of [['left', handL], ['right', handR]]) { const src = hands.pads[side]; if (src && src.gamepad) { const b = src.gamepad.buttons; h.pose(b[0] ? b[0].value : 0, b[1] ? b[1].value : 0, b[3] && b[3].touched ? 0.9 : 0.4); } }
 }
 
@@ -179,7 +197,6 @@ function nvifyScene() { scene.traverse((o) => { if (o.material) (Array.isArray(o
 const card = new Slate(1024, 640, 0.9); scene.add(card.mesh);
 const capSlate = new Slate(1024, 160, 0.9, {}); camera.add(capSlate.mesh); capSlate.mesh.position.set(0, -0.28, -0.9);
 const promptSlate = new Slate(512, 96, 0.22); scene.add(promptSlate.mesh);
-const mapSlate = new Slate(768, 768, 0.62); scene.add(mapSlate.mesh); mapSlate.mesh.material.userData.noNV = true;   // the minimap beside the VR pause card
 const minimap = new MiniMap(plan);
 const osdHud = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.975), new THREE.MeshBasicMaterial({ map: cam.osdTex, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false }));
 osdHud.material.userData.noNV = true; osdHud.position.set(0, 0, -1.0); osdHud.renderOrder = 998; osdHud.visible = false; camera.add(osdHud);
@@ -372,17 +389,13 @@ let deadT = 0;
 // ---------------------------------------------------------------- fades / pause
 let fade = 1, fadeGoal = 0;
 function fadeTo(v) { fadeGoal = v; }
-function pauseCard() { showMap(true); card.card([['PAUSED', 70], [objectiveText(), 34, '#c8c0b0'], ['', 20], [TAPE === 1 ? `Fuses ${G.fuses}/3   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}` : `Tape ${TAPE}   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}`, 32, '#9a948a'], ['', 20], ['Height ' + heightLabel() + '  \u00b7  left stick \u2191\u2193', 28, '#c8c0b0'], ['', 12], ['B resume   ·   hold trigger 2 s: last checkpoint', 30, '#9a948a']]); placeCard(); }
+function pauseCard() { showMap(true); card.card([['PAUSED', 70], [objectiveText(), 34, '#c8c0b0'], ['', 20], [TAPE === 1 ? `Fuses ${G.fuses}/3   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}` : `Tape ${TAPE}   ·   Notes ${G.notes.length}/${Object.keys(NOTES).length}`, 32, '#9a948a'], ['', 20], ['Height ' + heightLabel() + '  \u00b7  left stick \u2191\u2193', 28, '#c8c0b0'], ['Map: look at your right forearm, like a watch', 26, '#9a948a'], ['', 12], ['B resume   ·   hold trigger 2 s: last checkpoint', 30, '#9a948a']]); placeCard(); }
 function mapTitle() { return TAPE === 4 ? ({ basement: 'WARD C', female: 'THE WOMEN\u2019S WARD', disturbed: 'THE DISTURBED WARD', offices: 'STAFF OFFICES', exam: 'EXAMINING ROOMS', boiler: 'THE BOILER HOUSE' })[regionAt()] || 'MOUNT HARROW' : TAPE === 2 ? 'THE MALE WARD' : 'GROUND FLOOR'; }
 function regionAt() { if (!plan.regions) return ''; const gx = walker.pos.x / C, gy = walker.pos.z / C; for (const [k, [x0, y0, x1, y1]] of Object.entries(plan.regions)) if (gx >= x0 && gx <= x1 + 1 && gy >= y0 && gy <= y1 + 1) return k; return ''; }
 // the map: on the desktop pause panel, and beside the pause card in the headset
 function showMap(on) {
-  if (!on) { mapSlate.mesh.visible = false; return; }
-  if (renderer.xr.isPresenting) {
-    minimap.draw(mapSlate.cv, walker, mapTitle()); mapSlate.tex.needsUpdate = true;
-    const head = camera.getWorldPosition(new V()); const f = new V(0, 0, -1).applyQuaternion(camera.getWorldQuaternion(new THREE.Quaternion())); f.y = 0; f.normalize(); const r = new V(-f.z, 0, f.x);
-    mapSlate.mesh.position.copy(head).addScaledVector(f, 0.68).addScaledVector(r, 0.66); mapSlate.mesh.position.y -= 0.08; mapSlate.mesh.lookAt(head); mapSlate.mesh.visible = true;
-  } else { minimap.draw($('minimap'), walker, mapTitle()); }
+  if (!on) return;
+  if (!renderer.xr.isPresenting) minimap.draw($('minimap'), walker, mapTitle());   // (in the headset the map is on your right forearm)
 }
 function setPaused(p) {
   G.paused = p; $('pause').hidden = !p || renderer.xr.isPresenting;
@@ -553,7 +566,7 @@ function frame() {
     // in the headset: the left stick sets your height while paused
     if (vr) { const up = I.mz > 0.7, dn = I.mz < -0.7; if ((up || dn) && !G.hStick) { setHeight(S.height + (up ? 5 : -5)); sound.click && sound.click(); pauseCard(); } G.hStick = up || dn; }
     if (vr) { if (I.interact) readHold = 0; if (renderer.xr.getSession()) for (const src of renderer.xr.getSession().inputSources) if (src.handedness === 'right' && src.gamepad && src.gamepad.buttons[0].pressed) readHold += dt; if (readHold > 2) { readHold = 0; setPaused(false); respawn(); } }
-    draw(dt, vr, I); return;
+    updateArmMap(dt, vr); draw(dt, vr, I); return;
   }
   if (G.reading) { if (I.interact || I.pause) closeRead(); draw(dt, vr, I); return; }
   // the Tape 1 ending plays itself

@@ -2,7 +2,7 @@
 // and under beds, getting hurt, dying. Desktop moves the dolly from keys
 // and mouse; in VR your real head is the body and the stick moves it.
 import * as THREE from '../vendor/three.module.js';
-import { floorAt } from './plan.js?v=31';
+import { floorAt } from './plan.js?v=32';
 
 const V = THREE.Vector3;
 // Kroft is 2.16 m; his eyes are at about 2.02. However tall you make yourself, you're still a head under him.
