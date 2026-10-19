@@ -3,7 +3,7 @@
 // station and hydrotherapy sit off one long corridor; the chapel and the
 // surgical theater are locked away to the north; the stairwell down to the
 // basement is chained shut at the east end.
-import { C, W, D, Z, cx, cz } from './plan.js?v=33';
+import { C, W, D, Z, cx, cz } from './plan.js?v=34';
 
 export function makePlan2() {
   const g = new Uint8Array(W * D); const win = new Uint8Array(W * D);

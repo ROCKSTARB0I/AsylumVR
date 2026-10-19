@@ -3,9 +3,9 @@
 // dark), hears (your steps, doors, things you knock), patrols or keeps to
 // its corner, investigates, chases, searches, checks lockers, and kills.
 import * as THREE from '../vendor/three.module.js';
-import { C, W, D, cx, cz, floorAt } from './plan.js?v=33';
-import { VAULT_H } from './space.js?v=33';
-import { makeBody, pose, cleaver, bonesaw, flashlight, syringe, BODY_LIGHT } from './carcass.js?v=33';
+import { C, W, D, cx, cz, floorAt } from './plan.js?v=34';
+import { VAULT_H } from './space.js?v=34';
+import { makeBody, pose, cleaver, bonesaw, flashlight, syringe, BODY_LIGHT } from './carcass.js?v=34';
 
 const V = THREE.Vector3;
 const tmp = new V(), tmp2 = new V();
@@ -56,7 +56,7 @@ function stretch(b, arm = 1.5, leg = 1.2) {
 // two of them, back to back: a second body grown out of the first one's spine, facing the other way
 function fuse(b, seed = 1) {
   const o = makeBody('naked', seed + 500, { face: 'gouged', bald: true, blood: 0.8, lean: 1 });
-  o.root.rotation.y = Math.PI; o.root.position.set(0, -b.rest.spine.y * 0.95, -0.16 * b.s); b.bones.spine.add(o.root);
+  o.root.rotation.y = Math.PI; o.root.position.set(0, -o.rest.hips.y + 0.02 * b.s, -0.17 * b.s); b.bones.spine.add(o.root);   // its hips grown into the first one's lower back
   pose(o, 'idle', 0, {}); o.bones.Lupper.rotation.set(-1.2, 0, 0.4); o.bones.Rupper.rotation.set(-1.4, 0, -0.3); o.bones.Lfore.rotation.x = -0.6; o.bones.jaw.rotation.x = 0.7; o.bones.head.rotation.z = 0.5;
   o.bones.Lthigh.rotation.x = -1.4; o.bones.Rthigh.rotation.x = -1.2; o.bones.Lshin.rotation.x = 1.6; o.bones.Rshin.rotation.x = 1.4;
   b.twin = o; const m0 = b.mat; b.twinMat = o.mat;

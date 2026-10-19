@@ -4,7 +4,7 @@
 //   B1 (3.2 m), Intake & Genetics: the tank hall, the genetics lab, offices, specimen storage, the nursery
 //   B2 (0 m), Containment: holding cells behind glass, dissection, cryo, the observation gallery over the Pit
 // and the way out: the emergency stairs up two storeys to the vehicle bay, and the desert road at dawn.
-import { H, Z, setGrid, setLevels } from './plan.js?v=33';
+import { H, Z, setGrid, setLevels } from './plan.js?v=34';
 
 export function makePlan5() {
   const W = 110, D = 82; setGrid(W, D);
@@ -75,8 +75,8 @@ export function makePlan5() {
   rect(98, 4, 108, 18, Z.OUT);                 // the desert road, and morning
 
   // ------------------------------------------------------ surfaces
-  const floorOf = (x, y, z) => (z === Z.OUT ? 'sand' : z === Z.LAB || z === Z.CELL || z === Z.SEC ? 'floorLab' : z === Z.GEN || z === Z.STORE || z === Z.HALL && L.base[y * W + x] < H ? 'floorSteel' : z === Z.STAIR ? 'floorConcrete' : null);
-  const wallOf = (x, y, z) => (z === Z.OUT || z === Z.STAIR || (z === Z.GEN) ? 'wallBunker' : z === Z.LOBBY && L.base[y * W + x] > 5 ? 'wallBunker' : 'wallLab');
+  const floorOf = (x, y, z) => (z === Z.OUT ? (x > 97 ? 'asphalt' : 'sand') : z === Z.LAB || z === Z.CELL || z === Z.SEC || z === Z.LOBBY || z === Z.ADMIN || z === Z.SURGERY || z === Z.MORGUE ? 'floorLab' : z === Z.GEN || z === Z.STORE ? 'floorSteel' : z === Z.HALL ? 'floorLab' : z === Z.STAIR ? 'floorConcrete' : null);
+  const wallOf = (x, y, z) => (z === Z.OUT || z === Z.STAIR || z === Z.GEN ? 'wallBunker' : 'wallLab');
 
   // ------------------------------------------------------ lights
   const lamps = []; const Lm = (x, y, ch, o = {}) => lamps.push({ x, y, ch, ...o });
@@ -84,24 +84,25 @@ export function makePlan5() {
   const red = (x, y, i = 0.6) => Lm(x, y, 'S', { col: 0xff2010, i, r: 8, kind: 'cage' });
   const tankGlow = (x, y, i = 0.5) => Lm(x, y, 'S', { col: 0x50ff90, i, r: 5, kind: 'none', y2: 1.3 });
   // the surface: the moon on the sand, a floodlight on a pole, the hut's bulb
-  for (const [x, y] of [[8, 4], [20, 6], [32, 14], [14, 16], [28, 18], [38, 4]]) Lm(x, y, 'S', { col: 0x9ab0d8, i: 0.6, r: 13, kind: 'none', y2: 5 });
+  for (let x = 4; x <= 38; x += 6) for (let y = 3; y <= 18; y += 5) Lm(x + (y % 2), y, 'S', { col: 0xa8bce0, i: 1.1, r: 11, kind: 'none', y2: 2.6 });   // a bright desert moon on pale sand
+  for (const [x, y] of [[100, 6], [106, 6], [100, 13], [106, 13], [103, 17]]) Lm(x, y, 'S', { col: 0xe0b8a0, i: 1.0, r: 11, kind: 'none', y2: 2.6 });   // dawn on the road
   Lm(24, 19.4, 'S', { col: 0xffe2b0, i: 1.1, r: 11, kind: 'cage' }); Lm(8, 9.5, 'S', { col: 0xffd8a0, i: 0.5, r: 5, kind: 'bulb' }); Lm(31, 6.5, 'A', { col: 0xcfe8ff, i: 0.6, r: 6, kind: 'tube' });
-  for (const x of [19, 25, 30]) tube(x, 25, x === 25 ? 'A' : 'S', 0.7); tube(12, 25, 'B', 0.7); tube(35.5, 24, 'S', 0.5); red(37, 24, 0.4);
+  for (const x of [19, 25, 30]) for (const y of [23.5, 27]) tube(x, y, x === 25 && y > 25 ? 'A' : 'S', 1.0); tube(12, 25, 'B', 0.9); tube(35.5, 24, 'S', 0.5); red(37, 24, 0.4);
   // B1: cold tubes, a red beacon at each junction, the tanks glowing
-  for (let y = 6; y <= 36; y += 7) tube(45.5, y, y % 2 ? 'A' : 'S', 0.75);
-  for (let x = 50; x <= 94; x += 8) tube(x, 19.5, x % 16 ? 'S' : 'B', 0.7);
+  for (let y = 6; y <= 36; y += 5) tube(45.5, y, y % 3 ? 'S' : 'A', 1.0);
+  for (let x = 50; x <= 94; x += 6) tube(x, 19.5, x % 18 ? 'S' : 'B', 1.0);
   red(45.5, 19.5); red(60.5, 19.5); red(84, 19.5); red(60.5, 38);
-  for (const x of [52, 60, 68]) for (const y of [7, 14]) tube(x, y, 'S', 0.55);
-  for (const x of [80, 88]) for (const y of [7, 14]) tube(x, y, (x + y) % 3 ? 'S' : 'A', 0.8);
-  for (const [x, y] of [[50, 26], [56, 30]]) tube(x, y, 'S', 0.6); Lm(51, 24, 'S', { col: 0xffb060, i: 0.5, r: 5, kind: 'lamp' });
-  for (const [x, y] of [[67, 27], [74, 34], [70, 31]]) tube(x, y, 'B', 0.6);
-  for (const [x, y] of [[84, 28], [90, 34]]) Lm(x, y, 'S', { col: 0x70ff90, i: 0.5, r: 7, kind: 'bulb' });
+  for (const x of [49, 53, 57, 61, 65, 69]) for (const y of [8, 12, 16]) tube(x, y, 'S', 0.6); for (const [x, y] of [[51, 6], [59, 6], [67, 10], [55, 14], [63, 14], [70, 6], [55, 6], [63, 6], [51, 10], [59, 10], [70, 14], [51, 14]]) tankGlow(x, y, 0.45);
+  for (const x of [78, 84, 90]) for (const y of [6, 11, 15]) tube(x, y, (x + y) % 3 ? 'S' : 'A', 0.85);
+  for (const [x, y] of [[50, 25], [56, 25], [50, 30], [56, 30]]) tube(x, y, 'S', 0.75); Lm(51, 24, 'S', { col: 0xffb060, i: 0.5, r: 5, kind: 'lamp' });
+  for (const [x, y] of [[67, 26], [74, 26], [67, 34], [74, 34], [70, 30]]) tube(x, y, (x + y) % 2 ? 'B' : 'S', 0.75);
+  for (const [x, y] of [[84, 25], [90, 25], [84, 31], [90, 31], [86, 36]]) Lm(x, y, 'S', { col: 0x80ffa0, i: 0.6, r: 7, kind: 'bulb' });
   // B2: emergency red, the cells lit white, the gallery's screens, the Pit dark but for its own work lights
-  for (let x = 46; x <= 92; x += 8) red(x, 45.5, 0.55); for (let y = 50; y <= 76; y += 8) red(66.5, y, 0.5);
+  for (let x = 46; x <= 92; x += 6) red(x, 45.5, 0.75); for (let y = 50; y <= 76; y += 6) red(66.5, y, 0.7); for (const x of [50, 62, 78, 88]) tube(x, 45.5, 'A', 0.6);
   for (const x of [45.5, 50.5, 55.5, 60.5]) Lm(x + 0.5, 51, 'S', { col: 0xf0f4ff, i: 0.55, r: 5, kind: 'bulb' });
-  for (const x of [74, 82, 90]) Lm(x, 49.5, 'S', { col: 0x60ff90, i: 0.35, r: 5, kind: 'monitor' }); tube(82, 52, 'A', 0.6);
+  for (const x of [74, 82, 90]) Lm(x, 49.5, 'S', { col: 0x60ff90, i: 0.35, r: 5, kind: 'monitor' }); tube(76, 52, 'A', 0.8); tube(88, 52, 'S', 0.7);
   for (const [x, y] of [[74, 62], [90, 62], [82, 70]]) Lm(x, y, 'S', { col: 0xfff0d0, i: 0.9, r: 9, kind: 'cage' }); red(68, 66, 0.5);
-  tube(54, 61.5, 'S', 0.9); Lm(54, 61.5, 'S', { col: 0xf4f8ff, i: 1.8, r: 8, kind: 'bulb' }); tube(54, 72, 'B', 0.6); for (const x of [46, 50, 54, 58, 62]) Lm(x, 75.6, 'S', { col: 0x80c0ff, i: 0.3, r: 4, kind: 'none', y2: 1.6 });
+  tube(47, 61.5, 'S', 0.9); tube(61, 61.5, 'S', 0.9); Lm(54, 61.5, 'S', { col: 0xf4f8ff, i: 1.8, r: 8, kind: 'bulb' }); tube(48, 72, 'B', 0.8); tube(60, 72, 'S', 0.7); for (const x of [46, 50, 54, 58, 62]) Lm(x, 75.6, 'S', { col: 0x80c0ff, i: 0.3, r: 4, kind: 'none', y2: 1.6 });
   red(98, 45.5, 0.7); red(107, 43.5, 0.5);
   // the bay and the road: dawn coming up
   tube(104, 25, 'P', 1.0); tube(104, 31, 'P', 1.0); red(104, 21, 0.5);

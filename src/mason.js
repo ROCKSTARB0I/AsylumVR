@@ -5,8 +5,8 @@
 // cones and stains are added on top. Light comes in four channels: S always
 // on, A and B the stuttering broken tubes, P the main circuit (generator).
 import * as THREE from '../vendor/three.module.js';
-import { C, H, W, D, Z, cx, cz, LEVELS, floorAt, cellFloorAt, ceilOf, liftOf, baseOf } from './plan.js?v=33';
-import { T, scrawlTexture, rng } from './surfaces.js?v=33';
+import { C, H, W, D, Z, cx, cz, LEVELS, floorAt, cellFloorAt, ceilOf, liftOf, baseOf } from './plan.js?v=34';
+import { T, scrawlTexture, rng } from './surfaces.js?v=34';
 
 const V3 = THREE.Vector3;
 export const LIGHT = { A: { value: 1 }, B: { value: 1 }, P: { value: 0 }, S: { value: 1 }, cool: { value: new THREE.Color(0.78, 0.88, 1.0) } };
@@ -625,7 +625,7 @@ Object.assign(PROPS, {
 // a few colour-only materials props refer to
 export const EXTRA_MATS = {
   glass: () => { const m = bakedMaterial({ color: 0xa8d0c8, roughness: 0.04, transparent: true, opacity: 0.2, depthWrite: false }); m.side = THREE.DoubleSide; return m; },
-  fluid: () => bakedMaterial({ color: 0x2f7a48, emissive: 0x0f5a24, roughness: 0.1, transparent: true, opacity: 0.6, depthWrite: false }),
+  fluid: () => bakedMaterial({ color: 0x3f9a5c, emissive: 0x0f5a24, roughness: 0.1, transparent: true, opacity: 0.36, depthWrite: false }),
   hazard: () => bakedMaterial({ color: 0xb8901a, roughness: 0.5 }),
   labwhite: () => bakedMaterial({ color: 0xcfd3d2, roughness: 0.3 }),
   screengreen: () => bakedMaterial({ color: 0x0c1a10, emissive: 0x1a6a2a, roughness: 0.2 }),
@@ -667,7 +667,7 @@ export function laydecals(world, plan, scene) {
   };
   for (const gd of plan.gore) {
     const x = cx(gd.x), z = cz(gd.y);
-    if (gd.k === 'pool') floorDecal('pool' + ((gd.x * 3 + gd.y) | 0) % 3, x, z, 1.1 * gd.s + 0.4, R() * 6.28);
+    if (gd.k === 'pool') floorDecal('pool' + ((gd.x * 3 + gd.y) | 0) % 3, x, z, 1.1 * (gd.s ?? 1) + 0.4, R() * 6.28);
     if (gd.k === 'smear') { wallDecal(R() > 0.5 ? 'wallsmear' : 'hands', x, z, gd.wall, 1.4, 0.5 + R() * 0.5); }
   }
   // drag trails between some pools, filth and damp everywhere
