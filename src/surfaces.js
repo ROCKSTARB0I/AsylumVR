@@ -2,7 +2,7 @@
 // canvases at load time (tile, plaster, linoleum, concrete, rust, blood,
 // mattress stains, scrawl), with a matching normal map from its height.
 import * as THREE from '../vendor/three.module.js';
-import { picture, keepPicture, keptData, keepData } from './keep.js?v=32';
+import { picture, keepPicture, keptData, keepData } from './keep.js?v=33';
 
 // ---------------------------------------------------------------- noise
 function hash(x, y, s) { let h = (x * 374761393 + y * 668265263 + s * 2147483647) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
@@ -316,6 +316,62 @@ function paintSurfaces() {
     const p = new Paint(S);   // car park tarmac with a painted bay line
     p.each((x, y, i) => { const u = x / S, v = y / S, n = fbm(u * 20, v * 20, 200, 4, 20), g = hash(x, y, 201); const k = 0.17 + n * 0.08 + g * 0.06; p.set(i, k, k, k * 1.03); p.z[i] = g * 0.5 + n * 0.3; p.r[i] = 0.85; if (Math.abs(u - 0.5) < 0.012) p.set(i, 0.62, 0.6, 0.52); });
     T.asphalt = set(p, 1.5);
+  }
+  // ---- the Testing Site: a clean, cold lab under the Nevada desert
+  {
+    const p = new Paint(S);   // lab wall: white enamel panels 1 m wide, seams and rivets, a dark kick band, a teal line at 1.2 m, a hazard band low down
+    p.each((x, y, i) => {
+      const u = x / S, v = y / S, n = fbm(u * 6, v * 6, 210, 4, 6), f = fbm(u * 40, v * 40, 211, 3, 40);
+      const h = 3.2 * (1 - v);   // height above the floor (m)
+      const pu = (u * 3) % 1; const seam = Math.min(pu, 1 - pu) * 3; // metres to the nearest panel seam
+      let k = 0.86 + n * 0.08 + f * 0.03; p.set(i, 0.82 * k, 0.84 * k, 0.85 * k); p.z[i] = 0.6; p.r[i] = 0.22 + n * 0.1;
+      if (seam < 0.006) { p.set(i, 0.35, 0.37, 0.38); p.z[i] = 0.2; p.r[i] = 0.6; }
+      if (Math.abs(h - 2.6) < 0.01 || Math.abs(h - 0.32) < 0.01) { p.set(i, 0.4, 0.42, 0.43); p.z[i] = 0.3; }
+      for (const rh of [0.4, 1.5, 2.5]) if (Math.hypot(seam - 0.03, h - rh) < 0.008) { p.set(i, 0.55, 0.57, 0.58); p.z[i] = 1.2; }   // rivets
+      if (h < 0.3) { p.set(i, 0.16 + n * 0.03, 0.17, 0.18); p.z[i] = 0.4; p.r[i] = 0.5; }
+      if (h > 1.17 && h < 1.23) { p.set(i, 0.12, 0.5, 0.48); p.r[i] = 0.3; }
+      if (h > 0.34 && h < 0.46) { const st = Math.floor((u * 3 * 6 + h * 4)) % 2; p.set(i, st ? 0.85 : 0.08, st ? 0.66 : 0.07, st ? 0.08 : 0.05); p.r[i] = 0.45; }
+    });
+    p.grime(212, 0.35, true); T.wallLab = set(p, 1.5);
+  }
+  {
+    const p = new Paint(S);   // lab floor: pale grey epoxy, scuffed by trolleys, a yellow safety line
+    p.each((x, y, i) => {
+      const u = x / S, v = y / S, n = fbm(u * 5, v * 5, 220, 5, 5), sc = fbm(u * 50, v * 3, 221, 3, 50);
+      const k = 0.62 + n * 0.12; p.set(i, 0.5 * k, 0.52 * k, 0.53 * k); p.z[i] = n * 0.2; p.r[i] = 0.32 + n * 0.15;
+      if (sc > 0.66) { p.mul(i, 0.85); p.r[i] = 0.55; }
+      if (Math.abs(u - 0.03) < 0.012) { p.set(i, 0.8, 0.62, 0.1); p.r[i] = 0.4; }
+    });
+    p.grime(222, 0.4); T.floorLab = set(p, 1);
+  }
+  {
+    const p = new Paint(S);   // steel deck plate, diamond tread
+    p.each((x, y, i) => {
+      const u = x / S, v = y / S, n = fbm(u * 8, v * 8, 230, 4, 8); const a = ((u * 24 + v * 24) % 1), b = ((u * 24 - v * 24 + 100) % 1);
+      const bump = (Math.floor(u * 12 + v * 12) % 2 ? Math.max(0, 1 - Math.abs(a - 0.5) * 8) * (Math.abs(b - 0.5) < 0.18 ? 1 : 0) : Math.max(0, 1 - Math.abs(b - 0.5) * 8) * (Math.abs(a - 0.5) < 0.18 ? 1 : 0));
+      const k = 0.33 + n * 0.1 + bump * 0.12; p.set(i, k, k * 1.01, k * 1.03); p.z[i] = bump; p.r[i] = 0.4 - bump * 0.1 + n * 0.1;
+    });
+    p.grime(232, 0.7); T.floorSteel = set(p, 3);
+  }
+  {
+    const p = new Paint(S);   // desert: pale sand in wind ripples, pebbles, scrub
+    p.each((x, y, i) => {
+      const u = x / S, v = y / S, n = fbm(u * 4, v * 4, 240, 5, 4), rp = Math.sin((v * 30 + fbm(u * 3, v * 3, 241, 3, 3) * 6) * Math.PI * 2) * 0.5 + 0.5, pb = hash(x >> 2, y >> 2, 242);
+      const k = 0.62 + n * 0.2 + rp * 0.06; p.set(i, 0.66 * k, 0.55 * k, 0.4 * k); p.z[i] = rp * 0.5 + n * 0.3; p.r[i] = 0.95;
+      if (pb > 0.985) { p.set(i, 0.32, 0.29, 0.25); p.z[i] = 1.4; }
+      if (n < 0.3) p.mix(i, 0.38, 0.36, 0.22, (0.3 - n) * 2);
+    });
+    T.sand = set(p, 2);
+  }
+  {
+    const p = new Paint(S);   // bunker concrete: board-formed, form-tie holes, a stencil band
+    p.each((x, y, i) => {
+      const u = x / S, v = y / S, n = fbm(u * 7, v * 7, 250, 5, 7), board = fbm(u * 1.5, v * 16, 251, 3, 2);
+      const k = 0.42 + n * 0.14 + board * 0.06; p.set(i, k, k * 0.99, k * 0.96); p.z[i] = n * 0.5 + board * 0.3; p.r[i] = 0.9;
+      const hx = (u * 6) % 1, hy = (v * 4) % 1; if (Math.hypot(hx - 0.5, (hy - 0.5) * 0.66) < 0.035) { p.set(i, 0.16, 0.15, 0.14); p.z[i] = 0; }
+      if (v > 0.6 && v < 0.62) p.set(i, 0.6, 0.12, 0.08);
+    });
+    p.grime(252, 0.9, true); T.wallBunker = set(p, 2.5);
   }
   T.decals = buildDecals();
 }

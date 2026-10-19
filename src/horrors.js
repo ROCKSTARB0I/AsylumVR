@@ -3,9 +3,9 @@
 // dark), hears (your steps, doors, things you knock), patrols or keeps to
 // its corner, investigates, chases, searches, checks lockers, and kills.
 import * as THREE from '../vendor/three.module.js';
-import { C, W, D, cx, cz, floorAt } from './plan.js?v=32';
-import { VAULT_H } from './space.js?v=32';
-import { makeBody, pose, cleaver, bonesaw, flashlight, syringe, BODY_LIGHT } from './carcass.js?v=32';
+import { C, W, D, cx, cz, floorAt } from './plan.js?v=33';
+import { VAULT_H } from './space.js?v=33';
+import { makeBody, pose, cleaver, bonesaw, flashlight, syringe, BODY_LIGHT } from './carcass.js?v=33';
 
 const V = THREE.Vector3;
 const tmp = new V(), tmp2 = new V();
@@ -48,6 +48,20 @@ class Nav {
 }
 function clearWide(space, a, b) { const dx = b.z - a.z, dz = -(b.x - a.x); const l = Math.hypot(dx, dz) || 1; const ox = dx / l * 0.35, oz = dz / l * 0.35; return space.los(a.x + ox, a.z + oz, b.x + ox, b.z + oz, false) && space.los(a.x - ox, a.z - oz, b.x - ox, b.z - oz, false); }
 
+// grown wrong: arms (and legs) longer than a person's, by pushing the joints of the skeleton apart
+function stretch(b, arm = 1.5, leg = 1.2) {
+  for (const s of ['L', 'R']) { for (const n of [s + 'fore', s + 'hand']) { b.bones[n].position.multiplyScalar(arm); b.rest[n] = b.bones[n].position.clone(); } for (const n of [s + 'shin', s + 'foot']) { b.bones[n].position.multiplyScalar(leg); b.rest[n] = b.bones[n].position.clone(); } }
+  b.bones.hips.position.y *= 1 + (leg - 1) * 0.5; b.rest.hips = b.bones.hips.position.clone();
+}
+// two of them, back to back: a second body grown out of the first one's spine, facing the other way
+function fuse(b, seed = 1) {
+  const o = makeBody('naked', seed + 500, { face: 'gouged', bald: true, blood: 0.8, lean: 1 });
+  o.root.rotation.y = Math.PI; o.root.position.set(0, -b.rest.spine.y * 0.95, -0.16 * b.s); b.bones.spine.add(o.root);
+  pose(o, 'idle', 0, {}); o.bones.Lupper.rotation.set(-1.2, 0, 0.4); o.bones.Rupper.rotation.set(-1.4, 0, -0.3); o.bones.Lfore.rotation.x = -0.6; o.bones.jaw.rotation.x = 0.7; o.bones.head.rotation.z = 0.5;
+  o.bones.Lthigh.rotation.x = -1.4; o.bones.Rthigh.rotation.x = -1.2; o.bones.Lshin.rotation.x = 1.6; o.bones.Rshin.rotation.x = 1.4;
+  b.twin = o; const m0 = b.mat; b.twinMat = o.mat;
+}
+
 // ---------------------------------------------------------------- one of them
 const KINDS = {
   brute: { body: 'brute', walk: 1.25, run: 4.05, fov: 0.6, sight: 1.0, hear: 1.25, dmg: 55, reach: 1.35, wind: 0.55, gait: 'brute', voice: 'brute', weapon: 'cleaver' },
@@ -57,6 +71,15 @@ const KINDS = {
   orderly: { body: 'orderly', walk: 1.35, run: 4.15, fov: 0.55, sight: 1.05, hear: 1.3, dmg: 45, reach: 1.25, wind: 0.4, gait: 'walk', voice: 'orderly', weapon: 'flashlight', lamp: 'hand' },
   // the Matron of the women's ward: Nurse Kelly, who stayed. A long glass syringe; she hums to her girls
   matron: { body: 'orderly', walk: 1.2, run: 3.95, fov: 0.6, sight: 1.0, hear: 1.55, dmg: 50, reach: 1.25, wind: 0.4, gait: 'walk', voice: 'matron', weapon: 'needle', music: 'patient', look: { outfit: 'nurse', female: true, h: 1.74, girth: 0.82, muscle: 0, lean: 0.55, face: 'smile', skin: [0.7, 0.58, 0.52], hair: [0.42, 0.38, 0.34], bald: false, blood: 0.85, dirt: 0.6, scars: 0.5, stare: true } },
+  // ---- the Testing Site: things grown in the tanks
+  skitter: { body: 'naked', walk: 1.6, run: 5.0, fov: 0.5, sight: 0.8, hear: 1.4, dmg: 18, reach: 1.0, wind: 0.25, gait: 'stalk', crawl: true, jerky: true, voice: 'c:skitter', music: 'eater', look: { h: 1.15, girth: 0.55, lean: 1, bald: true, face: 'gouged', skin: [0.78, 0.74, 0.68], blood: 0.4, dirt: 0.2, scars: 0.3, stare: true }, mod: (b) => stretch(b, 1.5, 1.2) },
+  longarm: { body: 'gown', walk: 0.85, run: 3.3, fov: 0.3, sight: 0.35, hear: 2.1, dmg: 65, reach: 1.9, wind: 0.6, gait: 'walk', voice: 'c:longarm', music: 'surgeon', look: { h: 2.6, girth: 0.55, lean: 1, bald: true, face: 'sewn', outfit: 'rags', skin: [0.62, 0.63, 0.6], blood: 0.2, dirt: 0.3, stare: true }, mod: (b) => stretch(b, 1.75, 1.3) },
+  bloater: { body: 'brute', walk: 0.8, run: 2.7, fov: 0.6, sight: 0.9, hear: 1.0, dmg: 75, reach: 1.5, wind: 0.7, gait: 'brute', voice: 'c:bloater', music: 'brute', look: { h: 1.95, girth: 2.5, face: 'burned', outfit: 'rags', skin: [0.58, 0.6, 0.42], blood: 0.6, dirt: 0.6, shackles: false, smile: false } },
+  hollow: { body: 'gown', walk: 1.2, run: 4.4, fov: 0.6, sight: 1.1, hear: 1.2, dmg: 35, reach: 1.2, wind: 0.35, gait: 'shamble', jerky: true, voice: 'c:hollow', music: 'patient', caller: true, look: { face: 'lobotomy', bald: true, blood: 0.8, outfit: 'gown', skin: [0.7, 0.66, 0.6] } },
+  dropper: { body: 'naked', walk: 1.0, run: 4.2, fov: 0.5, sight: 0.9, hear: 1.3, dmg: 30, reach: 1.1, wind: 0.3, gait: 'stalk', crawl: true, jerky: true, voice: 'c:skitter', music: 'eater', look: { h: 1.6, girth: 0.6, lean: 1, bald: true, face: 'smile', skin: [0.72, 0.7, 0.66], blood: 0.5, stare: true }, mod: (b) => stretch(b, 1.6, 1.4) },
+  amalgam: { body: 'gown', walk: 1.0, run: 3.6, fov: 1.7, sight: 1.0, hear: 1.2, dmg: 45, reach: 1.3, wind: 0.4, gait: 'shamble', jerky: true, voice: 'c:amalgam', music: 'orderly', look: { face: 'sewn', bald: true, blood: 0.7, outfit: 'rags' }, mod: (b, seed) => fuse(b, seed) },
+  mimic: { body: 'orderly', walk: 1.1, run: 4.0, fov: 0.55, sight: 1.0, hear: 1.2, dmg: 40, reach: 1.2, wind: 0.35, gait: 'walk', jerky: true, voice: 'c:hollow', music: 'patient', look: { outfit: 'orderly', face: 'gouged', glasses: true, blood: 0.9, stare: true, bald: false } },
+  subject: { body: 'brute', walk: 1.4, run: 4.6, fov: 0.7, sight: 1.2, hear: 1.6, dmg: 100, reach: 1.9, wind: 0.5, gait: 'brute', crawl: true, voice: 'c:subject', music: 'brute', look: { h: 2.9, girth: 1.2, face: 'noseless', smile: true, skin: [0.6, 0.55, 0.52], blood: 1, scars: 1, shackles: false, outfit: 'rags' }, mod: (b) => stretch(b, 1.4, 1.25) },
   rocker: { body: 'jacket', walk: 0.8, run: 0, fov: 0, sight: 0, hear: 0, dmg: 0, gait: 'shamble', voice: 'rocker', harmless: true },
 };
 
@@ -64,6 +87,7 @@ class Horror {
   constructor(H, kind, x, z, opts = {}) {
     this.H = H; this.kind = kind; this.K = KINDS[kind]; this.opts = opts;
     this.body = makeBody(this.K.body, opts.seed ?? Math.floor(x * 7 + z * 3), { ...(this.K.look || {}), ...(opts.look || {}) });
+    if (this.K.mod) this.K.mod(this.body, opts.seed ?? 1);
     H.scene.add(this.body.root);
     if (this.K.weapon === 'cleaver') { const w = cleaver(this.body.s); w.position.set(0, -0.1 * this.body.s, 0.02); w.rotation.x = -Math.PI / 2; this.body.bones.Rhand.add(w); }
     if (this.K.weapon === 'saw') { const w = bonesaw(this.body.s); w.position.set(0, -0.1 * this.body.s, 0.02); w.rotation.x = -Math.PI / 2; this.body.bones.Rhand.add(w); }
@@ -186,7 +210,7 @@ class Horror {
     if (see > 0) { this.aware = Math.min(1.5, this.aware + see * dt * (this.state === 'investigate' || this.state === 'search' ? 3.2 : 1.8)); this.lastSeen = P.clone(); this.lostT = 0; }
     else this.aware = Math.max(0, this.aware - dt * 0.25);
     if (this.aware >= 1 && this.state !== 'chase' && this.state !== 'spot' && this.state !== 'attack' && this.state !== 'execute' && this.K.run && this.state !== 'eat' && H.mayChase(this)) {   // (not again while it's already roaring at you)
-      this.state = 'spot'; this.spotT = 0; this.path = null; H.onChase(this);
+      this.state = 'spot'; this.spotT = 0; this.path = null; H.onChase(this); if (this.K.caller) H.call(this);
     } else if (this.aware > 0.35 && (this.state === 'patrol' || this.state === 'idle') && this.K.run && H.isHunter(this)) { this.state = 'investigate'; this.goal = P.clone(); this.wait = 0.5; }
     let st = this.state; let anim = 'idle', animP = {};
     if (this.vault) { this.vaulting(dt); anim = 'vault'; animP = { k: this.vault ? this.vault.k : 1 }; }
@@ -292,9 +316,9 @@ class Horror {
     if (this.voiceT < 0 && (this.state === 'patrol' || this.state === 'search' || this.state === 'idle')) { this.voiceT = 4 + Math.random() * 6; H.sound.voice(this.K.voice, 'idle', this.pos); }
     // draw
     const b = this.body;
-    if (this.kind === 'eater' && (anim === 'run' || anim === 'stalk' || anim === 'walk' || anim === 'shamble')) anim = 'crawl';
+    if ((this.kind === 'eater' || this.K.crawl) && (anim === 'run' || anim === 'stalk' || anim === 'walk' || anim === 'shamble' || anim === 'brute')) anim = 'crawl';
     // the feral and the inmates move like a damaged tape: held frames, then a jump
-    const jerky = (this.kind === 'eater' || this.kind === 'patient') && anim !== 'eat' && anim !== 'rock';
+    const jerky = (this.kind === 'eater' || this.kind === 'patient' || this.K.jerky) && anim !== 'eat' && anim !== 'rock';
     this.frameT = (this.frameT || 0) - dt;
     if (!jerky || this.frameT <= 0 || this.state === 'execute') {
       this.frameT = jerky ? 0.06 + Math.random() * 0.1 : 0;
@@ -302,7 +326,8 @@ class Horror {
       pose(b, anim, this.t, { speed: this.speed, phase: this.phase, reach: this.state === 'chase' && dist < 3 && this.kind !== 'brute', twitch: this.K.run ? 1 : 0.4, ...animP });
     }
     if (this.lamp) this.lamp.update(this);
-    const L = H.world.lightAt(this.pos.x, this.pos.z); b.mat.userData.uAmb.value.copy(L);
+    const L = H.world.lightAt(this.pos.x, this.pos.z); b.mat.userData.uAmb.value.copy(L); if (b.twinMat) b.twinMat.userData.uAmb.value.copy(L);
+    if (b.twin) { b.twin.bones.head.rotation.z = 0.5 + Math.sin(this.t * 3.3) * 0.2; b.twin.bones.jaw.rotation.x = 0.6 + Math.abs(Math.sin(this.t * 2.1)) * 0.3; b.twin.bones.Lupper.rotation.x = -1.2 + Math.sin(this.t * 4) * 0.3; }
     // the kill: its face in yours, lit hard and strobing so you see all of it
     if (this.state === 'execute') { const st = Math.sin(this.exT * 64) > -0.3 ? 1 : 0.3; b.mat.userData.uAmb.value.setRGB(0.5 * st, 0.46 * st, 0.42 * st); }
     else if (this.state === 'spot') b.mat.userData.uAmb.value.multiplyScalar(2.2).addScalar(0.03);   // the moment it sees you, you see it
@@ -325,8 +350,8 @@ export class Horrors {
       this.list.push(this.brute, this.surgeon);
     }
     for (const [i, m] of p.inmates.entries()) {
-      const kind = m.kind === 'eater' ? 'eater' : m.kind === 'stalker' ? 'patient' : 'rocker';
-      const h = new Horror(this, kind, cx(m.x), cz(m.y), { huntRoute: m.huntRoute, idle: m.kind === 'eater' ? 'eat' : m.kind === 'stalker' ? 'patrol' : 'rock', yaw: m.facing ?? (i * 1.7), seed: 40 + i, route: m.route, look: m.look, dormant: m.dormant, pack: m.pack });
+      const kind = m.kind === 'eater' ? 'eater' : m.kind === 'stalker' ? 'patient' : KINDS[m.kind] && m.kind !== 'rocker' ? m.kind : 'rocker';
+      const h = new Horror(this, kind, cx(m.x), cz(m.y), { huntRoute: m.huntRoute, idle: m.idle || (m.kind === 'eater' ? 'eat' : m.kind === 'stalker' || (KINDS[m.kind] && m.route) ? 'patrol' : KINDS[m.kind] && m.kind !== 'rocker' ? 'idle' : 'rock'), yaw: m.facing ?? (i * 1.7), seed: 40 + i, route: m.route, look: m.look, dormant: m.dormant, pack: m.pack });
       this.list.push(h);
       if (m.kind === 'eater') this.feral = h;
     }
@@ -350,6 +375,8 @@ export class Horrors {
     h.lamp = { update: (hh) => { if (!(hh.active && hh.body.root.visible)) return; src.getWorldPosition(v); aimFn(); this.beam.intensity = 14 * (0.92 + Math.random() * 0.08); this.beam.position.copy(v); this.beamTgt.position.copy(v).addScaledVector(fwd, 3); this.beamTgt.updateMatrixWorld(); } };
   }
   heard(x, z, r) { if (r <= 0) return; for (const h of this.list) h.hear(x, z, r); }
+  // a shriek that every pack creature within 25 m comes running to
+  call(h) { for (const o of this.list) if (o !== h && o.active && o.opts.pack && o.state !== 'chase' && o.pos.distanceTo(h.pos) < 25) { o.state = 'investigate'; o.goal = this.walker.pos.clone(); o.wait = 0.2; o.path = null; } }
   sawHide(hide) { for (const h of this.list) if (h.state === 'chase' && h.canSee(this.walker.pos, true) > 0) h.sawHide = hide; }
   onChase(h) { this.chaseStart = this.G.t; this.G.chased++; if (h.kind === 'brute' && !this.G.said.has('brute')) { this.G.said.add('brute'); } this.sound.stinger(); }
   onFound(h, hide) { this.sound.lockerRip(); this.glitchKick(1); this.walker.unhide(); }

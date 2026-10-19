@@ -2,29 +2,29 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz, floorAt, ceilOf } from './plan.js?v=32';
-import { buildSurfaces, T } from './surfaces.js?v=32';
-import { loadPictures, savePictures } from './keep.js?v=32';
-import { VRMenu } from './vrmenu.js?v=32';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=32';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=32';
-import { Doors } from './doors.js?v=32';
-import { Space } from './space.js?v=32';
-import { Input } from './input.js?v=32';
-import { Walker, MAX_EYE } from './walker.js?v=32';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=32';
-import { makeTape, makeVeil } from './tape.js?v=32';
-import { Slate } from './slate.js?v=32';
-import { MiniMap } from './minimap.js?v=32';
-import * as STORY1 from './story.js?v=32';
-import * as TAPE3 from './tape3.js?v=32';
-import * as TAPE2 from './tape2.js?v=32';
-import * as TAPE4 from './tape4.js?v=32';
-import { Sound } from './dread.js?v=32';
-import { Horrors } from './horrors.js?v=32';
-import { Dressing } from './dressing.js?v=32';
-import { Scares } from './scares.js?v=32';
-import { makeHand } from './hands.js?v=32';
+import { makePlan, C, H, Z, cx, cz, floorAt, ceilOf } from './plan.js?v=33';
+import { buildSurfaces, T } from './surfaces.js?v=33';
+import { loadPictures, savePictures } from './keep.js?v=33';
+import { VRMenu } from './vrmenu.js?v=33';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=33';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=33';
+import { Doors } from './doors.js?v=33';
+import { Space } from './space.js?v=33';
+import { Input } from './input.js?v=33';
+import { Walker, MAX_EYE } from './walker.js?v=33';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=33';
+import { makeTape, makeVeil } from './tape.js?v=33';
+import { Slate } from './slate.js?v=33';
+import { MiniMap } from './minimap.js?v=33';
+import * as STORY1 from './story.js?v=33';
+import * as TAPE3 from './tape3.js?v=33';
+import * as TAPE2 from './tape2.js?v=33';
+import * as TAPE4 from './tape4.js?v=33';
+import { Sound } from './dread.js?v=33';
+import { Horrors } from './horrors.js?v=33';
+import { Dressing } from './dressing.js?v=33';
+import { Scares } from './scares.js?v=33';
+import { makeHand } from './hands.js?v=33';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -37,9 +37,11 @@ let unlocked = 1; try { unlocked = Math.max(1, +(localStorage.getItem('asylumvr_
 // a tape plays only once every tape before it is finished (or you've already played into it: it has a save or is done)
 const tapeDone = (n) => { try { return localStorage.getItem('asylumvr_done_t' + n) === '1'; } catch (e) { return false; } };
 const tapeSaved = (n) => { try { return !!localStorage.getItem('asylumvr_save_t' + n); } catch (e) { return false; } };
-const tapeOpen = (n) => { if (n <= 1 || tapeDone(n) || tapeSaved(n)) return true; for (let k = 1; k < n; k++) if (!tapeDone(k)) return false; return true; };
-let TAPE = Math.max(1, Math.min(4, +(new URLSearchParams(location.search).get('tape') || 1)));
-const TAPE_ASKED = TAPE; while (TAPE > 1 && !tapeOpen(TAPE)) TAPE--;      // a locked tape in the address: the last one you can play
+// two series: the asylum tapes (1-4) and the Testing Site tapes (5-7), each its own chain. Not-yet-made tapes never open.
+const MADE = [1, 2, 3, 4]; const firstOf = (n) => (n >= 5 ? 5 : 1);   // (5 joins MADE when Testing Site 1 is finished)
+const tapeOpen = (n) => { if (!MADE.includes(n)) return false; if (n === firstOf(n) || tapeDone(n) || tapeSaved(n)) return true; for (let k = firstOf(n); k < n; k++) if (!tapeDone(k)) return false; return true; };
+let TAPE = Math.max(1, Math.min(7, +(new URLSearchParams(location.search).get('tape') || 1)));
+const TAPE_ASKED = TAPE; while (TAPE > firstOf(TAPE) && !tapeOpen(TAPE)) TAPE--; if (!tapeOpen(TAPE)) TAPE = 1;      // a locked tape in the address: the last one you can play
 if (TAPE !== TAPE_ASKED) history.replaceState(null, '', location.pathname + '?tape=' + TAPE + (location.search.includes('mute') ? '&mute' : ''));
 const STORY = TAPE === 4 ? TAPE4 : TAPE === 2 ? TAPE2 : TAPE === 3 ? TAPE3 : STORY1; const { NOTES, MUTTER, OBJECTIVES } = STORY;
 
@@ -439,7 +441,7 @@ if (hasSave) {
   const nb = document.createElement('button'); nb.textContent = 'New game'; nb.onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); }; $('menu').insertBefore(nb, $('selectBtn'));
 }
 {
-  const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4 &middot; ${TAPE === 4 ? 'The End' : TAPE === 3 ? 'The Fall' : TAPE === 2 ? 'The Male Ward' : 'Recovered Footage'}`;
+  const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = TAPE >= 5 ? `Recovered footage &middot; Mount Harrow Research Annex &middot; Site 7, Nevada &middot; Testing Site ${TAPE - 4}` : `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4 &middot; ${TAPE === 5 ? 'The Testing Site' : TAPE === 4 ? 'The End' : TAPE === 3 ? 'The Fall' : TAPE === 2 ? 'The Male Ward' : 'Recovered Footage'}`;
   // the prequel is a different night
   if (TAPE === 3) { const d = document.querySelector('.osd-bot .date'), c = document.querySelector('.osd-bot .clock'); if (d) d.textContent = 'OCT.14 1989'; if (c) c.textContent = '11:40 PM'; }
   // the tape shelf
@@ -448,8 +450,11 @@ if (hasSave) {
     { n: 2, name: 'Tape 2: The Male Ward', sub: 'The north building. Dormitory, chapel, surgical theater.' },
     { n: 3, name: 'Tape 3: The Fall', sub: '14 October 1989. The night it all came apart.' },
     { n: 4, name: 'Tape 4: The End', sub: 'The last tape. Ward C, the women\u2019s ward, the disturbed wards, and the way out.' },
+    { n: 5, site: true, name: 'Testing Site 1: Containment', sub: 'Site 7, Nye County, Nevada. Something got out of the tanks.' },
+    { n: 6, site: true, name: 'Testing Site 2', sub: 'Not yet recovered.' },
+    { n: 7, site: true, name: 'Testing Site 3', sub: 'Not yet recovered.' },
   ];
-  for (const tp of TAPES) if (!tapeOpen(tp.n)) { tp.locked = true; tp.sub = `Finish Tape ${tp.n - 1} to unlock.`; }
+  for (const tp of TAPES) if (!tapeOpen(tp.n)) { tp.locked = true; if (MADE.includes(tp.n)) tp.sub = tp.site ? `Finish Testing Site ${tp.n - 5} to unlock.` : `Finish Tape ${tp.n - 1} to unlock.`; }
   const status = (n) => {
     let done = false, sv = null; try { done = localStorage.getItem('asylumvr_done_t' + n) === '1'; sv = JSON.parse(localStorage.getItem('asylumvr_save_t' + n) || 'null'); } catch (e) {}
     if (sv) { const k = (sv.items || []).filter((i) => !i.startsWith('n')).length; const what = n === 1 ? `${sv.fuses || 0}/3 fuses` : `${k} key${k === 1 ? '' : 's'}`; const ago = Math.max(1, Math.round((Date.now() - sv.at) / 60000)); return ['prog', `IN PROGRESS · ${what} · saved ${ago < 60 ? ago + ' min' : Math.round(ago / 60) + ' h'} ago`]; }
@@ -461,9 +466,10 @@ if (hasSave) {
   for (const tp of TAPES) {
     const b = document.createElement('button'); b.className = 'tape' + (tp.locked ? ' locked' : '') + (tp.n === TAPE ? ' loaded' : ''); b.disabled = !!tp.locked;
     const [cls, txt] = tp.locked ? ['', 'LOCKED'] : status(tp.n);
+    if (tp.site) b.classList.add('site');
     b.innerHTML = `<span class="reels"><i></i><i></i></span><span class="label"><b>${tp.name}</b><small>${tp.sub}</small></span><span class="status ${tp.n === TAPE && !tp.locked ? 'now' : cls}">${tp.n === TAPE && !tp.locked ? 'LOADED · ' + txt : txt}</span>`;
     b.onclick = () => { if (tp.locked) return; if (tp.n === TAPE) { $('shelf').hidden = true; $('menu').hidden = false; document.querySelector('.vhs').classList.remove('selecting'); return; } setTimeout(() => { location.href = '?tape=' + tp.n; }, 650); };
-    shelf.appendChild(b);
+    (tp.site ? $('tapesSite') : shelf).appendChild(b);
   }
   const vhs = document.querySelector('.vhs');
   $('selectBtn').onclick = () => { $('shelf').hidden = false; $('menu').hidden = true; $('how').hidden = true; vhs.classList.add('selecting'); };

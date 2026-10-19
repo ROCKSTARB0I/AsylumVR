@@ -5,10 +5,10 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=32';
-import { floorAt } from './plan.js?v=32';
-import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=32';
-import { renderMenuTheme, THEME_LOOP } from './theme.js?v=32';
+import { Score } from './score.js?v=33';
+import { floorAt } from './plan.js?v=33';
+import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=33';
+import { renderMenuTheme, THEME_LOOP } from './theme.js?v=33';
 
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
@@ -102,6 +102,7 @@ export class Sound {
   syllables(pos, n, base, opts = {}) { let d = 0; const V = Object.keys(VOWELS); for (let i = 0; i < n; i++) { const dur = rnd(0.12, 0.3); this.voiceSynth(pos, { f0: base * rnd(0.85, 1.2), f1: base * rnd(0.8, 1.1), dur, vowels: [V[(Math.random() * V.length) | 0], V[(Math.random() * V.length) | 0]], delay: d, a: 0.02, ...opts }); d += dur + rnd(0.02, 0.15); } return d; }
   voice(kind, what, pos) {
     if (!this.on) return; const p = pos.clone(); p.y = 1.6;
+    if (kind.startsWith('c:')) return this.creature(kind.slice(2), what, p);
     if (kind === 'brute') {
       if (what === 'idle') {   // Kroft sings: a low wandering nursery tune, out of key
         const notes = [0, 2, 3, 2, 0, -2, 0, 3, 5, 3]; let d = 0; const base = 92;
@@ -152,6 +153,44 @@ export class Sound {
       else if (what === 'attack') this.voiceSynth(p, { f0: 300, dur: 0.35, vowels: ['a'], rough: 0.7, gain: 0.8 });
       else if (what === 'pant') this.breathAt(p, 0.3, 0.6, 600);
       else if (what === 'lost') this.syllables(p, 4, 130, { gain: 0.3 });
+    }
+  }
+  // the things from the tanks
+  creature(c, what, p) {
+    const clicks = (n, f, gap, g, d0 = 0) => { for (let i = 0; i < n; i++) this.burst(p, { f: f * rnd(0.8, 1.25), q: 6, dur: 0.012, gain: g, delay: d0 + i * gap * rnd(0.7, 1.3), verb: 0.25 }); };
+    const wet = (n, g, d0 = 0) => { for (let i = 0; i < n; i++) this.burst(p, { f: rnd(150, 450), q: 3, dur: rnd(0.05, 0.12), gain: g, brown: true, delay: d0 + i * rnd(0.1, 0.25) }); };
+    if (c === 'skitter') {
+      if (what === 'idle' || what === 'lost') { clicks(12, 4200, 0.045, 0.22); this.voiceSynth(p, { f0: rnd(800, 1000), f1: rnd(600, 900), dur: 0.35, vowels: ['i', 'e'], rough: 0.7, breath: 0.4, gain: 0.25, delay: 0.5 }); }
+      else if (what === 'alert') { this.voiceSynth(p, { f0: 1100, f1: 1400, dur: 0.5, vowels: ['i', 'i'], rough: 0.8, breath: 0.3, gain: 0.6 }); clicks(6, 5000, 0.03, 0.3); }
+      else if (what === 'chase') { this.voiceSynth(p, { f0: 1200, f1: 1700, dur: 0.9, vowels: ['i', 'a', 'i'], rough: 1, breath: 0.4, gain: 0.8, vib: 14, vibD: 0.08 }); clicks(16, 4500, 0.03, 0.35); }
+      else if (what === 'attack') { this.burst(p, { f: 2500, q: 2, dur: 0.05, gain: 0.8 }); this.voiceSynth(p, { f0: 1400, dur: 0.3, vowels: ['i'], rough: 1, gain: 0.8 }); }
+      else if (what === 'pant') { for (let i = 0; i < 6; i++) this.burst(p, { f: 2200, q: 1.5, dur: 0.05, gain: 0.18, delay: i * 0.09 }); }
+    } else if (c === 'longarm') {
+      if (what === 'idle' || what === 'lost') { clicks(5, 350, 0.25, 0.4); this.voiceSynth(p, { f0: 58, f1: 50, dur: 2.2, vowels: ['o', 'u'], rough: 0.5, breath: 0.85, gain: 0.45, delay: 0.8, verb: 0.6 }); }
+      else if (what === 'alert') { this.voiceSynth(p, { f0: 55, f1: 80, dur: 1.6, vowels: ['u', 'a'], rough: 0.4, breath: 0.95, gain: 0.55, verb: 0.5 }); clicks(4, 300, 0.12, 0.5, 1.2); }
+      else if (what === 'chase') { this.voiceSynth(p, { f0: 62, f1: 48, dur: 2.0, vowels: ['a', 'o', 'u'], rough: 1, breath: 0.5, gain: 1.0, vib: 4, vibD: 0.08, verb: 0.5 }); clicks(10, 400, 0.08, 0.5); }
+      else if (what === 'attack') { wet(3, 0.7); this.voiceSynth(p, { f0: 70, dur: 0.6, vowels: ['a'], rough: 1, gain: 0.9 }); }
+      else if (what === 'pant') this.breathAt(p, 0.35, 1.4, 200);
+    } else if (c === 'bloater') {
+      if (what === 'idle' || what === 'lost') { wet(6, 0.45); for (let i = 0; i < 5; i++) this.tone(p, { f: rnd(60, 110), f2: rnd(140, 220), dur: 0.12, gain: 0.25, delay: 0.3 + i * 0.18 }); }
+      else if (what === 'alert') this.voiceSynth(p, { f0: 68, f1: 52, dur: 1.1, vowels: ['o', 'uh'], rough: 1, breath: 0.4, gain: 0.8 });
+      else if (what === 'chase' || what === 'attack') { this.voiceSynth(p, { f0: 82, f1: 60, dur: what === 'chase' ? 1.6 : 0.7, vowels: ['a', 'o'], rough: 1, breath: 0.45, gain: 1.0, vib: 6, vibD: 0.05 }); wet(4, 0.6, 0.2); }
+      else if (what === 'pant') { wet(3, 0.35); this.breathAt(p, 0.4, 0.9, 180); }
+    } else if (c === 'hollow') {
+      if (what === 'idle' || what === 'lost') this.voiceSynth(p, { f0: rnd(280, 340), f1: rnd(200, 260), dur: 1.4, vowels: ['u', 'o', 'u'], rough: 0.3, breath: 0.75, gain: 0.35, vib: 6, vibD: 0.04, verb: 0.5 });
+      else if (what === 'alert' || what === 'chase') this.voiceSynth(p, { f0: 880, f1: 1100, dur: 1.5, vowels: ['a', 'i', 'a'], rough: 0.9, breath: 0.35, gain: 1.0, vib: 12, vibD: 0.07, verb: 0.6 });
+      else if (what === 'attack') this.voiceSynth(p, { f0: 700, dur: 0.4, vowels: ['a'], rough: 1, gain: 0.9 });
+      else if (what === 'pant') this.breathAt(p, 0.3, 0.6, 700);
+    } else if (c === 'amalgam') {
+      if (what === 'idle' || what === 'lost') { this.voiceSynth(p, { f0: 220, f1: 200, dur: 1.6, vowels: ['u', 'a', 'u'], breath: 0.6, gain: 0.3, vib: 7, vibD: 0.05 }); this.voiceSynth(p, { f0: 330, f1: 300, dur: 1.4, vowels: ['a', 'u'], breath: 0.6, gain: 0.25, delay: 0.3, vib: 8, vibD: 0.06 }); }
+      else if (what === 'alert' || what === 'chase') { this.voiceSynth(p, { f0: 460, f1: 620, dur: 1.2, vowels: ['a', 'i'], rough: 0.8, gain: 0.8 }); this.voiceSynth(p, { f0: 300, f1: 420, dur: 1.3, vowels: ['e', 'a'], rough: 0.8, gain: 0.7, delay: 0.08 }); }
+      else if (what === 'attack') { this.voiceSynth(p, { f0: 400, dur: 0.4, vowels: ['a'], rough: 1, gain: 0.8 }); this.voiceSynth(p, { f0: 260, dur: 0.45, vowels: ['a'], rough: 1, gain: 0.7, delay: 0.05 }); }
+      else if (what === 'pant') this.breathAt(p, 0.3, 0.7, 550);
+    } else if (c === 'subject') {
+      if (what === 'idle' || what === 'lost') { this.voiceSynth(p, { f0: 42, f1: 36, dur: 2.4, vowels: ['o', 'u'], rough: 0.8, breath: 0.6, gain: 0.7, verb: 0.6 }); wet(3, 0.4, 1.2); }
+      else if (what === 'alert') this.voiceSynth(p, { f0: 48, f1: 70, dur: 1.4, vowels: ['u', 'a'], rough: 1, breath: 0.5, gain: 0.9 });
+      else if (what === 'chase' || what === 'attack') { this.voiceSynth(p, { f0: 56, f1: 44, dur: what === 'chase' ? 2.2 : 0.8, vowels: ['a', 'o'], rough: 1, breath: 0.4, gain: 1.2, vib: 5, vibD: 0.06, verb: 0.5 }); this.tone(p, { f: 38, f2: 26, dur: 1.4, gain: 0.8 }); }
+      else if (what === 'pant') this.breathAt(p, 0.55, 1.2, 140);
     }
   }
   farScream(p) { this.voiceSynth(p, { f0: rnd(450, 650), f1: rnd(300, 500), dur: rnd(1.2, 2.2), vowels: ['a', 'e', 'o'], rough: 0.5, breath: 0.3, gain: 0.35, verb: 0.95 }); }
@@ -346,7 +385,7 @@ Sound.prototype.record = async function (onProgress) {
   jobs.push(async () => { const b = await render(14, (s) => { Sound.prototype.ambience.call(s); s.fearG.gain.value = 0; }, noiseBuf, brownBuf, 1); rec.amb = foldLoop(b, 12); });
   jobs.push(async () => { const b = await render(7, (s) => { Sound.prototype.ambience.call(s); s.droneG.gain.value = 0; s.fearG.gain.value = 0.05; }, noiseBuf, brownBuf, 1); rec.fear = foldLoop(b, 5); });
   // voices
-  const VO = { matron: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], orderly: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], brute: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], surgeon: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], rocker: ['mutter', 'scream'], eater: ['chew', 'chase', 'alert', 'attack', 'pant'], patient: ['idle', 'chase', 'alert', 'attack', 'pant', 'lost'] };
+  const VO = { 'c:skitter': ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], 'c:longarm': ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], 'c:bloater': ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], 'c:hollow': ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], 'c:amalgam': ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], 'c:subject': ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], matron: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], orderly: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], brute: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], surgeon: ['idle', 'alert', 'chase', 'attack', 'pant', 'lost'], rocker: ['mutter', 'scream'], eater: ['chew', 'chase', 'alert', 'attack', 'pant'], patient: ['idle', 'chase', 'alert', 'attack', 'pant', 'lost'] };
   for (const [kind, whats] of Object.entries(VO)) for (const w of whats) one(`v:${kind}:${w}`, w === 'idle' || w === 'mutter' ? 4.6 : 2.2, w === 'idle' ? 1 : 2, (s) => ORIG.voice.call(s, kind, w, V0));
   for (const k of ['sting', 'scare']) one('j:' + k, 2.6, k === 'scare' ? 3 : 2, (s) => ORIG.jump.call(s, k));
   one('kill', 3, 2, (s) => ORIG.kill.call(s)); one('rip', 2.6, 2, (s) => ORIG.lockerRip.call(s));

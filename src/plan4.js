@@ -9,7 +9,7 @@
 //   the boiler house and the power plant (0 m), and out through the coal yard.
 // "Refractory" / "disturbed": what asylums called the wards for patients who couldn't be managed —
 // strong rooms, padded cells, canvas strong-clothing, locked airing courts, attendants behind glass.
-import { C, H, Z, setGrid, setLevels } from './plan.js?v=32';
+import { C, H, Z, setGrid, setLevels } from './plan.js?v=33';
 
 export const GW = 100, GD = 106;
 
@@ -154,7 +154,7 @@ export function makePlan4() {
   // Ward C: bare bulbs, a few red cages, one room lit like day
   bulb(4, 3, 0.5, 0xffd0a0); bulb(5, 7, 0.4); cage(8, 11.5); cage(20, 11.5, 0.5); cage(33, 11.5, 0.45); cage(43.5, 14, 0.5); cage(43.5, 24, 0.5);
   Lm(14, 5.5, 'S', { col: 0xf4f8ff, i: 2.4, r: 9, kind: 'bulb' }); tube(12, 3, 'A', 0.7); desk(17, 3, 0.7);   // Voss's room: the operating lamp, the radio's dial
-  tube(24, 5, 'B', 0.7); bulb(34, 5, 0.35, 0xcfe8ff); bulb(42, 5, 0.3);
+  tube(24, 5, 'B', 0.7); bulb(34, 5, 0.35, 0xcfe8ff); bulb(31.6, 6.6, 0.55, 0xe8f0ff);   // a bulb over the slab, so the key shows bulb(42, 5, 0.3);
   for (const x of [11, 19, 27, 35, 41]) bulb(x, 18.5, 0.4, 0xffc890);
   for (const [x, y] of [[11, 15], [19, 15], [31, 15], [35, 15], [15, 22.2], [23, 22.2], [27, 22.2], [31, 22.2]]) bulb(x, y, 0.42, 0xffc890);   // a bulb over every chair
   tube(39, 23, 'A', 0.7); cage(7.5, 25, 0.45);
@@ -294,7 +294,7 @@ export function makePlan4() {
   // ------------------------------------------------------ what you can pick up
   const items = [
     { k: 'note', x: 13.4, y: 6.6, id: 'n4_radio' }, { k: 'note', x: 24, y: 2.6, id: 'n4_trays' }, { k: 'note', x: 23, y: 15.4, id: 'n4_wardc' }, { k: 'note', x: 40, y: 24.4, id: 'n4_pump' },
-    { k: 'stairKey', x: 34.6, y: 4.2, id: 'stairKey' },
+    { k: 'stairKey', x: 31.6, y: 6.95, id: 'stairKey' },   // on the slab in the cold room, at the feet of the man on it
     { k: 'note', x: 71, y: 19.4, id: 'n4_kelly' }, { k: 'note', x: 61, y: 8.3, id: 'n4_dorm' }, { k: 'note', x: 82, y: 21, id: 'n4_laundry' }, { k: 'note', x: 92, y: 8.6, id: 'n4_nursery' },
     { k: 'wardKeys', x: 71.8, y: 27.6, id: 'wardKeys' },
     { k: 'note', x: 61.5, y: 48.4, id: 'n4_booth' }, { k: 'note', x: 89.6, y: 55.5, id: 'n4_restraint' }, { k: 'note', x: 61.6, y: 58.2, id: 'n4_hole' },

@@ -3,8 +3,8 @@
 // disturbed ward, down through the staff offices to the examining rooms, and down again to the boiler
 // house, the power plant, and the coal yard. Everything Mount Harrow was hiding is on this tape.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, C, floorAt } from './plan.js?v=32';
-import { makeBody, pose, bonesaw } from './carcass.js?v=32';
+import { cx, cz, C, floorAt } from './plan.js?v=33';
+import { makeBody, pose, bonesaw } from './carcass.js?v=33';
 const V = THREE.Vector3;
 
 // ------------------------------------------------------------------ the documents
@@ -387,8 +387,8 @@ export function setupTape4(ctx) {
     // the stair door: locked
     if (!st.sawStairDoor && near(46, 12, 2.2)) { st.sawStairDoor = true; if (!G.items.has('stairKey')) say1('stairDoor', 0.2); }
     // the larder: the body on the hook, and what happens when you take the key
-    { const hx = cx(34.6), hz = cz(4.2) - 0.55; const top = 3.2;
-      if (near(34.6, 4.2, 14) && !st.female) {
+    { const hx = cx(33.0), hz = cz(7.0); const top = 3.2;   // he hangs right beside the slab with the key on it
+      if (near(33, 7, 14) && !st.female) {
         hook.root.visible = true; hookRope.visible = true; hookRope.position.set(hx, top - 0.28, hz);
         if (!S.hookT) { pose(hook, 'hang', 0); hook.root.position.set(hx, top - 0.25 - 1.95 * hook.s, hz); hook.root.rotation.set(0, Math.PI + Math.sin(t * 0.5) * 0.08, 0); }
         else { const k = S.hookT += dt; pose(hook, 'grab', t, { k: Math.min(1, k * 3), mouth: 0.8 }); hook.root.position.set(hx, top - 0.25 - 1.95 * hook.s, hz); hook.root.rotation.set(0, Math.atan2(walker.pos.x - hx, walker.pos.z - hz), Math.sin(k * 20) * 0.08 * Math.max(0, 1 - k)); hook.bones.head.rotation.x = 0.5 * Math.sin(k * 30) * Math.max(0, 1 - k / 2);
@@ -397,7 +397,7 @@ export function setupTape4(ctx) {
           if (k > 0.65 && once('spill')) { sound.squelch(new V(hx, 1, hz), 1.6); sound.burst(new V(hx, 0.3, hz), { f: 300, q: 0.7, dur: 0.6, gain: 0.8, brown: true }); caption('It all comes out of him. It’s warm on your shoes.', 3.5); } }
         lightBody(hook, world, 1.2); if (S.hookT && S.hookT < 1.4) { const st = Math.sin(S.hookT * 60) > -0.3 ? 0.5 : 0.15; hook.mat.userData.uAmb.value.setRGB(st, st * 0.92, st * 0.85); }
       } else { hook.root.visible = false; hookRope.visible = false; }
-      if (G.items.has('stairKey') && !S.hookT && near(34.6, 4.2, 3)) { S.hookT = 0.001; sound.jump('scare'); sound.scream(new V(hx, 1.8, hz), 1.3); horrors.glitchKick(2); horrors.staticBurst(0.12); walker.shake = 1.2; horrors.heard(hx, hz, 16); }
+      if (G.items.has('stairKey') && !S.hookT && near(32, 7, 3.2)) { S.hookT = 0.001; sound.jump('scare'); sound.scream(new V(hx, 1.8, hz), 1.3); horrors.glitchKick(2); horrors.staticBurst(0.12); walker.shake = 1.2; horrors.heard(hx, hz, 16); }
     }
     // the cistern: the water, and the body that drifts into you
     if (near(21, 28.5, 16) && !st.female) {

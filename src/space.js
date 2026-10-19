@@ -1,8 +1,8 @@
 // Space: what is solid. Circle movers (you and them) are pushed out of
 // wall cells, props, door leaves and the gate; sight lines are traced
 // through the grid and closed doors.
-import { C, W, D, LEVELS, floorAt, cellFloorAt } from './plan.js?v=32';
-import { circleSeg } from './doors.js?v=32';
+import { C, W, D, LEVELS, floorAt, cellFloorAt } from './plan.js?v=33';
+import { circleSeg } from './doors.js?v=33';
 
 // props up to this height (m) can be vaulted by the things chasing you
 export const VAULT_H = 1.15;
@@ -25,6 +25,7 @@ export class Space {
         if (ox * oz > C * C * 0.45 && gx >= 0 && gy >= 0 && gx < W && gy < D) this.blockedCell[gy * W + gx] = 1;
       }
     }
+    if (plan.noNav) for (const [x, y] of plan.noNav) if (x >= 0 && y >= 0 && x < W && y < D) { this.blockedCell[y * W + x] = 1; this.tallCell[y * W + x] = 1; }   // (glass the creatures can't see is there)
     this.gateBox = null; this.boxes = [];   // extra solid boxes [x0, z0, x1, z1] (a fence gate, a parked car)
   }
   solid(gx, gy) { return !this.plan.at(gx, gy); }

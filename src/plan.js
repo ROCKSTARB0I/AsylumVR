@@ -29,19 +29,21 @@ export function baseOf(gx, gy) { if (!LEVELS || gx < 0 || gy < 0 || gx >= W || g
 export const liftAt = (x, z) => { if (!LEVELS) return 0; const [gx, gy] = _cell(x, z); return baseOf(gx, gy); };
 
 // zone codes. 0 is solid wall.
-export const Z = { SOLID: 0, HALL: 1, CELL: 2, CAFE: 3, SHOWER: 4, MORGUE: 5, ADMIN: 6, LOBBY: 7, GEN: 8, DAY: 9, STORE: 10, SEC: 11, DOOR: 12, OUT: 13, CHAPEL: 14, PADDED: 15, SURGERY: 16, DORM: 17, NURSE: 18, STAIR: 19 };
-export const ZNAME = ['', 'Corridor', 'Patient Cell', 'Cafeteria', 'Showers', 'Morgue', 'Administration', 'Lobby', 'Generator Room', 'Day Room', 'Storage', 'Security', 'Door', 'Courtyard', 'Chapel', 'Padded Cell', 'Surgical Theater', 'Dormitory', 'Nurses\' Station', 'Stairwell'];
+export const Z = { SOLID: 0, HALL: 1, CELL: 2, CAFE: 3, SHOWER: 4, MORGUE: 5, ADMIN: 6, LOBBY: 7, GEN: 8, DAY: 9, STORE: 10, SEC: 11, DOOR: 12, OUT: 13, CHAPEL: 14, PADDED: 15, SURGERY: 16, DORM: 17, NURSE: 18, STAIR: 19, LAB: 20 };
+export const ZNAME = ['', 'Corridor', 'Patient Cell', 'Cafeteria', 'Showers', 'Morgue', 'Administration', 'Lobby', 'Generator Room', 'Day Room', 'Storage', 'Security', 'Door', 'Courtyard', 'Chapel', 'Padded Cell', 'Surgical Theater', 'Dormitory', 'Nurses\' Station', 'Stairwell', 'Laboratory'];
 
 export const cx = (x) => (x + 0.5) * C;
 export const cz = (y) => (y + 0.5) * C;
-import { makePlan2 } from './plan2.js?v=32';
-import { makePlan3 } from './plan3.js?v=32';
-import { makePlan4 } from './plan4.js?v=32';
+import { makePlan2 } from './plan2.js?v=33';
+import { makePlan3 } from './plan3.js?v=33';
+import { makePlan4 } from './plan4.js?v=33';
+import { makePlan5 } from './plan5.js?v=33';
 
 export function makePlan(tape = 1) {
   if (tape === 2) return makePlan2();
   if (tape === 3) return makePlan3(makePlan1());
   if (tape === 4) return makePlan4();
+  if (tape === 5) return makePlan5();
   return makePlan1();
 }
 function makePlan1() {

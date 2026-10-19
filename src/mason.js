@@ -5,8 +5,8 @@
 // cones and stains are added on top. Light comes in four channels: S always
 // on, A and B the stuttering broken tubes, P the main circuit (generator).
 import * as THREE from '../vendor/three.module.js';
-import { C, H, W, D, Z, cx, cz, LEVELS, floorAt, cellFloorAt, ceilOf, liftOf, baseOf } from './plan.js?v=32';
-import { T, scrawlTexture, rng } from './surfaces.js?v=32';
+import { C, H, W, D, Z, cx, cz, LEVELS, floorAt, cellFloorAt, ceilOf, liftOf, baseOf } from './plan.js?v=33';
+import { T, scrawlTexture, rng } from './surfaces.js?v=33';
 
 const V3 = THREE.Vector3;
 export const LIGHT = { A: { value: 1 }, B: { value: 1 }, P: { value: 0 }, S: { value: 1 }, cool: { value: new THREE.Color(0.78, 0.88, 1.0) } };
@@ -160,8 +160,8 @@ class Baker {
 }
 
 // ------------------------------------------------------------ the build
-const WALL_OF = { [Z.HALL]: 'wallWard', [Z.CAFE]: 'wallWard', [Z.LOBBY]: 'wallWard', [Z.DAY]: 'wallWard', [Z.DOOR]: 'wallWard', [Z.CELL]: 'wallCell', [Z.SHOWER]: 'wallShower', [Z.MORGUE]: 'wallMorgue', [Z.ADMIN]: 'wallOffice', [Z.SEC]: 'wallOffice', [Z.GEN]: 'wallBlock', [Z.STORE]: 'wallBlock', [Z.OUT]: 'wallBlock', [Z.CHAPEL]: 'wallOffice', [Z.PADDED]: 'wallPadded', [Z.SURGERY]: 'wallMorgue', [Z.DORM]: 'wallWard', [Z.NURSE]: 'wallOffice', [Z.STAIR]: 'wallBlock' };
-const FLOOR_OF = { [Z.HALL]: 'floorWard', [Z.CAFE]: 'floorWard', [Z.LOBBY]: 'floorWard', [Z.DAY]: 'floorWard', [Z.DOOR]: 'floorWard', [Z.CELL]: 'floorWard', [Z.SHOWER]: 'floorShower', [Z.MORGUE]: 'floorShower', [Z.ADMIN]: 'floorWood', [Z.SEC]: 'floorWood', [Z.GEN]: 'floorConcrete', [Z.STORE]: 'floorConcrete', [Z.OUT]: 'floorConcrete', [Z.CHAPEL]: 'floorWood', [Z.PADDED]: 'floorPadded', [Z.SURGERY]: 'floorShower', [Z.DORM]: 'floorWard', [Z.NURSE]: 'floorWard', [Z.STAIR]: 'floorConcrete' };
+const WALL_OF = { [Z.HALL]: 'wallWard', [Z.CAFE]: 'wallWard', [Z.LOBBY]: 'wallWard', [Z.DAY]: 'wallWard', [Z.DOOR]: 'wallWard', [Z.CELL]: 'wallCell', [Z.SHOWER]: 'wallShower', [Z.MORGUE]: 'wallMorgue', [Z.ADMIN]: 'wallOffice', [Z.SEC]: 'wallOffice', [Z.GEN]: 'wallBlock', [Z.STORE]: 'wallBlock', [Z.OUT]: 'wallBlock', [Z.CHAPEL]: 'wallOffice', [Z.PADDED]: 'wallPadded', [Z.SURGERY]: 'wallMorgue', [Z.DORM]: 'wallWard', [Z.NURSE]: 'wallOffice', [Z.STAIR]: 'wallBlock', [Z.LAB]: 'wallLab' };
+const FLOOR_OF = { [Z.HALL]: 'floorWard', [Z.CAFE]: 'floorWard', [Z.LOBBY]: 'floorWard', [Z.DAY]: 'floorWard', [Z.DOOR]: 'floorWard', [Z.CELL]: 'floorWard', [Z.SHOWER]: 'floorShower', [Z.MORGUE]: 'floorShower', [Z.ADMIN]: 'floorWood', [Z.SEC]: 'floorWood', [Z.GEN]: 'floorConcrete', [Z.STORE]: 'floorConcrete', [Z.OUT]: 'floorConcrete', [Z.CHAPEL]: 'floorWood', [Z.PADDED]: 'floorPadded', [Z.SURGERY]: 'floorShower', [Z.DORM]: 'floorWard', [Z.NURSE]: 'floorWard', [Z.STAIR]: 'floorConcrete', [Z.LAB]: 'floorLab' };
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 export function buildAsylum(plan, scene) {
@@ -281,8 +281,9 @@ export function buildAsylum(plan, scene) {
         }
       }
       if (z !== Z.OUT) for (let j = 0; j < 2; j++) for (let k = 0; k < 2; k++) { const a = x0 + k * h, b = z0 + j * h; M('ceiling').quad([a, ceil, b], [a + h, ceil, b], [a + h, ceil, b + h], [a, ceil, b + h], [0, -1, 0], [a / 3, b / 3], [(a + h) / 3, b / 3], [(a + h) / 3, (b + h) / 3], [a / 3, (b + h) / 3]); }
+      const wkey = (plan.wallOf && plan.wallOf(x, y, z)) || WALL_OF[z];
       for (const [dx, dy] of DIRS) {
-        const nx = x + dx, ny = y + dy; const e = edgeOf(x, y, dx, dy); const n = [-dx, 0, -dy]; const wb = M(WALL_OF[z]);
+        const nx = x + dx, ny = y + dy; const e = edgeOf(x, y, dx, dy); const n = [-dx, 0, -dy]; const wb = M(wkey);
         const [pa, pb] = inset(e, x, y); const fa = cellFloorAt(x, y, pa[0], pa[1]), fbb = cellFloorAt(x, y, pb[0], pb[1]);
         if (solid(nx, ny)) {
           if (z === Z.OUT && plan.perimeter && plan.perimeter(nx, ny)) continue;
@@ -528,6 +529,51 @@ const PROPS = {
   ivstand: { size: [0.4, 1.9, 0.4], solid: false, build(c) { c.cyl('metal', 0.012, 0.012, 1.85, 0, 0.93, 0, null, 6); for (let i = 0; i < 4; i++) c.box('metal', 0.32, 0.02, 0.02, 0, 0.04, 0, 1, RY(i * Math.PI / 4)); c.box('metal', 0.3, 0.015, 0.015, 0, 1.84, 0); c.box('sheet', 0.1, 0.16, 0.04, 0.12, 1.7, 0, 1); c.cyl('rubber', 0.004, 0.004, 0.9, 0.12, 1.15, 0.05, RX(0.1), 4); } },
   trolley: { size: [0.6, 0.9, 1.0], tip: new THREE.Matrix4().makeTranslation(0, 0.3, 0).multiply(RZ(Math.PI / 2)).multiply(new THREE.Matrix4().makeTranslation(0, -0.3, 0)), build(c) { for (const y of [0.25, 0.85]) c.box('metal', 0.56, 0.02, 0.95, 0, y, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) c.box('metal', 0.02, 0.85, 0.02, sx * 0.27, 0.43, sz * 0.46); for (let i = 0; i < 4; i++) c.box(i % 2 ? 'porcelain' : 'metal', 0.08, 0.04, 0.2, -0.15 + i * 0.1, 0.88, -0.2 + (i % 3) * 0.2); } },
 };
+// the Testing Site's furniture
+Object.assign(PROPS, {
+  // a specimen tank: a glass cylinder of green fluid on a steel plinth, fed from the ceiling
+  tank: { size: [1.2, 2.9, 1.2], build(c) {
+    c.cyl('metal', 0.6, 0.62, 0.32, 0, 0.16, 0, null, 20); c.cyl('black', 0.56, 0.56, 0.04, 0, 0.33, 0, null, 20);
+    c.cyl('fluid', 0.46, 0.46, 1.82, 0, 1.26, 0, null, 20); c.cyl('glass', 0.5, 0.5, 2.0, 0, 1.33, 0, null, 24);
+    c.cyl('metal', 0.56, 0.56, 0.22, 0, 2.43, 0, null, 20); for (const a of [0, 2.1, 4.2]) c.cyl('metal', 0.04, 0.04, 0.7, Math.cos(a) * 0.32, 2.85, Math.sin(a) * 0.32, null, 8);
+    c.box('screengreen', 0.24, 0.12, 0.02, 0, 0.2, 0.61); c.box('hazard', 0.6, 0.06, 0.02, 0, 0.06, 0.61);
+  } },
+  // a tank whose glass and fluid the tape keeps separately (so they can burst)
+  tankBase: { size: [1.2, 2.9, 1.2], build(c) {
+    c.cyl('metal', 0.6, 0.62, 0.32, 0, 0.16, 0, null, 20); c.cyl('black', 0.56, 0.56, 0.04, 0, 0.33, 0, null, 20);
+    c.cyl('metal', 0.56, 0.56, 0.22, 0, 2.43, 0, null, 20); for (const a of [0, 2.1, 4.2]) c.cyl('metal', 0.04, 0.04, 0.7, Math.cos(a) * 0.32, 2.85, Math.sin(a) * 0.32, null, 8);
+    c.box('screengreen', 0.24, 0.12, 0.02, 0, 0.2, 0.61); c.box('hazard', 0.6, 0.06, 0.02, 0, 0.06, 0.61);
+  } },
+  // a broken tank: the glass gone except for teeth around the rim, the fluid on the floor
+  tankBroken: { size: [1.2, 2.9, 1.2], build(c) {
+    c.cyl('metal', 0.6, 0.62, 0.32, 0, 0.16, 0, null, 20); c.cyl('metal', 0.56, 0.56, 0.22, 0, 2.43, 0, null, 20);
+    for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; const hgt = 0.1 + ((i * 37) % 7) / 7 * 0.5; c.box('glass', 0.3, hgt, 0.02, Math.cos(a) * 0.5, 0.33 + hgt / 2, Math.sin(a) * 0.5, 1, new THREE.Matrix4().makeRotationY(-a + Math.PI / 2)); }
+    c.box('fluid', 2.2, 0.01, 2.2, 0, 0.012, 0); c.box('screengreen', 0.24, 0.12, 0.02, 0, 0.2, 0.61);
+  } },
+  labbench: { size: [2.4, 1.0, 0.8], build(c) {
+    c.box('black', 2.4, 0.05, 0.8, 0, 0.92, 0); c.box('labwhite', 2.36, 0.85, 0.74, 0, 0.45, 0); c.box('metal', 2.36, 0.04, 0.76, 0, 0.04, 0);
+    for (let i = 0; i < 5; i++) c.cyl('glass', 0.04, 0.035, 0.18 + (i % 3) * 0.06, -0.9 + i * 0.22, 1.04 + (i % 3) * 0.03, -0.15, null, 10);
+    c.cyl('fluid', 0.03, 0.03, 0.1, -0.68, 0.99, -0.15, null, 8); c.box('black', 0.2, 0.32, 0.22, 0.75, 1.1, -0.1); c.cyl('metal', 0.03, 0.03, 0.2, 0.75, 1.2, 0.02, RX(0.6), 8);
+  } },
+  console: { size: [1.9, 1.3, 0.75], snap: true, build(c) {
+    c.box('labwhite', 1.9, 0.8, 0.7, 0, 0.4, 0); c.box('black', 1.9, 0.05, 0.72, 0, 0.82, 0.02);
+    for (let i = 0; i < 3; i++) { c.box('black', 0.5, 0.4, 0.06, -0.6 + i * 0.6, 1.1, -0.22, 1, RX(-0.35)); c.box('screengreen', 0.44, 0.33, 0.01, -0.6 + i * 0.6, 1.1, -0.185, 1, RX(-0.35)); }
+    c.box('black', 1.2, 0.03, 0.18, 0, 0.86, 0.18); for (let i = 0; i < 6; i++) c.box(i % 2 ? 'redbtn' : 'screengreen', 0.04, 0.02, 0.04, -0.7 + i * 0.28, 0.85, 0.28);
+  } },
+  cryopod: { size: [0.95, 2.2, 0.9], snap: true, build(c) {
+    c.box('metal', 0.95, 0.12, 0.9, 0, 0.06, 0); c.box('metal', 0.95, 0.15, 0.9, 0, 2.12, 0); for (const sx of [-1, 1]) c.box('metal', 0.08, 2.0, 0.85, sx * 0.44, 1.1, 0);
+    c.box('labwhite', 0.8, 2.0, 0.05, 0, 1.1, -0.4); c.box('glass', 0.8, 1.9, 0.03, 0, 1.1, 0.42); c.box('screengreen', 0.3, 0.12, 0.02, 0, 1.7, 0.44);
+  } },
+  cage: { size: [2.2, 2.3, 2.2], build(c) {
+    c.box('metal', 2.2, 0.06, 2.2, 0, 0.03, 0); c.box('metal', 2.2, 0.06, 2.2, 0, 2.27, 0);
+    for (let i = 0; i <= 10; i++) { const t = -1.05 + i * 0.21; for (const [x, z] of [[t, -1.07], [t, 1.07], [-1.07, t], [1.07, t]]) if (!(z === 1.07 && Math.abs(t) < 0.35)) c.box('metal', 0.03, 2.2, 0.03, x, 1.15, z); }
+  } },
+  vat: { size: [2.0, 1.2, 2.0], build(c) { c.cyl('metal', 1.0, 0.95, 1.1, 0, 0.55, 0, null, 24); c.cyl('fluid', 0.92, 0.92, 0.02, 0, 1.02, 0, null, 24); c.box('metal', 0.1, 1.5, 0.1, 0.95, 0.75, 0); } },
+  barrel: { size: [0.62, 0.92, 0.62], build(c) { c.cyl('hazard', 0.3, 0.3, 0.9, 0, 0.45, 0, null, 14); for (const y of [0.25, 0.65]) c.cyl('black', 0.31, 0.31, 0.04, 0, y, 0, null, 14); } },
+  // a glass partition between a lab and its corridor: you can see through, you can't get through
+  glasswall: { size: [1.5, 3.2, 0.08], build(c) { c.box('glass', 1.5, 3.1, 0.03, 0, 1.55, 0); for (const sx of [-1, 1]) c.box('metal', 0.05, 3.2, 0.08, sx * 0.72, 1.6, 0); c.box('metal', 1.5, 0.06, 0.08, 0, 0.03, 0); c.box('metal', 1.5, 0.06, 0.08, 0, 1.0, 0); } },
+});
+
 // Tape 4's furniture
 Object.assign(PROPS, {
   // a restraint chair: oak, bolted down, leather straps at the wrists, ankles and forehead
@@ -578,6 +624,11 @@ Object.assign(PROPS, {
 });
 // a few colour-only materials props refer to
 export const EXTRA_MATS = {
+  glass: () => { const m = bakedMaterial({ color: 0xa8d0c8, roughness: 0.04, transparent: true, opacity: 0.2, depthWrite: false }); m.side = THREE.DoubleSide; return m; },
+  fluid: () => bakedMaterial({ color: 0x2f7a48, emissive: 0x0f5a24, roughness: 0.1, transparent: true, opacity: 0.6, depthWrite: false }),
+  hazard: () => bakedMaterial({ color: 0xb8901a, roughness: 0.5 }),
+  labwhite: () => bakedMaterial({ color: 0xcfd3d2, roughness: 0.3 }),
+  screengreen: () => bakedMaterial({ color: 0x0c1a10, emissive: 0x1a6a2a, roughness: 0.2 }),
   filthwater: () => bakedMaterial({ color: 0x2a200c, roughness: 0.05 }),
   screen: () => bakedMaterial({ color: 0x0a120c, emissive: 0x0a2a10, roughness: 0.1 }),
   redbtn: () => bakedMaterial({ color: 0x6a0806, emissive: 0x200000 }),
