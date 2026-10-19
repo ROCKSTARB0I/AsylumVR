@@ -9,7 +9,7 @@
 //   the boiler house and the power plant (0 m), and out through the coal yard.
 // "Refractory" / "disturbed": what asylums called the wards for patients who couldn't be managed —
 // strong rooms, padded cells, canvas strong-clothing, locked airing courts, attendants behind glass.
-import { C, H, Z, setGrid, setLevels } from './plan.js?v=36';
+import { C, H, Z, setGrid, setLevels } from './plan.js?v=37';
 
 export const GW = 100, GD = 106;
 

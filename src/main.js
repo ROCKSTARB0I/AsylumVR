@@ -2,30 +2,30 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz, floorAt, ceilOf } from './plan.js?v=36';
-import { buildSurfaces, T } from './surfaces.js?v=36';
-import { loadPictures, savePictures } from './keep.js?v=36';
-import { VRMenu } from './vrmenu.js?v=36';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=36';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=36';
-import { Doors } from './doors.js?v=36';
-import { Space } from './space.js?v=36';
-import { Input } from './input.js?v=36';
-import { Walker, MAX_EYE } from './walker.js?v=36';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=36';
-import { makeTape, makeVeil } from './tape.js?v=36';
-import { Slate } from './slate.js?v=36';
-import { MiniMap } from './minimap.js?v=36';
-import * as STORY1 from './story.js?v=36';
-import * as TAPE3 from './tape3.js?v=36';
-import * as TAPE2 from './tape2.js?v=36';
-import * as TAPE4 from './tape4.js?v=36';
-import * as TAPE5 from './tape5.js?v=36';
-import { Sound } from './dread.js?v=36';
-import { Horrors } from './horrors.js?v=36';
-import { Dressing } from './dressing.js?v=36';
-import { Scares } from './scares.js?v=36';
-import { makeHand } from './hands.js?v=36';
+import { makePlan, C, H, Z, cx, cz, floorAt, ceilOf } from './plan.js?v=37';
+import { buildSurfaces, T } from './surfaces.js?v=37';
+import { loadPictures, savePictures } from './keep.js?v=37';
+import { VRMenu } from './vrmenu.js?v=37';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=37';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=37';
+import { Doors } from './doors.js?v=37';
+import { Space } from './space.js?v=37';
+import { Input } from './input.js?v=37';
+import { Walker, MAX_EYE } from './walker.js?v=37';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=37';
+import { makeTape, makeVeil } from './tape.js?v=37';
+import { Slate } from './slate.js?v=37';
+import { MiniMap } from './minimap.js?v=37';
+import * as STORY1 from './story.js?v=37';
+import * as TAPE3 from './tape3.js?v=37';
+import * as TAPE2 from './tape2.js?v=37';
+import * as TAPE4 from './tape4.js?v=37';
+import * as TAPE5 from './tape5.js?v=37';
+import { Sound } from './dread.js?v=37';
+import { Horrors } from './horrors.js?v=37';
+import { Dressing } from './dressing.js?v=37';
+import { Scares } from './scares.js?v=37';
+import { makeHand } from './hands.js?v=37';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -198,8 +198,8 @@ function nvifyScene() { scene.traverse((o) => { if (o.material) (Array.isArray(o
 
 // VR slates: a reading/pause card, captions low in view, a small prompt
 const card = new Slate(1024, 640, 0.9); scene.add(card.mesh);
-const capSlate = new Slate(1024, 160, 0.9, {}); camera.add(capSlate.mesh); capSlate.mesh.position.set(0, -0.28, -0.9);
-const promptSlate = new Slate(512, 96, 0.22); scene.add(promptSlate.mesh);
+const capSlate = new Slate(1024, 300, 0.9, {}); camera.add(capSlate.mesh); capSlate.mesh.position.set(0, -0.3, -0.9);   // (tall enough for three lines)
+const promptSlate = new Slate(640, 220, 0.3); scene.add(promptSlate.mesh);   // (room for a two- or three-line prompt)
 const minimap = new MiniMap(plan);
 const osdHud = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.975), new THREE.MeshBasicMaterial({ map: cam.osdTex, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false }));
 osdHud.material.userData.noNV = true; osdHud.position.set(0, 0, -1.0); osdHud.renderOrder = 998; osdHud.visible = false; camera.add(osdHud);
@@ -336,7 +336,7 @@ function placeCard() {
 let capT = 0;
 function caption(text, secs = 3.5) {
   $('caption').textContent = text; $('caption').hidden = false; capT = secs;
-  capSlate.card([[text, 40, '#f0eadc']], { bg: false, top: 70 }); capSlate.mesh.visible = renderer.xr.isPresenting;
+  const cs = text.length > 150 ? 32 : text.length > 100 ? 36 : 40; capSlate.card([[text, cs, '#f0eadc']], { bg: false, top: text.length > 53 ? 50 : 120 }); capSlate.mesh.visible = renderer.xr.isPresenting;
 }
 function say(key, delay = 0, force = false) {
   if (!key || (!force && G.said.has(key))) return; G.said.add(key);
@@ -624,7 +624,7 @@ function frame() {
   if (walker.hidden && walker.hidden.k !== 'strap' && vr && (Math.abs(I.mx) + Math.abs(I.mz) > 1.3)) { walker.unhide(); sound.locker(false); }
   const lab = focus ? focus.label() : '';
   $('prompt').hidden = !lab || vr; $('prompt').textContent = lab ? (vr ? lab : `[E] ${lab}`) : '';
-  if (vr && lab) { if (promptSlate.text !== lab) { promptSlate.text = lab; promptSlate.card([[lab, 52]], { top: 62 }); } promptSlate.mesh.visible = true; promptSlate.mesh.position.copy(origin).addScaledVector(dir, 0.35).add(tmpV.set(0, 0.06, 0)); promptSlate.mesh.lookAt(camera.getWorldPosition(tmpV2)); } else promptSlate.mesh.visible = false;
+  if (vr && lab) { if (promptSlate.text !== lab) { promptSlate.text = lab; const ps = lab.length <= 22 ? 56 : lab.length <= 44 ? 46 : 38; promptSlate.card([[lab, ps]], { top: lab.length <= 22 ? 118 : lab.length <= 44 ? 82 : 60 }); } promptSlate.mesh.visible = true; promptSlate.mesh.position.copy(origin).addScaledVector(dir, 0.35).add(tmpV.set(0, 0.06, 0)); promptSlate.mesh.lookAt(camera.getWorldPosition(tmpV2)); } else promptSlate.mesh.visible = false;
 
   // the world moves
   doors.update(dt);
