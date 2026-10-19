@@ -14,7 +14,7 @@
 // Self-update: GitHub Pages caches this page for a few minutes, so a stale copy can load old scripts.
 // Ask for the current version (never cached) and, if it's newer than this page, reload past the cache.
 (function () {
-  var BUILD = 28;
+  var BUILD = 30;
   try {
     fetch('version.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v > BUILD) { var q = new URLSearchParams(location.search); if (q.get('build') === String(j.v)) return; q.set('build', j.v); location.replace(location.pathname + '?' + q.toString()); }
@@ -22,7 +22,7 @@
   } catch (e) {}
 })();
 </script>
-<link rel="stylesheet" href="style.css?v=28">
+<link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
 <canvas id="view" tabindex="0"></canvas>
@@ -48,7 +48,7 @@
   <div class="row"><button id="resume">Resume</button><button id="restartCk">Last checkpoint</button><button id="toTitle">Title</button></div>
   <div class="row"><label>Brightness <input id="bright" type="range" min="0.5" max="2" step="0.05" value="1"></label></div>
   <div class="row"><label>Tape grain <input id="grain" type="range" min="0" max="1.5" step="0.05" value="1"></label></div>
-  <div class="row"><label>Height <input id="height" type="range" min="-40" max="40" step="1" value="0"> <span id="heightVal">+0 cm</span></label></div>
+  <div class="row"><label>Height <input id="height" type="range" min="-40" max="19" step="1" value="0"> <span id="heightVal">+0 cm</span></label></div>
   <div class="row"><label><input id="smooth" type="checkbox"> VR smooth turn</label></div>
   <div id="notesList"></div>
 </div>
@@ -91,6 +91,6 @@
   <div class="osd-bot"><span class="date">OCT.17 1993</span><span class="clock">2:13 AM</span></div>
 </div>
 
-<script type="module" src="src/main.js?v=28"></script>
+<script type="module" src="src/main.js?v=30"></script>
 </body>
 </html>
