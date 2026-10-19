@@ -4,8 +4,8 @@
 import * as THREE from '../vendor/three.module.js';
 
 const V = THREE.Vector3;
-// Kroft is 2.16 m; his eyes are at about 2.02. However tall you make yourself, you look up at him.
-export const MAX_EYE = 2.02;
+// Kroft is 2.16 m; his eyes are at about 2.02. However tall you make yourself, you're still a head under him.
+export const MAX_EYE = 1.88;
 
 export class Walker {
   constructor(dolly, camera, space) {

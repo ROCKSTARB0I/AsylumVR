@@ -2,27 +2,27 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz } from './plan.js?v=28';
-import { buildSurfaces, T } from './surfaces.js?v=28';
-import { loadPictures, savePictures } from './keep.js?v=28';
-import { VRMenu } from './vrmenu.js?v=28';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=28';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=28';
-import { Doors } from './doors.js?v=28';
-import { Space } from './space.js?v=28';
-import { Input } from './input.js?v=28';
-import { Walker, MAX_EYE } from './walker.js?v=28';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=28';
-import { makeTape, makeVeil } from './tape.js?v=28';
-import { Slate } from './slate.js?v=28';
-import * as STORY1 from './story.js?v=28';
-import * as TAPE3 from './tape3.js?v=28';
-import * as TAPE2 from './tape2.js?v=28';
-import { Sound } from './dread.js?v=28';
-import { Horrors } from './horrors.js?v=28';
-import { Dressing } from './dressing.js?v=28';
-import { Scares } from './scares.js?v=28';
-import { makeHand } from './hands.js?v=28';
+import { makePlan, C, H, Z, cx, cz } from './plan.js?v=29';
+import { buildSurfaces, T } from './surfaces.js?v=29';
+import { loadPictures, savePictures } from './keep.js?v=29';
+import { VRMenu } from './vrmenu.js?v=29';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=29';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=29';
+import { Doors } from './doors.js?v=29';
+import { Space } from './space.js?v=29';
+import { Input } from './input.js?v=29';
+import { Walker, MAX_EYE } from './walker.js?v=29';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=29';
+import { makeTape, makeVeil } from './tape.js?v=29';
+import { Slate } from './slate.js?v=29';
+import * as STORY1 from './story.js?v=29';
+import * as TAPE3 from './tape3.js?v=29';
+import * as TAPE2 from './tape2.js?v=29';
+import { Sound } from './dread.js?v=29';
+import { Horrors } from './horrors.js?v=29';
+import { Dressing } from './dressing.js?v=29';
+import { Scares } from './scares.js?v=29';
+import { makeHand } from './hands.js?v=29';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -365,7 +365,7 @@ $('grain').oninput = (e) => { S.grain = +e.target.value; save(); };
 $('smooth').onchange = (e) => { S.smooth = e.target.checked; save(); };
 // height: added to your real height in VR (or to the standard eye on desktop), capped at Kroft's eye level
 function heightLabel() { const eyeV = renderer.xr.isPresenting ? camera.position.y + S.height / 100 : 1.64 + S.height / 100; const capped = eyeV > MAX_EYE + 0.005; return `${S.height >= 0 ? '+' : ''}${S.height} cm${capped ? ' (as tall as you can be: Kroft is taller)' : ''}`; }
-function setHeight(cm) { S.height = Math.max(-40, Math.min(40, Math.round(cm))); walker.heightOff = S.height / 100; $('height').value = S.height; $('heightVal').textContent = heightLabel(); save(); }
+function setHeight(cm) { S.height = Math.max(-40, Math.min(25, Math.round(cm))); walker.heightOff = S.height / 100; $('height').value = S.height; $('heightVal').textContent = heightLabel(); save(); }
 $('height').oninput = (e) => setHeight(+e.target.value); setHeight(S.height || 0);
 document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && G.playing && !renderer.xr.isPresenting && !G.reading && !G.paused && input.hadLock) setPaused(true); if (document.pointerLockElement) input.hadLock = true; });
 

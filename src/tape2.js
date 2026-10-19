@@ -1,8 +1,8 @@
 // Tape 2, The Male Ward: the documents, what you mutter, the objectives,
 // the wake-up, the keys, and this tape's own set-piece scares.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, H } from './plan.js?v=28';
-import { makeBody, pose } from './carcass.js?v=28';
+import { cx, cz, H } from './plan.js?v=29';
+import { makeBody, pose } from './carcass.js?v=29';
 
 const V = THREE.Vector3;
 
