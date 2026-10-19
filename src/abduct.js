@@ -3,8 +3,8 @@
 // comes down. The tape keeps rolling while you lie there, and while he drags you back inside by the
 // ankles. Then a card says where he took you (Tape 2 picks up from there).
 import * as THREE from '../vendor/three.module.js';
-import { makeBody, pose, flashlight } from './carcass.js?v=37';
-import { C } from './plan.js?v=37';
+import { makeBody, pose, flashlight } from './carcass.js?v=38';
+import { C } from './plan.js?v=38';
 const V = THREE.Vector3;
 const sm = (a, b, t) => { const x = Math.min(1, Math.max(0, (t - a) / (b - a))); return x * x * (3 - 2 * x); };
 

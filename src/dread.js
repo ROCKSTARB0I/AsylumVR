@@ -5,10 +5,11 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=37';
-import { floorAt } from './plan.js?v=37';
-import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=37';
-import { renderMenuTheme, THEME_LOOP } from './theme.js?v=37';
+import { Score } from './score.js?v=38';
+import { floorAt } from './plan.js?v=38';
+import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=38';
+import { renderMenuTheme, THEME_LOOP } from './theme.js?v=38';
+import { renderSiteTheme, SITE_LOOP } from './sitetheme.js?v=38';
 
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
@@ -361,12 +362,13 @@ function foldLoop(buf, loopLen) {
 const V0 = new THREE.Vector3(0, 0, 0);
 Sound.prototype.record = async function (onProgress) {
   if (this.rec) return this.rec;
+  if (this.site) this.recordSiteTheme();   // the Testing Site tapes' own theme, kept on its own
   // recorded on an earlier run with this same sound code: just unpack it
   const hash = await sourceHash('dread.js', 'score.js', 'theme.js');
   const kept = hash && await keepGet('snd');
   if (kept && kept.hash === hash) {
     try {
-      const rec = unpackSound(kept.rec); this.menuBuf = rec.menu; this.rec = rec; if (onProgress) onProgress(1);
+      const rec = unpackSound(kept.rec); if (!this.site) this.menuBuf = rec.menu; this.rec = rec; if (onProgress) onProgress(1);
       if (this.on && this.menuWanted) this.playMenu(); if (this.on && !this.droneLoop) this.swapAmbience();
       return rec;
     } catch (e) {}
@@ -375,7 +377,7 @@ Sound.prototype.record = async function (onProgress) {
   const rec = { one: {}, music: {}, amb: null, fear: null }; const jobs = [];
   const one = (key, dur, n, fn) => { for (let i = 0; i < n; i++) jobs.push(async () => { const b = await render(dur, fn, noiseBuf, brownBuf); (rec.one[key] ||= []).push(b); }); };
   // music: four bars of each theme, plus the sting when a chase starts
-  jobs.push(async () => { const b = await render(THEME_LOOP + 7, (s) => renderMenuTheme(s.ctx, s.dry, s.verbIn), noiseBuf, brownBuf, 2); rec.menu = this.menuBuf = foldLoop(b, THEME_LOOP); if (this.on && this.menuWanted) this.playMenu(); });
+  jobs.push(async () => { const b = await render(THEME_LOOP + 7, (s) => renderMenuTheme(s.ctx, s.dry, s.verbIn), noiseBuf, brownBuf, 2); rec.menu = foldLoop(b, THEME_LOOP); if (!this.site) { this.menuBuf = rec.menu; if (this.on && this.menuWanted) this.playMenu(); } });
   const musicKinds = ['brute', 'surgeon', 'patient', 'eater', 'orderly'];
   for (const kind of musicKinds) jobs.push(async () => {
     const len = Score.loopSeconds(kind, 4); const b = await render(len + 2.5, (s) => { const sc = new Score(s); sc.renderLoop(kind, 4); }, noiseBuf, brownBuf, 1); rec.music[kind] = foldLoop(b, len);
@@ -408,6 +410,16 @@ Sound.prototype.record = async function (onProgress) {
   // keep it for next time
   if (hash) { try { await keepPut('snd', { hash, rec: packSound(rec) }); } catch (e) {} }
   return rec;
+};
+// the Testing Site theme: recorded (and kept) separately, so switching between the asylum and the site never re-records everything
+Sound.prototype.recordSiteTheme = async function () {
+  const hash = await sourceHash('sitetheme.js'); const kept = hash && await keepGet('sndSite');
+  let buf = null; if (kept && kept.hash === hash) { try { buf = unpackSound({ one: {}, music: {}, menu: kept.menu }).menu; } catch (e) {} }
+  if (!buf) {
+    const off = new OfflineAudioContext(2, Math.ceil((SITE_LOOP + 7) * SR), SR); renderSiteTheme(off, off.destination); buf = foldLoop(await off.startRendering(), SITE_LOOP);
+    if (hash) { try { await keepPut('sndSite', { hash, menu: packSound({ one: {}, music: {}, menu: buf }).menu }); } catch (e) {} }
+  }
+  this.menuBuf = buf; if (this.on && this.menuWanted) this.playMenu();
 };
 Sound.prototype.has = function (key) { return this.rec && this.rec.one[key] && this.rec.one[key].length; };
 Sound.prototype.playRec = function (key, pos, { gain = 1, verb = 0.12, delay = 0, rate = 1, ref = 1.5, roll = 1.2 } = {}) {

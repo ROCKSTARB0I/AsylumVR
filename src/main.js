@@ -2,30 +2,31 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz, floorAt, ceilOf } from './plan.js?v=37';
-import { buildSurfaces, T } from './surfaces.js?v=37';
-import { loadPictures, savePictures } from './keep.js?v=37';
-import { VRMenu } from './vrmenu.js?v=37';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=37';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=37';
-import { Doors } from './doors.js?v=37';
-import { Space } from './space.js?v=37';
-import { Input } from './input.js?v=37';
-import { Walker, MAX_EYE } from './walker.js?v=37';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=37';
-import { makeTape, makeVeil } from './tape.js?v=37';
-import { Slate } from './slate.js?v=37';
-import { MiniMap } from './minimap.js?v=37';
-import * as STORY1 from './story.js?v=37';
-import * as TAPE3 from './tape3.js?v=37';
-import * as TAPE2 from './tape2.js?v=37';
-import * as TAPE4 from './tape4.js?v=37';
-import * as TAPE5 from './tape5.js?v=37';
-import { Sound } from './dread.js?v=37';
-import { Horrors } from './horrors.js?v=37';
-import { Dressing } from './dressing.js?v=37';
-import { Scares } from './scares.js?v=37';
-import { makeHand } from './hands.js?v=37';
+import { makePlan, C, H, Z, cx, cz, floorAt, ceilOf } from './plan.js?v=38';
+import { buildSurfaces, T } from './surfaces.js?v=38';
+import { loadPictures, savePictures } from './keep.js?v=38';
+import { VRMenu } from './vrmenu.js?v=38';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=38';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=38';
+import { Doors } from './doors.js?v=38';
+import { Space } from './space.js?v=38';
+import { Input } from './input.js?v=38';
+import { Walker, MAX_EYE } from './walker.js?v=38';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=38';
+import { makeTape, makeVeil } from './tape.js?v=38';
+import { Slate } from './slate.js?v=38';
+import { MiniMap } from './minimap.js?v=38';
+import { drawSiteLogo, siteFonts, LOGO_W, LOGO_H } from './sitelogo.js?v=38';
+import * as STORY1 from './story.js?v=38';
+import * as TAPE3 from './tape3.js?v=38';
+import * as TAPE2 from './tape2.js?v=38';
+import * as TAPE4 from './tape4.js?v=38';
+import * as TAPE5 from './tape5.js?v=38';
+import { Sound } from './dread.js?v=38';
+import { Horrors } from './horrors.js?v=38';
+import { Dressing } from './dressing.js?v=38';
+import { Scares } from './scares.js?v=38';
+import { makeHand } from './hands.js?v=38';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -38,10 +39,10 @@ let unlocked = 1; try { unlocked = Math.max(1, +(localStorage.getItem('asylumvr_
 // a tape plays only once every tape before it is finished (or you've already played into it: it has a save or is done)
 const tapeDone = (n) => { try { return localStorage.getItem('asylumvr_done_t' + n) === '1'; } catch (e) { return false; } };
 const tapeSaved = (n) => { try { return !!localStorage.getItem('asylumvr_save_t' + n); } catch (e) { return false; } };
-// two series: the asylum tapes (1-4) and the Testing Site tapes (5-7), each its own chain. Not-yet-made tapes never open.
+// two series: the asylum tapes (1-4) and the Testing Site tapes (5-9), each its own chain. Not-yet-made tapes never open.
 const MADE = [1, 2, 3, 4, 5]; const firstOf = (n) => (n >= 5 ? 5 : 1);   // (5 joins MADE when Testing Site 1 is finished)
 const tapeOpen = (n) => { if (!MADE.includes(n)) return false; if (n === firstOf(n) || tapeDone(n) || tapeSaved(n)) return true; for (let k = firstOf(n); k < n; k++) if (!tapeDone(k)) return false; return true; };
-let TAPE = Math.max(1, Math.min(7, +(new URLSearchParams(location.search).get('tape') || 1)));
+let TAPE = Math.max(1, Math.min(9, +(new URLSearchParams(location.search).get('tape') || 1)));
 const TAPE_ASKED = TAPE; while (TAPE > firstOf(TAPE) && !tapeOpen(TAPE)) TAPE--; if (!tapeOpen(TAPE)) TAPE = 1;      // a locked tape in the address: the last one you can play
 if (TAPE !== TAPE_ASKED) history.replaceState(null, '', location.pathname + '?tape=' + TAPE + (location.search.includes('mute') ? '&mute' : ''));
 const STORY = TAPE === 5 ? TAPE5 : TAPE === 4 ? TAPE4 : TAPE === 2 ? TAPE2 : TAPE === 3 ? TAPE3 : STORY1; const { NOTES, MUTTER, OBJECTIVES } = STORY;
@@ -111,7 +112,7 @@ const space = new Space(plan, world, doors);
 const input = new Input(canvas, renderer);
 const walker = new Walker(dolly, camera, space);
 const cam = new Camcorder(scene);
-const sound = new Sound();
+const sound = new Sound(); sound.site = TAPE >= 5;   // the Testing Site tapes have their own theme
 mark('setup');
 const recording = sound.record((k) => { if (!G || !G.playing) $('loading').textContent = k < 1 ? `Recording sounds… ${Math.round(k * 100)}%` : ''; });
 const veil = makeVeil(); camera.add(veil.mesh); veil.mesh.visible = false;
@@ -442,7 +443,14 @@ if (hasSave) {
   const nb = document.createElement('button'); nb.textContent = 'New game'; nb.onclick = () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} location.reload(); }; $('menu').insertBefore(nb, $('selectBtn'));
 }
 {
-  const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = TAPE >= 5 ? `Recovered footage &middot; Mount Harrow Research Annex &middot; Site 7, Nevada &middot; Testing Site ${TAPE - 4}` : `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4 &middot; ${TAPE === 5 ? 'The Testing Site' : TAPE === 4 ? 'The End' : TAPE === 3 ? 'The Fall' : TAPE === 2 ? 'The Male Ward' : 'Recovered Footage'}`;
+  const kick = document.querySelector('.kicker'); if (kick) kick.innerHTML = TAPE >= 5 ? `Recovered footage &middot; Mount Harrow Research Annex &middot; Tape number unknown` : `Recovered footage &middot; Mount Harrow State Asylum &middot; Tape ${TAPE} of 4 &middot; ${TAPE === 5 ? 'The Testing Site' : TAPE === 4 ? 'The End' : TAPE === 3 ? 'The Fall' : TAPE === 2 ? 'The Male Ward' : 'Recovered Footage'}`;
+  // the Testing Site tapes have their own logo
+  if (TAPE >= 5) {
+    const h = document.querySelector('.vhs .logo'); const cv = document.createElement('canvas'); cv.width = LOGO_W; cv.height = LOGO_H; cv.className = 'siteLogo'; cv.setAttribute('aria-label', 'AsylumVR: The Testing Site'); cv.setAttribute('role', 'img');
+    const paint = () => { const c = cv.getContext('2d'); c.clearRect(0, 0, LOGO_W, LOGO_H); drawSiteLogo(c, 0, 0, 1); };
+    paint(); siteFonts().then(() => { paint(); try { vrMenu.refresh(); } catch (e) {} });
+    if (h) { h.replaceWith(cv); } document.title = 'AsylumVR: The Testing Site';
+  }
   // the prequel is a different night
   if (TAPE === 3) { const d = document.querySelector('.osd-bot .date'), c = document.querySelector('.osd-bot .clock'); if (d) d.textContent = 'OCT.14 1989'; if (c) c.textContent = '11:40 PM'; }
   // the tape shelf
@@ -451,9 +459,11 @@ if (hasSave) {
     { n: 2, name: 'Tape 2: The Male Ward', sub: 'The north building. Dormitory, chapel, surgical theater.' },
     { n: 3, name: 'Tape 3: The Fall', sub: '14 October 1989. The night it all came apart.' },
     { n: 4, name: 'Tape 4: The End', sub: 'The last tape. Ward C, the women\u2019s ward, the disturbed wards, and the way out.' },
-    { n: 5, site: true, name: 'Testing Site 1: Containment', sub: 'Site 7, Nye County, Nevada. Something got out of the tanks.' },
+    { n: 5, site: true, name: 'Testing Site 1: Containment', sub: 'Site 7, Nevada. Something got out of the tanks.' },
     { n: 6, site: true, name: 'Testing Site 2', sub: 'Not yet recovered.' },
     { n: 7, site: true, name: 'Testing Site 3', sub: 'Not yet recovered.' },
+    { n: 8, site: true, name: 'Testing Site 4', sub: 'Not yet recovered.' },
+    { n: 9, site: true, name: 'Testing Site 5', sub: 'Not yet recovered.' },
   ];
   for (const tp of TAPES) if (!tapeOpen(tp.n)) { tp.locked = true; if (MADE.includes(tp.n)) tp.sub = tp.site ? `Finish Testing Site ${tp.n - 5} to unlock.` : `Finish Tape ${tp.n - 1} to unlock.`; }
   const status = (n) => {
@@ -511,27 +521,18 @@ vrBtn.onclick = async () => {
 // the same menu, hanging in the dark lobby; point with either hand, pull the trigger
 const vrMenu = new VRMenu({ dolly, controllers: [left, right], sound, pages: {
   main: () => ({
-    logo: true, kicker: `Recovered footage · Mount Harrow State Asylum · Tape ${TAPE} of 4`,
+    logo: TAPE >= 5 ? 'site' : true, kicker: TAPE >= 5 ? `Recovered footage · Tape number unknown` : `Recovered footage · Mount Harrow State Asylum · Tape ${TAPE} of 4`,
     items: [
       { label: hasSave ? 'Continue' : 'Play', act: () => playInVR(hasSave) },
       ...(hasSave ? [{ label: 'New game', act: () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) {} playInVR(false); } }] : []),
-      { label: 'Select tape', page: 'tapes' },
+      { label: 'Select tape', page: TAPE >= 5 ? 'tapesSite' : 'tapes' },
       { label: 'How to play', page: 'how' },
       { label: 'Reset progress', page: 'reset', danger: true, small: true },
       { label: 'Exit VR', small: true, act: () => { const s = renderer.xr.getSession(); if (s) s.end(); } },
     ],
   }),
-  tapes: () => ({
-    title: '\u25B6\uFE0E SELECT TAPE',
-    items: [
-      ...shelfTapes.map((tp) => {
-        const [cls, txt] = tp.locked ? ['', 'LOCKED'] : tapeStatus(tp.n); const now = tp.n === TAPE && !tp.locked;
-        return { tape: true, label: tp.name, sub: tp.sub, locked: !!tp.locked, status: now ? 'LOADED' : txt.split(' · ')[0], statusColor: cls === 'done' ? '#2f5a2a' : now ? '#7a2a22' : '#3b372f',
-          act: () => { if (now) vrMenu.go('main'); else setTimeout(() => { location.href = '?tape=' + tp.n; }, 650); } };
-      }),
-      { label: 'Back', page: 'main', small: true },
-    ],
-  }),
+  // two shelves in the headset (all nine tapes don't fit on one panel): Mount Harrow, and the Testing Site
+  tapes: () => shelfPage(false), tapesSite: () => shelfPage(true),
   how: () => ({ title: 'HOW TO PLAY', text: [...document.querySelectorAll('#how p')].filter((p) => !/^Desktop/.test(p.textContent)).map((p) => { const b = p.querySelector('b'); const head = b ? b.textContent.trim() : ''; const body = p.textContent.trim().slice(head.length).trim(); return head ? `${head.toUpperCase()}: ${body}` : body; }), items: [{ label: 'Back', page: 'main', small: true }] }),
   reset: () => ({
     title: '\u25A0\uFE0E ERASE ALL TAPES?', text: ['Are you sure? This erases every save and unlocked tape. It can\'t be undone.'],
@@ -541,6 +542,20 @@ const vrMenu = new VRMenu({ dolly, controllers: [left, right], sound, pages: {
     ],
   }),
 } });
+function shelfPage(site) {
+  return {
+    title: site ? '\u25B6\uFE0E THE TESTING SITE' : '\u25B6\uFE0E MOUNT HARROW',
+    items: [
+      ...shelfTapes.filter((tp) => !!tp.site === site).map((tp) => {
+        const [cls, txt] = tp.locked ? ['', 'LOCKED'] : tapeStatus(tp.n); const now = tp.n === TAPE && !tp.locked;
+        return { tape: true, label: tp.name, sub: tp.sub, locked: !!tp.locked, status: now ? 'LOADED' : txt.split(' · ')[0], statusColor: cls === 'done' ? '#2f5a2a' : now ? '#7a2a22' : '#3b372f',
+          act: () => { if (now) vrMenu.go('main'); else setTimeout(() => { location.href = '?tape=' + tp.n; }, 650); } };
+      }),
+      { label: site ? 'Mount Harrow tapes' : 'The Testing Site tapes', page: site ? 'tapes' : 'tapesSite', small: true },
+      { label: 'Back', page: 'main', small: true },
+    ],
+  };
+}
 function playInVR(cont) { vrMenu.close(); handLight.lock = false; ray.visible = true; begin(true, cont); }
 $('vrMenuBtn').onclick = async () => {
   try {

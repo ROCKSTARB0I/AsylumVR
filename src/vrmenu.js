@@ -2,6 +2,7 @@
 // you; both controllers cast a pointer and the trigger clicks. The pages (main, tape shelf, how to play,
 // reset) come from main.js as plain data: { title, kicker, logo, text: [..], items: [{ label, sub, status, locked, danger, act }] }.
 import * as THREE from '../vendor/three.module.js';
+import { drawSiteLogo } from './sitelogo.js?v=38';
 
 const PW = 1024, PH = 1000;
 const INK = '#e8e2d4', DIM = '#8f897d', RED = '#c0352b';
@@ -72,7 +73,8 @@ export class VRMenu {
     c.textAlign = 'left';
     let y = 140;
     if (P.kicker) { c.font = '30px VT323, monospace'; c.fillStyle = DIM; y = wrap(c, P.kicker.toUpperCase(), 70, y, PW - 140, 32) + 10; }
-    if (P.logo) {
+    if (P.logo === 'site') { drawSiteLogo(c, 60, y - 6, 0.55); y += 240; }
+    else if (P.logo) {
       c.font = '150px "Special Elite", serif'; c.fillStyle = '#e4dccb'; c.fillText('ASYLUM', 64, y); const lw = c.measureText('ASYLUM').width;
       c.font = '78px "Special Elite", serif'; c.fillStyle = RED; c.fillText('VR', 70 + lw, y + 8); y += 178;
     }
@@ -101,7 +103,7 @@ export class VRMenu {
       y += h + (it.tape ? 4 : 6);
     }
     // how to point
-    c.font = '30px VT323, monospace'; c.fillStyle = DIM; c.textAlign = 'center'; c.fillText('POINT AND PULL THE TRIGGER', PW / 2, PH - 92); c.textAlign = 'left';
+    if (y < PH - 96) { c.font = '30px VT323, monospace'; c.fillStyle = DIM; c.textAlign = 'center'; c.fillText('POINT AND PULL THE TRIGGER', PW / 2, PH - 92); c.textAlign = 'left'; }   // (a full page has no room for it)
     this.tex.needsUpdate = true;
   }
 }

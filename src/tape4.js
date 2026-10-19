@@ -3,8 +3,8 @@
 // disturbed ward, down through the staff offices to the examining rooms, and down again to the boiler
 // house, the power plant, and the coal yard. Everything Mount Harrow was hiding is on this tape.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, C, floorAt } from './plan.js?v=37';
-import { makeBody, pose, bonesaw } from './carcass.js?v=37';
+import { cx, cz, C, floorAt } from './plan.js?v=38';
+import { makeBody, pose, bonesaw } from './carcass.js?v=38';
 const V = THREE.Vector3;
 
 // ------------------------------------------------------------------ the documents

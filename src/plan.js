@@ -34,10 +34,10 @@ export const ZNAME = ['', 'Corridor', 'Patient Cell', 'Cafeteria', 'Showers', 'M
 
 export const cx = (x) => (x + 0.5) * C;
 export const cz = (y) => (y + 0.5) * C;
-import { makePlan2 } from './plan2.js?v=37';
-import { makePlan3 } from './plan3.js?v=37';
-import { makePlan4 } from './plan4.js?v=37';
-import { makePlan5 } from './plan5.js?v=37';
+import { makePlan2 } from './plan2.js?v=38';
+import { makePlan3 } from './plan3.js?v=38';
+import { makePlan4 } from './plan4.js?v=38';
+import { makePlan5 } from './plan5.js?v=38';
 
 export function makePlan(tape = 1) {
   if (tape === 2) return makePlan2();
