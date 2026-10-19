@@ -1,8 +1,8 @@
 // Space: what is solid. Circle movers (you and them) are pushed out of
 // wall cells, props, door leaves and the gate; sight lines are traced
 // through the grid and closed doors.
-import { C, W, D, LEVELS, floorAt, cellFloorAt } from './plan.js?v=35';
-import { circleSeg } from './doors.js?v=35';
+import { C, W, D, LEVELS, floorAt, cellFloorAt } from './plan.js?v=36';
+import { circleSeg } from './doors.js?v=36';
 
 // props up to this height (m) can be vaulted by the things chasing you
 export const VAULT_H = 1.15;

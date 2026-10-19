@@ -3,8 +3,8 @@
 // disturbed ward, down through the staff offices to the examining rooms, and down again to the boiler
 // house, the power plant, and the coal yard. Everything Mount Harrow was hiding is on this tape.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, C, floorAt } from './plan.js?v=35';
-import { makeBody, pose, bonesaw } from './carcass.js?v=35';
+import { cx, cz, C, floorAt } from './plan.js?v=36';
+import { makeBody, pose, bonesaw } from './carcass.js?v=36';
 const V = THREE.Vector3;
 
 // ------------------------------------------------------------------ the documents
@@ -89,7 +89,7 @@ export const OBJECTIVES = [
 ];
 
 export const ITEM_LABEL = { wardKeys: 'Take the keys', boothKey: 'Take the key', directorKey: 'Take the key', examCard: 'Take the keycard', cutters: 'Take the bolt cutters' };
-export const LOCK_NAME = { stairKey: 'the stairwell key', officeKey: 'the office key', wardKeys: 'the ward keys', boothKey: 'the booth key', directorKey: 'the Director’s key', examCard: 'the Director’s keycard', chain: 'something to cut the chain', release: 'the release, in the booth', power: 'power', never: 'it won’t open' };
+export const LOCK_NAME = { cutters: 'bolt cutters (the chain)', stairKey: 'the stairwell key', officeKey: 'the office key', wardKeys: 'the ward keys', boothKey: 'the booth key', directorKey: 'the Director’s key', examCard: 'the Director’s keycard', chain: 'something to cut the chain', release: 'the release, in the booth', power: 'power', never: 'it won’t open' };
 
 export const ENDING_TEXT = [
   'You came out into the coal yard as the sky was going grey, and behind you the boilers of Mount Harrow went up, one after another.',
@@ -254,8 +254,7 @@ export function setupTape4(ctx) {
   // the switchboard: answer it
   add(() => P3(19, 55.8, 1.0), 1.2, () => (S.ringing ? 'Answer the phone' : ''), () => { if (!S.ringing) return; S.ringing = false; loopGain('phone', 0, 0.05); pellCall(); });
   // the chained door at the head of the boiler stairs
-  add(() => P3(46, 86, 1.1), 1.2, () => (s().chainCut ? '' : G.items.has('cutters') ? 'Cut the chain' : 'Chained shut'),
-    () => { if (s().chainCut) return; if (!G.items.has('cutters')) { sound.rattle(cx(46), cz(86)); say('chain'); return; } s().chainCut = true; const d = doors.at(46, 86); if (d) { d.locked = false; doors.push(d, walker.pos.x, walker.pos.z); } sound.clang(P3(46, 86, 1.1), 900, 0.4, 0.5); horrors.heard(cx(46), cz(86), 14); ctx.checkpoint(); ctx.save(); });
+  // (the chained door takes the bolt cutters itself: 'Unlock' on the door)
   // the steam valves
   for (const v of valves) add(() => v.g.position.clone(), 1.1, () => (!s().boiler || v.open ? '' : S.mash && S.mash.id === v.id ? 'Turn it! ' + bar(S.mash.k) : 'Open the steam valve'),
     () => { if (v.open || S.mash || !s().boiler) return; S.mash = { id: v.id, k: 0, rate: 0.045, decay: 0.03, tick: () => { v.wheel.rotation.z += 0.25; if (Math.random() < 0.3) sound.clang(v.g.position, 180 + Math.random() * 60, 0.12, 0.4); horrors.heard(v.g.position.x, v.g.position.z, 9); }, done: () => { v.open = true; s().valves = valves.filter((q) => q.open).length; sound.burst(v.g.position, { f: 3000, q: 0.5, dur: 3.5, gain: 0.6, a: 0.05, verb: 0.5 }); horrors.heard(v.g.position.x, v.g.position.z, 22); say(s().valves >= 3 ? 'valves' : 'valve', 0.5, true); if (v.id === 'coal') bodySlide(); ctx.checkpoint(); ctx.save(); } }; caption(ctx.vr() ? 'Mash any button to turn it' : 'Mash any key or click to turn it', 3); });
@@ -561,7 +560,7 @@ export function setupTape4(ctx) {
       G.t4 = { valves: 0, ...(d.t4 || {}) }; const st = G.t4; delete st.blown; delete st.boom; delete st.finale; delete st.out;
       if (st.captured && !st.boiler && !G.items.has('cutters')) { /* you got free: carry on */ }
       if (st.release) { for (const dd of doors.list) if (dd.y >= 37 && dd.y <= 68 && dd.x >= 52) { dd.locked = false; } }
-      if (st.chainCut) { const dd = doors.at(46, 86); if (dd) dd.locked = false; }
+      if (st.chainCut || G.items.has('cutters') && (d.unlocked || []).some(([x, y]) => x === 46 && y === 86)) { const dd = doors.at(46, 86); if (dd) dd.locked = false; }
       valves.forEach((v, i) => { v.open = i < (st.valves || 0); });
       if (st.power) { st.power = false; G.power = false; }   // the turbine has to be started again: the minute and a half starts over
       for (const k of ['female', 'disturbed', 'offices', 'exam', 'boiler', 'radio']) if (st[k]) S.beats.add(k); this.openWardC();

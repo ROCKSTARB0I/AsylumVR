@@ -2,9 +2,9 @@
 // (Voss has the staff film the patients). Clock in, do the count, take Voss his tray. Then the alarm:
 // the mains die, the beacons turn the building red, every cell door opens, and the staff die.
 import * as THREE from '../vendor/three.module.js';
-import { cx, cz, H } from './plan.js?v=35';
-import { makeBody, pose } from './carcass.js?v=35';
-import { Talk } from './talk.js?v=35';
+import { cx, cz, H } from './plan.js?v=36';
+import { makeBody, pose } from './carcass.js?v=36';
+import { Talk } from './talk.js?v=36';
 const V = THREE.Vector3;
 
 export const NOTES = {

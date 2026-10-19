@@ -9,7 +9,7 @@
 //   the boiler house and the power plant (0 m), and out through the coal yard.
 // "Refractory" / "disturbed": what asylums called the wards for patients who couldn't be managed —
 // strong rooms, padded cells, canvas strong-clothing, locked airing courts, attendants behind glass.
-import { C, H, Z, setGrid, setLevels } from './plan.js?v=35';
+import { C, H, Z, setGrid, setLevels } from './plan.js?v=36';
 
 export const GW = 100, GD = 106;
 
@@ -126,7 +126,7 @@ export function makePlan4() {
   rect(35, 77, 44, 90, Z.SURGERY); door(40, 76); door(34, 87);   // the theater (and through from x-ray's corridor)
   rect(25, 85, 33, 96, Z.NURSE); door(24, 90); // dental
   rect(35, 92, 44, 96, Z.STORE); door(40, 91); door(34, 94); door(40, 97);   // instruments
-  rect(45, 86, 48, 86, Z.HALL); door(46, 86, { lock: 'chain', heavy: true });
+  rect(45, 86, 48, 86, Z.HALL); door(46, 86, { lock: 'cutters', heavy: true });   // chained: the bolt cutters open it
   stairwell(51, 86, [-1, 0], [0, 1], 0, 'S4');  // down to the boiler house
 
   // ======================================================== 6. THE BOILER HOUSE AND THE POWER PLANT (0 m)
