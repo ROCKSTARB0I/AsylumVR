@@ -2,7 +2,7 @@
 // you; both controllers cast a pointer and the trigger clicks. The pages (main, tape shelf, how to play,
 // reset) come from main.js as plain data: { title, kicker, logo, text: [..], items: [{ label, sub, status, locked, danger, act }] }.
 import * as THREE from '../vendor/three.module.js';
-import { drawSiteLogo } from './sitelogo.js?v=38';
+import { drawSiteLogo } from './sitelogo.js?v=39';
 
 const PW = 1024, PH = 1000;
 const INK = '#e8e2d4', DIM = '#8f897d', RED = '#c0352b';

@@ -5,11 +5,9 @@
 // brute sings, the doctor hums, patients mutter and scream); doors,
 // lockers, footsteps on tile and concrete, the generator and the alarm.
 import * as THREE from '../vendor/three.module.js';
-import { Score } from './score.js?v=38';
-import { floorAt } from './plan.js?v=38';
-import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=38';
-import { renderMenuTheme, THEME_LOOP } from './theme.js?v=38';
-import { renderSiteTheme, SITE_LOOP } from './sitetheme.js?v=38';
+import { Score } from './score.js?v=39';
+import { floorAt } from './plan.js?v=39';
+import { sourceHash, keepGet, keepPut, packSound, unpackSound } from './keep.js?v=39';
 
 const QUEST = /OculusBrowser|Quest/i.test(navigator.userAgent);
 const VOWELS = { a: [800, 1150, 2900], e: [400, 2000, 2600], i: [300, 2300, 3000], o: [450, 800, 2830], u: [325, 700, 2700], m: [250, 1000, 2200], uh: [600, 1040, 2250] };
@@ -362,14 +360,13 @@ function foldLoop(buf, loopLen) {
 const V0 = new THREE.Vector3(0, 0, 0);
 Sound.prototype.record = async function (onProgress) {
   if (this.rec) return this.rec;
-  if (this.site) this.recordSiteTheme();   // the Testing Site tapes' own theme, kept on its own
   // recorded on an earlier run with this same sound code: just unpack it
   const hash = await sourceHash('dread.js', 'score.js', 'theme.js');
   const kept = hash && await keepGet('snd');
   if (kept && kept.hash === hash) {
     try {
-      const rec = unpackSound(kept.rec); if (!this.site) this.menuBuf = rec.menu; this.rec = rec; if (onProgress) onProgress(1);
-      if (this.on && this.menuWanted) this.playMenu(); if (this.on && !this.droneLoop) this.swapAmbience();
+      const rec = unpackSound(kept.rec); this.rec = rec; if (onProgress) onProgress(1);
+      if (this.on && !this.droneLoop) this.swapAmbience();
       return rec;
     } catch (e) {}
   }
@@ -377,7 +374,6 @@ Sound.prototype.record = async function (onProgress) {
   const rec = { one: {}, music: {}, amb: null, fear: null }; const jobs = [];
   const one = (key, dur, n, fn) => { for (let i = 0; i < n; i++) jobs.push(async () => { const b = await render(dur, fn, noiseBuf, brownBuf); (rec.one[key] ||= []).push(b); }); };
   // music: four bars of each theme, plus the sting when a chase starts
-  jobs.push(async () => { const b = await render(THEME_LOOP + 7, (s) => renderMenuTheme(s.ctx, s.dry, s.verbIn), noiseBuf, brownBuf, 2); rec.menu = foldLoop(b, THEME_LOOP); if (!this.site) { this.menuBuf = rec.menu; if (this.on && this.menuWanted) this.playMenu(); } });
   const musicKinds = ['brute', 'surgeon', 'patient', 'eater', 'orderly'];
   for (const kind of musicKinds) jobs.push(async () => {
     const len = Score.loopSeconds(kind, 4); const b = await render(len + 2.5, (s) => { const sc = new Score(s); sc.renderLoop(kind, 4); }, noiseBuf, brownBuf, 1); rec.music[kind] = foldLoop(b, len);
@@ -398,28 +394,28 @@ Sound.prototype.record = async function (onProgress) {
   for (const m of [0, 1]) for (const k of ['open', 'close', 'slam']) one(`d:${m}:${k}`, 1.4, 1, (s) => ORIG.door.call(s, { metal: !!m }, k, 0, 0));
   one('whisper', 2.2, 2, (s) => ORIG.syllables.call(s, null, 5, 95, { breath: 0.92, gain: 0.3, verb: 0.3 })); one('mutter', 1.8, 2, (s) => ORIG.mutter.call(s));
   // the beds and the music first: the game can start as soon as those exist
-  // the menu theme renders alone first so the title screen has music as soon as possible
-  // the menu theme renders alongside the game's core sounds, so it never holds up starting the game
-  const menuJob = jobs.shift(); const menuP = menuJob().catch(() => {});
   const core = jobs.splice(0, musicKinds.length + 3); await Promise.all(core.map((j) => j().catch(() => {})));
   this.rec = rec; if (onProgress) onProgress(1);
   if (this.on && !this.droneLoop) this.swapAmbience();
   // the rest a couple at a time in the background (anything not ready yet is synthesized live)
   for (let i = 0; i < jobs.length; i += 2) await Promise.all(jobs.slice(i, i + 2).map((j) => j().catch(() => {})));
-  await menuP;
   // keep it for next time
   if (hash) { try { await keepPut('snd', { hash, rec: packSound(rec) }); } catch (e) {} }
   return rec;
 };
-// the Testing Site theme: recorded (and kept) separately, so switching between the asylum and the site never re-records everything
-Sound.prototype.recordSiteTheme = async function () {
-  const hash = await sourceHash('sitetheme.js'); const kept = hash && await keepGet('sndSite');
-  let buf = null; if (kept && kept.hash === hash) { try { buf = unpackSound({ one: {}, music: {}, menu: kept.menu }).menu; } catch (e) {} }
-  if (!buf) {
-    const off = new OfflineAudioContext(2, Math.ceil((SITE_LOOP + 7) * SR), SR); renderSiteTheme(off, off.destination); buf = foldLoop(await off.startRendering(), SITE_LOOP);
-    if (hash) { try { await keepPut('sndSite', { hash, menu: packSound({ one: {}, music: {}, menu: buf }).menu }); } catch (e) {} }
-  }
-  this.menuBuf = buf; if (this.on && this.menuWanted) this.playMenu();
+// the title screen's sound is prerecorded (audio/, made by tools/menuaudio.js): the same every time, ready at once.
+// The Testing Site tapes have their own theme.
+const AUDIO = (f) => new URL('../audio/' + f + '.m4a?v=39', import.meta.url).href;
+Sound.prototype.loadMenu = function () {
+  if (this.menuLoad) return this.menuLoad; if (!this.ctx) this.init();
+  const get = async (f) => { const r = await fetch(AUDIO(f)); if (!r.ok) throw new Error(f); return this.ctx.decodeAudioData(await r.arrayBuffer()); };
+  this.sfx = {};
+  for (const f of ['click', 'load']) get(f).then((b) => { this.sfx[f] = b; }).catch(() => {});
+  return (this.menuLoad = get(this.site ? 'theme_site' : 'theme_asylum').then((b) => { this.menuBuf = b; if (this.on && this.menuWanted) this.playMenu(); }).catch(() => {}));
+};
+Sound.prototype.playSfx = function (f, gain = 1) {
+  const b = this.sfx && this.sfx[f]; if (!b || !this.on) return false;
+  const s = this.ctx.createBufferSource(); s.buffer = b; const g = this.ctx.createGain(); g.gain.value = gain; s.connect(g); g.connect(this.vipDry); s.start(this.t); return true;
 };
 Sound.prototype.has = function (key) { return this.rec && this.rec.one[key] && this.rec.one[key].length; };
 Sound.prototype.playRec = function (key, pos, { gain = 1, verb = 0.12, delay = 0, rate = 1, ref = 1.5, roll = 1.2 } = {}) {
@@ -478,7 +474,7 @@ Object.assign(Sound.prototype, OV);
 Object.assign(Sound.prototype, {
   // the main theme on the title screen
   playMenu() {
-    this.menuWanted = true; if (!this.on || !this.menuBuf || this.menuNow) return;
+    this.menuWanted = true; if (!this.menuBuf) { this.loadMenu(); return; } if (!this.on || this.menuNow) return;
     const t = this.t; const s = this.ctx.createBufferSource(); s.buffer = this.menuBuf; s.loop = true; const g = this.ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.55, t + 3);
     s.connect(g); g.connect(this.vipDry); s.start(t); this.menuNow = { s, g };
     if (this.droneG) this.droneG.gain.setTargetAtTime(0.25, t, 0.5);
@@ -486,14 +482,14 @@ Object.assign(Sound.prototype, {
   stopMenu() { this.menuWanted = false; if (!this.menuNow) return; const t = this.t; const { s, g } = this.menuNow; g.gain.setTargetAtTime(0.0001, t, 0.5); s.stop(t + 3); this.menuNow = null; if (this.droneG) this.droneG.gain.setTargetAtTime(1, t, 1); },
   // a VCR front-panel button: a hard plastic click, the latch, a tick of the transport
   tapeClick() {
-    if (!this.on) return; const v = this.vip; this.vip = true;
+    if (!this.on || this.playSfx('click')) return; const v = this.vip; this.vip = true;
     this.burst(null, { f: 4200, q: 2.5, dur: 0.012, gain: 0.35, verb: 0.02 }); this.burst(null, { f: 1300, q: 1.5, dur: 0.03, gain: 0.3, delay: 0.018, verb: 0.03 });
     this.tone(null, { f: 110, f2: 70, dur: 0.05, gain: 0.25, delay: 0.015, verb: 0 }); this.burst(null, { f: 2600, q: 4, dur: 0.01, gain: 0.15, delay: 0.07, verb: 0 });
     this.vip = v;
   },
   // a cassette going into the deck: the door, the clunk of the carriage, the heads spinning up
   tapeLoad() {
-    if (!this.on) return; const v = this.vip; this.vip = true;
+    if (!this.on || this.playSfx('load')) return; const v = this.vip; this.vip = true;
     this.burst(null, { f: 1800, q: 1.2, dur: 0.05, gain: 0.3, verb: 0.05 }); this.tone(null, { f: 80, f2: 50, dur: 0.12, gain: 0.5, delay: 0.12, verb: 0.05 }); this.burst(null, { f: 600, q: 0.8, dur: 0.1, gain: 0.35, brown: true, delay: 0.12 });
     this.tone(null, { f: 120, f2: 380, dur: 0.7, gain: 0.06, type: 'sawtooth', delay: 0.3, verb: 0.05 }); this.burst(null, { f: 3000, q: 3, dur: 0.02, gain: 0.2, delay: 1.0 });
     this.vip = v;

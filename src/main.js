@@ -2,31 +2,31 @@
 // camcorder's own render in VR), interaction, objectives, checkpoints
 // and the frame loop.
 import * as THREE from '../vendor/three.module.js';
-import { makePlan, C, H, Z, cx, cz, floorAt, ceilOf } from './plan.js?v=38';
-import { buildSurfaces, T } from './surfaces.js?v=38';
-import { loadPictures, savePictures } from './keep.js?v=38';
-import { VRMenu } from './vrmenu.js?v=38';
-import { Abduction, ABDUCT_TEXT } from './abduct.js?v=38';
-import { buildAsylum, laydecals, LIGHT } from './mason.js?v=38';
-import { Doors } from './doors.js?v=38';
-import { Space } from './space.js?v=38';
-import { Input } from './input.js?v=38';
-import { Walker, MAX_EYE } from './walker.js?v=38';
-import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=38';
-import { makeTape, makeVeil } from './tape.js?v=38';
-import { Slate } from './slate.js?v=38';
-import { MiniMap } from './minimap.js?v=38';
-import { drawSiteLogo, siteFonts, LOGO_W, LOGO_H } from './sitelogo.js?v=38';
-import * as STORY1 from './story.js?v=38';
-import * as TAPE3 from './tape3.js?v=38';
-import * as TAPE2 from './tape2.js?v=38';
-import * as TAPE4 from './tape4.js?v=38';
-import * as TAPE5 from './tape5.js?v=38';
-import { Sound } from './dread.js?v=38';
-import { Horrors } from './horrors.js?v=38';
-import { Dressing } from './dressing.js?v=38';
-import { Scares } from './scares.js?v=38';
-import { makeHand } from './hands.js?v=38';
+import { makePlan, C, H, Z, cx, cz, floorAt, ceilOf } from './plan.js?v=39';
+import { buildSurfaces, T } from './surfaces.js?v=39';
+import { loadPictures, savePictures } from './keep.js?v=39';
+import { VRMenu } from './vrmenu.js?v=39';
+import { Abduction, ABDUCT_TEXT } from './abduct.js?v=39';
+import { buildAsylum, laydecals, LIGHT } from './mason.js?v=39';
+import { Doors } from './doors.js?v=39';
+import { Space } from './space.js?v=39';
+import { Input } from './input.js?v=39';
+import { Walker, MAX_EYE } from './walker.js?v=39';
+import { Camcorder, EYE_LAYER, timecode } from './camcorder.js?v=39';
+import { makeTape, makeVeil } from './tape.js?v=39';
+import { Slate } from './slate.js?v=39';
+import { MiniMap } from './minimap.js?v=39';
+import { drawSiteLogo, siteFonts, LOGO_W, LOGO_H } from './sitelogo.js?v=39';
+import * as STORY1 from './story.js?v=39';
+import * as TAPE3 from './tape3.js?v=39';
+import * as TAPE2 from './tape2.js?v=39';
+import * as TAPE4 from './tape4.js?v=39';
+import * as TAPE5 from './tape5.js?v=39';
+import { Sound } from './dread.js?v=39';
+import { Horrors } from './horrors.js?v=39';
+import { Dressing } from './dressing.js?v=39';
+import { Scares } from './scares.js?v=39';
+import { makeHand } from './hands.js?v=39';
 
 const V = THREE.Vector3;
 const $ = (id) => document.getElementById(id);
@@ -113,6 +113,8 @@ const input = new Input(canvas, renderer);
 const walker = new Walker(dolly, camera, space);
 const cam = new Camcorder(scene);
 const sound = new Sound(); sound.site = TAPE >= 5;   // the Testing Site tapes have their own theme
+// the title music is a recording: fetch it now, and start it the moment the browser lets this page make sound
+sound.loadMenu(); if (new URLSearchParams(location.search).has('mute')) sound.master.gain.value = 0; else sound.menuWanted = true;
 mark('setup');
 const recording = sound.record((k) => { if (!G || !G.playing) $('loading').textContent = k < 1 ? `Recording sounds… ${Math.round(k * 100)}%` : ''; });
 const veil = makeVeil(); camera.add(veil.mesh); veil.mesh.visible = false;
@@ -487,6 +489,13 @@ if (hasSave) {
   $('shelfBack').onclick = () => { $('shelf').hidden = true; $('menu').hidden = false; vhs.classList.remove('selecting'); };
 }
 $('howBtn').onclick = () => { $('how').hidden = !$('how').hidden; };
+// installing the game as an app: an installed app may play its music the moment it opens, with no click first
+{
+  let ask = null; const btn = document.createElement('button'); btn.id = 'installBtn'; btn.textContent = 'Install app'; btn.title = 'Installed, the music starts by itself'; btn.hidden = true; $('menu').insertBefore(btn, $('resetBtn'));
+  addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); ask = e; btn.hidden = false; });
+  addEventListener('appinstalled', () => { btn.hidden = true; ask = null; });
+  btn.onclick = async () => { if (!ask) return; ask.prompt(); try { await ask.userChoice; } catch (e) {} ask = null; btn.hidden = true; };
+}
 // reset progress: asks first, then wipes every save, completion flag and unlocked tape
 $('resetBtn').onclick = () => { $('confirm').hidden = false; $('menu').hidden = true; $('how').hidden = true; };
 $('resetNo').onclick = () => { $('confirm').hidden = true; $('menu').hidden = false; };
